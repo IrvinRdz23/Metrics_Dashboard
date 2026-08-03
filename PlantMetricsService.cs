@@ -11,14 +11,21 @@ public interface IPlantMetricsService
 /// <summary>
 /// Capa de datos ADO.NET puro (sin ORM) contra [dbo].[Plant_Metrics_Production_Reports].
 ///
-/// NOTA IMPORTANTE PARA IRVIN:
-/// El SP devuelve un único result set que mezcla Report_Group 1 (Día/Turno agregado),
-/// 2 (Hora por hora) y 3 (SAP acumulado). Aquí se separan por Report_Group y se
-/// agregan por Product_Group_Desc (= horno) y Product_Desc (= línea).
-/// Ajusta el mapeo de columnas / agregación según las reglas exactas de negocio
-/// que solo tú conoces (p. ej. si Planned_Shift_for_OEE debe usarse en vez de
-/// Planned_Shift crudo). Está diseñado para que ese ajuste sea localizado aquí,
-/// sin tocar Controllers/Views/SignalR.
+/// MAPEO CONFIRMADO CON IRVIN (agosto 2026):
+/// - Report_Group = 1  -> Día/Turno acumulado. Esto alimenta las 5 cards de horno y el modal.
+///     - Total                  = producido en tiempo real
+///     - Accumulated_Rate       = lo que se debería llevar producido a esta hora
+///     - Planned_Shift_for_OEE  = plan completo de fin de turno
+///     - OEE_Shift              = ya viene calculado por el SP (Total / Accumulated_Rate)
+/// - Report_Group = 2  -> Hora por hora. Solo se usa para la gráfica de tendencia de planta:
+///     se suma Total por Hour_by_Hour de todas las líneas (excepto Product_Group_ID=7).
+///     No existe un "plan por hora" real, así que NO se hardcodea ningún valor de plan aquí.
+/// - Report_Group = 3  -> Acumulado SAP. Se suma Total_SAP y se pega a la línea correspondiente
+///     (match por nombre de línea dentro del mismo horno, ya que en Report_Group=1
+///     Product_List_ID siempre viene NULL).
+/// - Product_Group_ID: 1 y 6 -> Furnace 1 (6 = Clam Shells, comparten horno con 1),
+///   2 -> Furnace 2, 3 -> Furnace 3, 4 -> Furnace 4, 5 -> Furnace 5, 7 (Tube Mills) -> se ignora en todo el dashboard.
+/// - El turno (Shift_Desc) nunca se hardcodea: se toma tal cual lo resuelve el SP según la hora.
 /// </summary>
 public class PlantMetricsService : IPlantMetricsService
 {
@@ -27,10 +34,15 @@ public class PlantMetricsService : IPlantMetricsService
     private readonly bool _useDemoData;
     private readonly ILogger<PlantMetricsService> _logger;
 
-    // Nombres de horno tal como aparecen como encabezado de sección en el reporte por correo.
-    private static readonly string[] FurnaceNames =
+    private static readonly Dictionary<int, (int FurnaceId, string FurnaceName)> ProductGroupToFurnace = new()
     {
-        "Furnace 1", "Furnace 2", "Furnace 3", "Furnace 4", "Furnace 5"
+        [1] = (1, "Furnace 1"),
+        [6] = (1, "Furnace 1"), // Clam Shells -> mismo horno que 1
+        [2] = (2, "Furnace 2"),
+        [3] = (3, "Furnace 3"),
+        [4] = (4, "Furnace 4"),
+        [5] = (5, "Furnace 5"),
+        // 7 = Tube Mills -> excluido intencionalmente de todo el dashboard
     };
 
     public PlantMetricsService(IConfiguration config, ILogger<PlantMetricsService> logger)
@@ -54,8 +66,6 @@ public class PlantMetricsService : IPlantMetricsService
         }
         catch (Exception ex)
         {
-            // Nunca tumbar el dashboard por un error de datos: se loguea y se
-            // regresa el último snapshot demo como fallback visual.
             _logger.LogError(ex, "Error obteniendo snapshot de Plant_Metrics_Production_Reports");
             return BuildDemoSnapshot();
         }
@@ -63,11 +73,18 @@ public class PlantMetricsService : IPlantMetricsService
 
     private async Task<PlantDashboardSnapshot> GetSnapshotFromDatabaseAsync(CancellationToken ct)
     {
-        var furnaces = FurnaceNames
-            .Select((name, idx) => new FurnaceMetric { FurnaceId = idx + 1, FurnaceName = name })
+        // Un horno por cada FurnaceId 1..5, en orden.
+        var furnaces = Enumerable.Range(1, 5)
+            .Select(id => new FurnaceMetric { FurnaceId = id, FurnaceName = $"Furnace {id}" })
             .ToList();
 
-        var hourlyTotals = new SortedDictionary<string, (int prod, int planned)>();
+        // Índice (furnaceId, productDesc) -> línea, para poder pegarle el SAP (Report_Group=3) después.
+        var linesIndex = new Dictionary<(int furnaceId, string desc), ProductLineMetric>();
+
+        // Acumulado de producción por hora (Report_Group=2), toda la planta, sin Tube Mills.
+        var hourlyTotals = new SortedDictionary<string, int>();
+
+        string shiftDesc = string.Empty;
 
         await using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync(ct);
@@ -81,127 +98,128 @@ public class PlantMetricsService : IPlantMetricsService
         cmd.Parameters.AddWithValue("@Start_Date", DateTime.Today);
         cmd.Parameters.AddWithValue("@Plant_List_ID", _plantListId);
         cmd.Parameters.AddWithValue("@Get_Daily_Report", true);
-        cmd.Parameters.AddWithValue("@Get_Weekly_Report", false);
-        cmd.Parameters.AddWithValue("@Get_Monthly_Report", false);
-        cmd.Parameters.AddWithValue("@Is_Email_Request_Report", false);
-        cmd.Parameters.AddWithValue("@Send_Email_Alerts", false);
-        cmd.Parameters.AddWithValue("@Is_Test_Report", false);
-        cmd.Parameters.AddWithValue("@Enable_Logs_and_Query_Results", false);
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
 
-        int ordReportGroup = -1, ordGroupDesc = -1, ordDesc = -1, ordPlanned = -1,
-            ordTotal = -1, ordTotalSap = -1, ordHour = -1, ordCycleTime = -1,
-            ordCutMin = -1, ordProductListId = -1;
-
-        bool ordinalsResolved = false;
+        int ordReportGroup = reader.GetOrdinal("Report_Group");
+        int ordGroupId = reader.GetOrdinal("Product_Group_ID");
+        int ordDesc = reader.GetOrdinal("Product_Desc");
+        int ordCycleTime = reader.GetOrdinal("Cycle_Time_Secs");
+        int ordPlannedForOee = reader.GetOrdinal("Planned_Shift_for_OEE");
+        int ordAccumRate = reader.GetOrdinal("Accumulated_Rate");
+        int ordOeeShift = reader.GetOrdinal("OEE_Shift");
+        int ordTotal = reader.GetOrdinal("Total");
+        int ordTotalSap = reader.GetOrdinal("Total_SAP");
+        int ordHour = reader.GetOrdinal("Hour_by_Hour");
+        int ordShiftDesc = reader.GetOrdinal("Shift_Desc");
 
         while (await reader.ReadAsync(ct))
         {
-            if (!ordinalsResolved)
+            var reportGroup = reader.IsDBNull(ordReportGroup) ? -1 : reader.GetInt32(ordReportGroup);
+            var groupId = reader.IsDBNull(ordGroupId) ? -1 : reader.GetInt32(ordGroupId);
+
+            // Tube Mills (Product_Group_ID = 7) se ignora en todo el dashboard.
+            if (groupId == 7) continue;
+
+            if (string.IsNullOrEmpty(shiftDesc) && !reader.IsDBNull(ordShiftDesc))
             {
-                ordReportGroup = reader.GetOrdinal("Report_Group");
-                ordGroupDesc = reader.GetOrdinal("Product_Group_Desc");
-                ordDesc = reader.GetOrdinal("Product_Desc");
-                ordPlanned = reader.GetOrdinal("Planned_Shift");
-                ordTotal = reader.GetOrdinal("Total");
-                ordTotalSap = reader.GetOrdinal("Total_SAP");
-                ordHour = reader.GetOrdinal("Hour_by_Hour");
-                ordCycleTime = reader.GetOrdinal("Cycle_Time_Secs");
-                ordCutMin = reader.GetOrdinal("Cut_Min");
-                ordProductListId = reader.GetOrdinal("Product_List_ID");
-                ordinalsResolved = true;
+                shiftDesc = reader.GetString(ordShiftDesc);
             }
 
-            var reportGroup = reader.IsDBNull(ordReportGroup) ? -1 : reader.GetInt32(ordReportGroup);
-            var groupDesc = reader.IsDBNull(ordGroupDesc) ? "" : reader.GetString(ordGroupDesc).Trim();
-            var furnace = furnaces.FirstOrDefault(f =>
-                string.Equals(f.FurnaceName, groupDesc, StringComparison.OrdinalIgnoreCase));
-
-            // Report_Group = 2 -> detalle hora por hora, se usa para líneas por horno y tendencia general
-            if (reportGroup == 2 && furnace != null)
+            // ---------- Report_Group 1: día/turno acumulado -> cards de horno + modal ----------
+            if (reportGroup == 1 && ProductGroupToFurnace.TryGetValue(groupId, out var mapped))
             {
-                var productDesc = reader.IsDBNull(ordDesc) ? "" : reader.GetString(ordDesc);
-                var planned = reader.IsDBNull(ordPlanned) ? 0 : reader.GetInt32(ordPlanned);
-                var total = reader.IsDBNull(ordTotal) ? 0 : reader.GetInt32(ordTotal);
-                var totalSap = reader.IsDBNull(ordTotalSap) ? 0 : reader.GetInt32(ordTotalSap);
+                var furnace = furnaces.First(f => f.FurnaceId == mapped.FurnaceId);
+                var desc = reader.IsDBNull(ordDesc) ? "" : reader.GetString(ordDesc);
+
+                var line = new ProductLineMetric
+                {
+                    ProductDesc = desc,
+                    CycleTimeSecs = reader.IsDBNull(ordCycleTime) ? 0 : reader.GetDouble(ordCycleTime),
+                    Total = reader.IsDBNull(ordTotal) ? 0 : reader.GetInt32(ordTotal),
+                    AccumulatedRate = reader.IsDBNull(ordAccumRate) ? 0 : reader.GetInt32(ordAccumRate),
+                    PlannedShift = reader.IsDBNull(ordPlannedForOee) ? 0 : reader.GetInt32(ordPlannedForOee),
+                    OeeShift = reader.IsDBNull(ordOeeShift) ? 0 : reader.GetDouble(ordOeeShift),
+                };
+
+                furnace.Lines.Add(line);
+                linesIndex[(mapped.FurnaceId, desc)] = line;
+            }
+            // ---------- Report_Group 2: hora por hora -> solo tendencia de planta ----------
+            else if (reportGroup == 2)
+            {
                 var hour = reader.IsDBNull(ordHour) ? "" : reader.GetString(ordHour);
-
-                var line = furnace.Lines.FirstOrDefault(l => l.ProductDesc == productDesc);
-                if (line == null)
+                var total = reader.IsDBNull(ordTotal) ? 0 : reader.GetInt32(ordTotal);
+                if (!string.IsNullOrWhiteSpace(hour) && hour != "-")
                 {
-                    line = new ProductLineMetric
-                    {
-                        ProductListId = reader.IsDBNull(ordProductListId) ? 0 : reader.GetInt32(ordProductListId),
-                        ProductDesc = productDesc,
-                        CycleTimeSecs = reader.IsDBNull(ordCycleTime) ? 0 : reader.GetDouble(ordCycleTime),
-                        CutMin = reader.IsDBNull(ordCutMin) ? 0 : reader.GetDouble(ordCutMin),
-                    };
-                    furnace.Lines.Add(line);
+                    hourlyTotals.TryGetValue(hour, out var acc);
+                    hourlyTotals[hour] = acc + total;
                 }
-                line.PlannedShift += planned;
-                line.Total += total;
-                line.TotalSap += totalSap;
-
-                if (!string.IsNullOrWhiteSpace(hour))
+            }
+            // ---------- Report_Group 3: SAP -> se pega a la línea ya cargada por Report_Group 1 ----------
+            else if (reportGroup == 3 && ProductGroupToFurnace.TryGetValue(groupId, out var mappedSap))
+            {
+                var desc = reader.IsDBNull(ordDesc) ? "" : reader.GetString(ordDesc);
+                var totalSap = reader.IsDBNull(ordTotalSap) ? 0 : reader.GetInt32(ordTotalSap);
+                if (totalSap > 0 && linesIndex.TryGetValue((mappedSap.FurnaceId, desc), out var line))
                 {
-                    if (!hourlyTotals.TryGetValue(hour, out var acc)) acc = (0, 0);
-                    hourlyTotals[hour] = (acc.prod + total, acc.planned + planned);
+                    line.TotalSap += totalSap;
                 }
             }
         }
 
-        var snapshot = new PlantDashboardSnapshot
+        return new PlantDashboardSnapshot
         {
+            ShiftDesc = shiftDesc,
             Furnaces = furnaces,
             HourlyTrend = hourlyTotals.Select(kv => new HourlyPoint
             {
                 Hour = kv.Key,
-                Production = kv.Value.prod,
-                Planned = kv.Value.planned
+                Production = kv.Value
             }).ToList()
         };
-
-        return snapshot;
     }
 
     // ------------------------------------------------------------------
-    // MODO DEMO: genera datos realistas para poder ver y probar el
-    // dashboard completo (SignalR, cross-filter, light/dark, presentación)
-    // sin necesidad de conexión a SQL Server. Pon "UseDemoData": false en
+    // MODO DEMO: genera datos realistas (con la misma forma que produce
+    // GetSnapshotFromDatabaseAsync) para poder ver y probar el dashboard
+    // completo sin conexión a SQL Server. Pon "UseDemoData": false en
     // appsettings.json cuando conectes datos reales.
     // ------------------------------------------------------------------
     private static readonly Random _rng = new();
 
     private PlantDashboardSnapshot BuildDemoSnapshot()
     {
-        var lineNamesByFurnace = new Dictionary<string, string[]>
+        var lineNamesByFurnace = new Dictionary<int, string[]>
         {
-            ["Furnace 1"] = new[] { "PTC PCM CM1 (Line 2)", "PTC PCM Evaporator", "PTC Clam Shell 1", "PTC Clam Shell 2", "PTC Clam Shell 3", "PTC Clam Shell 4", "PTC Clam Shell 5" },
-            ["Furnace 2"] = new[] { "PTC BMW LTR CB", "PTC BMW LTR", "PTC Tesla Y LTR CB", "PTC Tesla Y LTR CB 2", "PTC Tesla Y LTR" },
-            ["Furnace 3"] = new[] { "PTC BMW HTR", "PTC BMW HTR CB", "PTC Toyota 24PL Radiator", "PTC Toyota 24PL Radiator CB", "PTC Toyota 24PL Radiator CB 2" },
-            ["Furnace 4"] = new[] { "PTC Toyota ICAC CB", "PTC Toyota ICAC", "PTC GM LM2 ICAC CB", "PTC GM LM2 ICAC", "PTC Toyota ICAC CB 2" },
-            ["Furnace 5"] = new[] { "PTC BMW Condenser CB", "PTC BMW Condenser", "PTC Honda TG7 Condenser CB", "PTC Honda T90 Condenser", "PTC RIVIAN LTR CB" },
+            [1] = new[] { "PTC PCM CM1 (Line 2)", "PTC PCM Evaporator", "PTC Clam Shell 1", "PTC Clam Shell 2", "PTC Clam Shell 3", "PTC Clam Shell 4", "PTC Clam Shell 5" },
+            [2] = new[] { "PTC BMW LTR CB", "PTC BMW LTR", "PTC Tesla Y LTR CB", "PTC Tesla Y LTR CB 2", "PTC Tesla Y LTR" },
+            [3] = new[] { "PTC BMW HTR", "PTC BMW HTR CB", "PTC Toyota 24PL Radiator", "PTC Toyota 24PL Radiator CB", "PTC Toyota 24PL Radiator CB 2" },
+            [4] = new[] { "PTC Toyota ICAC CB", "PTC Toyota ICAC", "PTC GM LM2 ICAC CB", "PTC GM LM2 ICAC", "PTC Toyota ICAC CB 2" },
+            [5] = new[] { "PTC BMW Condenser CB", "PTC BMW Condenser", "PTC Honda TG7 Condenser CB", "PTC Honda T90 Condenser", "PTC RIVIAN LTR CB" },
         };
 
         var furnaces = new List<FurnaceMetric>();
-        int fId = 1;
-        foreach (var (furnaceName, lineNames) in lineNamesByFurnace)
+        foreach (var (furnaceId, lineNames) in lineNamesByFurnace)
         {
-            var furnace = new FurnaceMetric { FurnaceId = fId++, FurnaceName = furnaceName };
+            var furnace = new FurnaceMetric { FurnaceId = furnaceId, FurnaceName = $"Furnace {furnaceId}" };
             foreach (var lineName in lineNames)
             {
-                var planned = _rng.Next(300, 900);
-                var oeeFactor = 0.35 + _rng.NextDouble() * 0.6; // 35% - 95%
-                var total = (int)(planned * oeeFactor);
+                var plannedShift = _rng.Next(300, 900);
+                // Fracción del turno ya transcurrida (simulada) -> lo que "debería" llevar a esta hora
+                var accumulatedRate = (int)(plannedShift * (0.3 + _rng.NextDouble() * 0.5));
+                var oeeFactor = 0.55 + _rng.NextDouble() * 0.6; // entre 55% y 115% de lo esperado a esta hora
+                var total = Math.Max(0, (int)(accumulatedRate * oeeFactor));
                 var sap = (int)(total * (0.7 + _rng.NextDouble() * 0.3));
 
                 furnace.Lines.Add(new ProductLineMetric
                 {
                     ProductDesc = lineName,
-                    PlannedShift = planned,
+                    PlannedShift = plannedShift,
+                    AccumulatedRate = accumulatedRate,
                     Total = total,
                     TotalSap = sap,
+                    OeeShift = accumulatedRate <= 0 ? (total > 0 ? 1.0 : 0.0) : (double)total / accumulatedRate,
                     CycleTimeSecs = Math.Round(20 + _rng.NextDouble() * 60, 2)
                 });
             }
@@ -215,14 +233,13 @@ public class PlantMetricsService : IPlantMetricsService
             hourly.Add(new HourlyPoint
             {
                 Hour = $"{h:00}:00",
-                Production = _rng.Next(800, 1600),
-                Planned = 1500
+                Production = _rng.Next(2500, 6200)
             });
         }
 
         return new PlantDashboardSnapshot
         {
-            ShiftDesc = "Turno 1",
+            ShiftDesc = "Shift 1 06:00-15:20",
             Furnaces = furnaces,
             HourlyTrend = hourly
         };
