@@ -1,0 +1,67 @@
+Ok, mira, tengo bastantes observaciones antes de pasarnos con el horno por horno.
+
+Ya vi mejor el comprtamiento de las tablas y del sp. Ahi te va. Actualmente, cuando se actualiza el dashboard, es un desmadre. Por que la produccion y la hora por hora cambia, pero a veces hasta disminuye, eso esta muy raro. Entonces queria ver si lo que hiciste concuerda con las reglas que ya mas entendi.
+Mira, corri el sp asi:
+
+EXEC	@return_value = [dbo].[Plant_Metrics_Production_Reports]
+		@Start_Date = N'8/3/2026',
+		@Plant_List_ID = 1,
+		@Get_Daily_Report = 1
+
+Ese SP asi me devuelve 791 lineas. De las cuales se dividen en 3 Report_Group
+
+El 1, es para todo el daily, todo lo acumulado. Ese tipo de report group es lo que usariamos para los 5 hornos como tal. 
+En la Furnance 1 van el Product_Group_ID 1 y 6 (el 6 es para las clam shells). La Furnace 2 es el 2, el 3 es el 3 y asi sucesivamente. Tube Mills es el Product_Group_ID=7 esas no nos importan por el momento. Para todo vamos a omitir ese grupo.
+
+Ahora, asi se ven los registros para ese Report group:
+
+
+Report_Group	Product_Group_ID	Product_Group_Desc	Week_Group	Product_List_ID	Product_Order	Product_Desc	Cycle_Time_Secs	Cut_Min	Planned_Shift	Mahle_Matl_Nbr	Cust_Matl_Nbr	Event_Date_Short	Event_Date_Short_Name	Event_Date_Short_Month_Name	Shift_Desc	Shift_ID	Accumulated_Rate	Hour_by_Hour	Total	Total_SAP	Planned_Shift_for_OEE	OEE_Shift	Heijunka_Enabled	Beginning_Inventory	OPS	WIP	CB	Using_CB_As_OPS	Capacity_5d_Percent	Heijunka_Percent_OEE	Capacity_5d	Heijunka	Change_Over	Cumulative_Heijunka_Planned_Shift
+1	3	Furnace 3	0	NULL	170	PTC BMW HTR CB	59.30	40.00	505	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	406	-	335	0	505	0.82512315270936	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	505	505	1	0
+1	2	Furnace 2	0	NULL	80	PTC BMW LTR	53.30	0.00	562	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	452	-	0	0	0	0	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	562	562	1	0
+1	2	Furnace 2	0	NULL	70	PTC BMW LTR CB	53.30	40.00	562	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	452	-	0	0	0	0	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	562	562	1	0
+1	6	Furnace 1 Clam Shells	0	NULL	470	PTC Clam Shell 1	5.12	28.00	5859	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	4710	-	1291	0	5859	0.274097664543524	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	5859	5859	1	0
+
+
+La columna Total es lo que llevan procesado en tiempo real. EL Accumulated_Rate es lo que deberian llevar producidos para ese momento. Y el Planned_Shift_for_OEE es lo que se deberia tener para el final del turno. EL OEE_Shift es la division ente el Accumulated y el total, para ver como van en ese momento tiempo real. Me explico?
+
+Eso es lo que deberiamos de poner en ese dashboard. El OEE promedio de todas las lineas de todos los hornos. En Produccion es la suma de todos los totales, y el plan la suma del Planned_Shift, si?
+Y luego por horno, esta bien poner 5, luego otras 5 cada 20 segundos, pero que aparezcan todas, y mas cuando le picamos y sale el modal con TODAS las lineas del horno, cada uno con su produccion, su planned y su OEE.
+
+Osea, tenemos un excelente punto de partida, pero creo que algo nos fallo ahi.
+
+Ahora, para el de hora por hora, es con el Report_Group 2:
+
+Report_Group	Product_Group_ID	Product_Group_Desc	Week_Group	Product_List_ID	Product_Order	Product_Desc	Cycle_Time_Secs	Cut_Min	Planned_Shift	Mahle_Matl_Nbr	Cust_Matl_Nbr	Event_Date_Short	Event_Date_Short_Name	Event_Date_Short_Month_Name	Shift_Desc	Shift_ID	Accumulated_Rate	Hour_by_Hour	Total	Total_SAP	Planned_Shift_for_OEE	OEE_Shift	Heijunka_Enabled	Beginning_Inventory	OPS	WIP	CB	Using_CB_As_OPS	Capacity_5d_Percent	Heijunka_Percent_OEE	Capacity_5d	Heijunka	Change_Over	Cumulative_Heijunka_Planned_Shift
+2	4	Furnace 4	0	49	190	PTC Toyota ICAC CB	53.75	0.00	558	toyota	toyota	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	448	07:00	35	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+2	3	Furnace 3	0	53	150	PTC Toyota 24PL Radiator	69.00	0.00	434	16400AK01000	16400AK01000	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	349	07:00	35	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+2	5	Furnace 5	0	54	370	PTC Honda T90 Condenser	61.90	0.00	484	80100T90 A020M1	80100T90 A020M1	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	389	07:00	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+2	3	Furnace 3	0	52	130	PTC Toyota 24PL Radiator CB	78.30	41.00	383	24PL 3.0	24PL 3.0	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	308	07:00	36	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+
+Este tendria que ser solo la suma de los Total por hora de todas las lineas de todos los hornos, sin contar el tipo 7 de tube mills. Y el Plan para esa grafica no me gusta que ese hardcoded, por que en si no hay un plan, o al menos que yo vea, si tu lo ves, me dices, pero yo no he visto nada.
+
+Y por el ultimo, el otro Report group es para lo de sap, lo viste ahi en el sp Total/Accumulated SAP(HU) es para el 3. Ahi si no le entendi, pero masomenos con lo que ya te explique puedes ver no? MIra, asi se ve:
+
+ Report_Group	Product_Group_ID	Product_Group_Desc	Week_Group	Product_List_ID	Product_Order	Product_Desc	Cycle_Time_Secs	Cut_Min	Planned_Shift	Mahle_Matl_Nbr	Cust_Matl_Nbr	Event_Date_Short	Event_Date_Short_Name	Event_Date_Short_Month_Name	Shift_Desc	Shift_ID	Accumulated_Rate	Hour_by_Hour	Total	Total_SAP	Planned_Shift_for_OEE	OEE_Shift	Heijunka_Enabled	Beginning_Inventory	OPS	WIP	CB	Using_CB_As_OPS	Capacity_5d_Percent	Heijunka_Percent_OEE	Capacity_5d	Heijunka	Change_Over	Cumulative_Heijunka_Planned_Shift
+3	5	Furnace 5	0	20	310	PTC Honda TG7 Condenser	58.30	0.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	254	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+3	1	Furnace 1	0	23	60	PTC Lucid Evaporator	0.00	0.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+3	5	Furnace 5	0	21	300	PTC Honda TG7 Condenser CB	58.30	36.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+3	2	Furnace 2	0	26	120	PTC Tesla Y CFM	0.00	0.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+3	2	Furnace 2	0	25	120	PTC Tesla Y CFM	0.00	0.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+3	1	Furnace 1	0	24	20	PTC PCM Evaporator	36.11	0.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	399	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+3	2	Furnace 2	0	27	110	PTC Tesla Y LTR	28.24	0.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+3	2	Furnace 2	0	28	90	PTC Tesla Y LTR CB	45.80	38.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+3	7	Tube Mills	0	40	560	PTC Tube Mill 5 (24PL)	43.00	106.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+3	7	Tube Mills	0	39	530	PTC Tube Mill 4 (BMW Cond)	32.00	57.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+3	7	Tube Mills	0	38	520	PTC Tube Mill 2 (Tesla)	24.00	57.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+3	4	Furnace 4	0	43	230	PTC GM LM2 ICAC 3	67.67	0.00	0	-	-	2026/08/03	Monday	August	Shift 1 06:00-15:20	1	0	-	0	191	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+
+
+Ahi si no se como ponerlo. Pero ya entendiste un poco mas no?
+Ah, y tampoco hay que hacerle hardcode al Turno, por las horas ya sabemos.Por el Shift_Desc sabemos de que turno se trata por la hora en la que estemos. Va?
+
+Y agregale mas UX, que se vea como un Proyecto mega professional. Al fin y al cabo es para atraer clientes nuevos y tener contentos a los jefes. Ahh, Tambien quitale el limite de 1,600 a lo de hora x hora. Creo que necesitamos los datos bien bien para la toma de decisiones.
+
+Ah y otra cosa de una vez, cuando pongo modo presentacion, solo las graficas de arriba crecen, las de Abajo se quedan igual, cuando deberia ser proporcional las 2. Gracias!
+
+Pasame solo los archivos que se cambiarian, no me pases el Proyecto otra vez. Gracias!
