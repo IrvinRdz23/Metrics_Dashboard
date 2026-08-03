@@ -1,0 +1,487 @@
+@model PlantMetricsDashboard.Models.PlantDashboardSnapshot
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Plant Metrics · Dashboard General</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+    :root[data-theme="dark"] {
+        --bg: #0b0f16;
+        --bg-elevated: #121826;
+        --card: #161f30;
+        --card-hover: #1c2740;
+        --border: #223049;
+        --text: #e6ecf5;
+        --text-dim: #8fa0bd;
+        --accent: #4da3ff;
+        --good: #35d68f;
+        --warn: #f2b84b;
+        --bad: #ff5d6c;
+        --grid-line: rgba(255,255,255,0.06);
+    }
+    :root[data-theme="light"] {
+        --bg: #eef1f6;
+        --bg-elevated: #ffffff;
+        --card: #ffffff;
+        --card-hover: #f4f7fb;
+        --border: #dbe2ec;
+        --text: #101828;
+        --text-dim: #5b6675;
+        --accent: #1f6feb;
+        --good: #12a463;
+        --warn: #b57a09;
+        --bad: #d43a4a;
+        --grid-line: rgba(0,0,0,0.06);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+        margin: 0; padding: 0; height: 100%; overflow: hidden;
+        background: var(--bg); color: var(--text);
+        font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    .app {
+        height: 100vh; width: 100vw;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    /* ---------- HEADER ---------- */
+    header {
+        display: flex; align-items: center; justify-content: space-between;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 18px;
+        transition: opacity .25s ease, max-height .25s ease, padding .25s ease;
+    }
+    .app.presentation header.controls-collapsible { display: none; }
+
+    .brand { display: flex; align-items: baseline; gap: 12px; }
+    .brand h1 { font-size: 1.15rem; margin: 0; font-weight: 600; letter-spacing: .3px; }
+    .brand .subtitle { color: var(--text-dim); font-size: .82rem; }
+
+    .plant-kpi { display: flex; align-items: center; gap: 26px; }
+    .kpi-block { text-align: center; }
+    .kpi-block .value { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .kpi-block .label { font-size: .68rem; text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim); margin-top: 2px; }
+
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .btn {
+        background: var(--card); border: 1px solid var(--border); color: var(--text);
+        border-radius: 8px; padding: 8px 12px; font-size: .8rem; cursor: pointer;
+        display: flex; align-items: center; gap: 6px; transition: background .15s;
+    }
+    .btn:hover { background: var(--card-hover); }
+    .date-picker { display: none; align-items: center; gap: 6px; }
+    .date-picker.open { display: flex; }
+    .date-picker input {
+        background: var(--card); border: 1px solid var(--border); color: var(--text);
+        border-radius: 8px; padding: 7px 10px; font-size: .8rem;
+    }
+
+    /* ---------- GRID DE HORNOS ---------- */
+    .grid-main {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 12px;
+        min-height: 0;
+    }
+    .app.presentation .grid-main { grid-template-rows: 1fr; }
+
+    .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        cursor: pointer;
+        transition: transform .12s ease, border-color .12s ease, background .12s ease;
+    }
+    .card:hover { transform: translateY(-2px); border-color: var(--accent); }
+    .card.selected { border-color: var(--accent); background: var(--card-hover); box-shadow: 0 0 0 1px var(--accent); }
+    .card.dimmed { opacity: .35; }
+
+    .furnace-card .card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .furnace-card h2 { font-size: .95rem; margin: 0; font-weight: 600; }
+    .furnace-card .oee-pill {
+        font-size: .78rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+        color: #05140c;
+    }
+    .furnace-card .numbers { display: flex; gap: 18px; margin-top: 10px; }
+    .furnace-card .numbers .n { }
+    .furnace-card .numbers .n .v { font-size: 1.3rem; font-weight: 700; }
+    .furnace-card .numbers .n .l { font-size: .65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; }
+
+    .furnace-card .chart-wrap { flex: 1; min-height: 0; margin-top: 8px; position: relative; }
+    .furnace-card .worst-line {
+        margin-top: 8px; font-size: .72rem; color: var(--text-dim);
+        display: flex; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 8px;
+    }
+    .furnace-card .worst-line b { color: var(--bad); }
+
+    /* Card de tendencia general (ocupa 1 celda del grid, la 6ta) */
+    .trend-card { display: flex; flex-direction: column; }
+    .trend-card h2 { font-size: .95rem; margin: 0 0 6px 0; font-weight: 600; }
+    .trend-card .chart-wrap { flex: 1; min-height: 0; }
+
+    /* ---------- PANEL DE DRILL-DOWN (cross-filter) ---------- */
+    .drilldown-overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,.55);
+        display: none; align-items: center; justify-content: center; z-index: 50;
+    }
+    .drilldown-overlay.open { display: flex; }
+    .drilldown-panel {
+        width: min(900px, 92vw); max-height: 82vh; overflow: auto;
+        background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 14px;
+        padding: 20px 22px;
+    }
+    .drilldown-panel h3 { margin: 0 0 4px 0; }
+    .drilldown-panel .sub { color: var(--text-dim); font-size: .8rem; margin-bottom: 14px; }
+    table.lines-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    table.lines-table th, table.lines-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    table.lines-table th { color: var(--text-dim); font-weight: 600; font-size: .7rem; text-transform: uppercase; letter-spacing: .4px; }
+    .bar-cell { display: flex; align-items: center; gap: 8px; }
+    .bar-track { flex: 1; height: 6px; border-radius: 4px; background: var(--grid-line); overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; }
+    .close-btn { float: right; }
+
+    .live-dot {
+        width: 8px; height: 8px; border-radius: 50%; background: var(--good);
+        box-shadow: 0 0 0 0 rgba(53,214,143,.6); animation: pulse 1.8s infinite;
+    }
+    @@keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(53,214,143,.55); }
+        70% { box-shadow: 0 0 0 8px rgba(53,214,143,0); }
+        100% { box-shadow: 0 0 0 0 rgba(53,214,143,0); }
+    }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+    <header>
+        <div class="brand">
+            <h1>Plant Metrics · Planta 1</h1>
+            <span class="subtitle" id="shiftLabel">@Model.ShiftDesc</span>
+        </div>
+
+        <div class="plant-kpi">
+            <div class="kpi-block">
+                <div class="value" id="plantOee">@Model.PlantOee.ToString("P0")</div>
+                <div class="label">OEE Planta</div>
+            </div>
+            <div class="kpi-block">
+                <div class="value" id="plantProd">@Model.TotalProduction.ToString("N0")</div>
+                <div class="label">Producción</div>
+            </div>
+            <div class="kpi-block">
+                <div class="value" id="plantPlanned">@Model.TotalPlanned.ToString("N0")</div>
+                <div class="label">Plan</div>
+            </div>
+            <div class="kpi-block">
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <span class="live-dot"></span>
+                    <span class="value" style="font-size:.85rem" id="lastUpdate">--:--</span>
+                </div>
+                <div class="label">Última actualización</div>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <div class="date-picker" id="datePicker">
+                <input type="date" id="dateInput" />
+            </div>
+            <button class="btn" id="toggleDate">📅 Fecha</button>
+            <button class="btn" id="toggleTheme">🌗 Tema</button>
+            <button class="btn" id="togglePresentation">🖥️ Presentación</button>
+        </div>
+    </header>
+
+    <div class="grid-main" id="grid"></div>
+</div>
+
+<div class="drilldown-overlay" id="drilldownOverlay">
+    <div class="drilldown-panel">
+        <button class="btn close-btn" id="closeDrilldown">Cerrar ✕</button>
+        <h3 id="drilldownTitle">Horno</h3>
+        <div class="sub" id="drilldownSub"></div>
+        <table class="lines-table">
+            <thead>
+                <tr><th>Línea</th><th>OEE Turno</th><th>Producción</th><th>Plan</th><th>SAP</th></tr>
+            </thead>
+            <tbody id="drilldownBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // ---------------------------------------------------------------
+    // Estado inicial servido por el servidor (primer render, sin esperar SignalR)
+    // ---------------------------------------------------------------
+    let snapshot = @Html.Raw(Json.Serialize(Model));
+    let selectedFurnaceId = null;
+    const charts = {}; // id -> Chart.js instance
+
+    function oeeColor(oee) {
+        if (oee >= 0.85) return getCss('--good');
+        if (oee >= 0.70) return getCss('--warn');
+        return getCss('--bad');
+    }
+    function getCss(varName) {
+        return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    }
+
+    // ---------------------------------------------------------------
+    // RENDER
+    // ---------------------------------------------------------------
+    function render() {
+        document.getElementById('plantOee').textContent = pct(snapshot.plantOee);
+        document.getElementById('plantProd').textContent = snapshot.totalProduction.toLocaleString();
+        document.getElementById('plantPlanned').textContent = snapshot.totalPlanned.toLocaleString();
+        document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '';
+        document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+
+        const grid = document.getElementById('grid');
+        const isFirstRender = grid.children.length === 0;
+
+        if (isFirstRender) {
+            grid.innerHTML = '';
+            snapshot.furnaces.forEach(f => grid.appendChild(buildFurnaceCard(f)));
+            grid.appendChild(buildTrendCard());
+        } else {
+            snapshot.furnaces.forEach(f => updateFurnaceCard(f));
+            updateTrendChart();
+        }
+        applySelection();
+    }
+
+    function pct(v) { return (v * 100).toFixed(0) + '%'; }
+
+    function buildFurnaceCard(f) {
+        const div = document.createElement('div');
+        div.className = 'card furnace-card';
+        div.id = 'furnace-' + f.furnaceId;
+        div.onclick = () => selectFurnace(f.furnaceId);
+
+        div.innerHTML = `
+            <div class="card-top">
+                <h2>${f.furnaceName}</h2>
+                <span class="oee-pill" id="pill-${f.furnaceId}" style="background:${oeeColor(f.oee)}">${pct(f.oee)}</span>
+            </div>
+            <div class="numbers">
+                <div class="n"><div class="v" id="prod-${f.furnaceId}">${f.totalProduction.toLocaleString()}</div><div class="l">Producción</div></div>
+                <div class="n"><div class="v" id="plan-${f.furnaceId}">${f.totalPlanned.toLocaleString()}</div><div class="l">Plan</div></div>
+                <div class="n"><div class="v" id="sap-${f.furnaceId}">${pct(f.sapPercent)}</div><div class="l">SAP %</div></div>
+            </div>
+            <div class="chart-wrap"><canvas id="chart-${f.furnaceId}"></canvas></div>
+            <div class="worst-line" id="worst-${f.furnaceId}"></div>
+        `;
+        setTimeout(() => {
+            charts['f' + f.furnaceId] = new Chart(document.getElementById('chart-' + f.furnaceId), lineBarConfig(f));
+            renderWorstLine(f);
+        }, 0);
+        return div;
+    }
+
+    function lineBarConfig(f) {
+        const top = [...f.lines].sort((a, b) => b.total - a.total).slice(0, 5);
+        return {
+            type: 'bar',
+            data: {
+                labels: top.map(l => l.productDesc.replace('PTC ', '')),
+                datasets: [{
+                    data: top.map(l => l.oeeShift * 100),
+                    backgroundColor: top.map(l => oeeColor(l.oeeShift)),
+                    borderRadius: 4,
+                    maxBarThickness: 14
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toFixed(0) + '% OEE' } } },
+                scales: {
+                    x: { min: 0, max: 100, ticks: { display: false }, grid: { color: getCss('--grid-line') } },
+                    y: { ticks: { color: getCss('--text-dim'), font: { size: 10 } }, grid: { display: false } }
+                }
+            }
+        };
+    }
+
+    function renderWorstLine(f) {
+        const el = document.getElementById('worst-' + f.furnaceId);
+        if (!el) return;
+        if (f.worstLine) {
+            el.innerHTML = `<span>⚠ Línea más baja: ${f.worstLine.productDesc}</span><b>${pct(f.worstLine.oeeShift)}</b>`;
+        } else {
+            el.innerHTML = '';
+        }
+    }
+
+    function updateFurnaceCard(f) {
+        const pill = document.getElementById('pill-' + f.furnaceId);
+        if (!pill) return;
+        pill.textContent = pct(f.oee);
+        pill.style.background = oeeColor(f.oee);
+        document.getElementById('prod-' + f.furnaceId).textContent = f.totalProduction.toLocaleString();
+        document.getElementById('plan-' + f.furnaceId).textContent = f.totalPlanned.toLocaleString();
+        document.getElementById('sap-' + f.furnaceId).textContent = pct(f.sapPercent);
+        renderWorstLine(f);
+
+        const chart = charts['f' + f.furnaceId];
+        if (chart) {
+            const cfg = lineBarConfig(f);
+            chart.data = cfg.data;
+            chart.update('none');
+        }
+        if (selectedFurnaceId === f.furnaceId) renderDrilldown(f);
+    }
+
+    function buildTrendCard() {
+        const div = document.createElement('div');
+        div.className = 'card trend-card';
+        div.innerHTML = `<h2>Tendencia de Planta (Hora por Hora)</h2><div class="chart-wrap"><canvas id="chart-trend"></canvas></div>`;
+        setTimeout(() => { charts['trend'] = new Chart(document.getElementById('chart-trend'), trendConfig()); }, 0);
+        return div;
+    }
+
+    function trendConfig() {
+        return {
+            type: 'line',
+            data: {
+                labels: snapshot.hourlyTrend.map(h => h.hour),
+                datasets: [
+                    { label: 'Producción', data: snapshot.hourlyTrend.map(h => h.production), borderColor: getCss('--accent'), backgroundColor: 'transparent', tension: .35, pointRadius: 3 },
+                    { label: 'Plan', data: snapshot.hourlyTrend.map(h => h.planned), borderColor: getCss('--text-dim'), borderDash: [4, 4], backgroundColor: 'transparent', tension: 0, pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: getCss('--text-dim'), font: { size: 11 } } } },
+                scales: {
+                    x: { ticks: { color: getCss('--text-dim') }, grid: { color: getCss('--grid-line') } },
+                    y: { ticks: { color: getCss('--text-dim') }, grid: { color: getCss('--grid-line') } }
+                }
+            }
+        };
+    }
+
+    function updateTrendChart() {
+        const chart = charts['trend'];
+        if (!chart) return;
+        chart.data.labels = snapshot.hourlyTrend.map(h => h.hour);
+        chart.data.datasets[0].data = snapshot.hourlyTrend.map(h => h.production);
+        chart.data.datasets[1].data = snapshot.hourlyTrend.map(h => h.planned);
+        chart.update('none');
+    }
+
+    // ---------------------------------------------------------------
+    // CROSS-FILTER: clic en un horno -> dimear los demás + abrir drill-down
+    // ---------------------------------------------------------------
+    function selectFurnace(id) {
+        selectedFurnaceId = (selectedFurnaceId === id) ? null : id;
+        applySelection();
+        if (selectedFurnaceId) {
+            const f = snapshot.furnaces.find(x => x.furnaceId === selectedFurnaceId);
+            renderDrilldown(f);
+            document.getElementById('drilldownOverlay').classList.add('open');
+        } else {
+            document.getElementById('drilldownOverlay').classList.remove('open');
+        }
+    }
+
+    function applySelection() {
+        snapshot.furnaces.forEach(f => {
+            const card = document.getElementById('furnace-' + f.furnaceId);
+            if (!card) return;
+            card.classList.toggle('selected', selectedFurnaceId === f.furnaceId);
+            card.classList.toggle('dimmed', selectedFurnaceId !== null && selectedFurnaceId !== f.furnaceId);
+        });
+    }
+
+    function renderDrilldown(f) {
+        if (!f) return;
+        document.getElementById('drilldownTitle').textContent = f.furnaceName;
+        document.getElementById('drilldownSub').textContent =
+            `Producción ${f.totalProduction.toLocaleString()} / Plan ${f.totalPlanned.toLocaleString()} · OEE ${pct(f.oee)}`;
+        const rows = [...f.lines].sort((a, b) => b.total - a.total).map(l => `
+            <tr>
+                <td>${l.productDesc}</td>
+                <td>
+                    <div class="bar-cell">
+                        <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}"></div></div>
+                        <span>${pct(l.oeeShift)}</span>
+                    </div>
+                </td>
+                <td>${l.total.toLocaleString()}</td>
+                <td>${l.plannedShift.toLocaleString()}</td>
+                <td>${l.totalSap.toLocaleString()}</td>
+            </tr>`).join('');
+        document.getElementById('drilldownBody').innerHTML = rows;
+    }
+
+    document.getElementById('closeDrilldown').onclick = () => selectFurnace(selectedFurnaceId);
+    document.getElementById('drilldownOverlay').onclick = (e) => {
+        if (e.target.id === 'drilldownOverlay') selectFurnace(selectedFurnaceId);
+    };
+
+    // ---------------------------------------------------------------
+    // TEMA / PRESENTACIÓN / SELECTOR DE FECHA
+    // ---------------------------------------------------------------
+    document.getElementById('toggleTheme').onclick = () => {
+        const html = document.documentElement;
+        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('pm-theme', next);
+        Object.values(charts).forEach(c => c && c.update());
+    };
+    const savedTheme = localStorage.getItem('pm-theme');
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+
+    document.getElementById('togglePresentation').onclick = () => {
+        document.getElementById('app').classList.toggle('presentation');
+        const el = document.documentElement;
+        if (!document.fullscreenElement) {
+            el.requestFullscreen?.().catch(() => {});
+        } else {
+            document.exitFullscreen?.().catch(() => {});
+        }
+    };
+
+    document.getElementById('toggleDate').onclick = () => {
+        document.getElementById('datePicker').classList.toggle('open');
+    };
+
+    // ---------------------------------------------------------------
+    // SIGNALR: conexión + recepción de actualizaciones en vivo
+    // ---------------------------------------------------------------
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl('/hubs/metrics')
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on('SnapshotUpdated', (newSnapshot) => {
+        snapshot = newSnapshot;
+        render();
+    });
+
+    connection.start().catch(err => console.error('SignalR error:', err));
+
+    render();
+</script>
+</body>
+</html>
