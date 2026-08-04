@@ -38,19 +38,26 @@ public class FurnaceMetric
 {
     public int FurnaceId { get; set; }
     public string FurnaceName { get; set; } = string.Empty;
+
+    /// <summary>TODAS las líneas del turno actual, incluidas las que no tienen plan
+    /// (Planned_Shift_for_OEE = 0) — esas se muestran igual en el detalle pero no cuentan
+    /// para nada (ver CountedLines).</summary>
     public List<ProductLineMetric> Lines { get; set; } = new();
 
-    public int TotalProduction => Lines.Sum(l => l.Total);
-    public int TotalPlanned => Lines.Sum(l => l.PlannedShift);
-    public int TotalSap => Lines.Sum(l => l.TotalSap);
+    /// <summary>Solo las líneas con plan > 0 — las únicas que cuentan para producción/plan/OEE.</summary>
+    private List<ProductLineMetric> CountedLines => Lines.Where(l => l.PlannedShift > 0).ToList();
 
-    /// <summary>OEE promedio de todas las líneas del horno (no producción/plan del horno).</summary>
-    public double Oee => Lines.Count == 0 ? 0 : Lines.Average(l => l.OeeShift);
+    public int TotalProduction => CountedLines.Sum(l => l.Total);
+    public int TotalPlanned => CountedLines.Sum(l => l.PlannedShift);
+    public int TotalSap => CountedLines.Sum(l => l.TotalSap);
+
+    /// <summary>OEE promedio de las líneas CON plan del horno (no producción/plan del horno).</summary>
+    public double Oee => CountedLines.Count == 0 ? 0 : CountedLines.Average(l => l.OeeShift);
 
     public double SapPercent => TotalProduction <= 0 ? 0 : (double)TotalSap / TotalProduction;
 
-    /// <summary>Línea con peor OEE de turno dentro del horno — para alertas rápidas.</summary>
-    public ProductLineMetric? WorstLine => Lines
+    /// <summary>Línea con peor OEE de turno dentro del horno (solo entre las que tienen plan).</summary>
+    public ProductLineMetric? WorstLine => CountedLines
         .OrderBy(l => l.OeeShift)
         .FirstOrDefault();
 }
