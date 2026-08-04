@@ -54,7 +54,10 @@ public class PlantMetricsService : IPlantMetricsService
             .SelectMany(kv => kv.Value.ProductGroupIds.Select(gid => (GroupId: gid, FurnaceId: kv.Key)))
             .ToDictionary(x => x.GroupId, x => x.FurnaceId);
 
-        foreach (var r in rows.Where(r => r.ReportGroup == 1 && r.PlannedForOee != 0 && groupToFurnace.ContainsKey(r.GroupId)))
+        // Se incluyen TODAS las líneas (incluso con Planned_Shift_for_OEE = 0) para poder
+        // mostrarlas en el detalle; FurnaceMetric ya se encarga de no contarlas en las
+        // estadísticas (ver CountedLines en el modelo).
+        foreach (var r in rows.Where(r => r.ReportGroup == 1 && groupToFurnace.ContainsKey(r.GroupId)))
         {
             var furnaceId = groupToFurnace[r.GroupId];
             var line = new ProductLineMetric
