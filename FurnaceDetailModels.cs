@@ -55,27 +55,31 @@ public class FurnaceDetailSnapshot
     public DateTime GeneratedAt { get; set; } = DateTime.Now;
     public string ShiftDesc { get; set; } = string.Empty;
 
-    /// <summary>Todas las líneas con plan > 0 en el turno actual, ordenadas por Product_Order.</summary>
+    /// <summary>TODAS las líneas del turno actual (incluidas las que no tienen plan),
+    /// ordenadas por Product_Order. Las que no tienen plan no cuentan para nada — ver CountedLines.</summary>
     public List<ProductLineMetric> Lines { get; set; } = new();
     public List<HourlyPoint> HourlyTrend { get; set; } = new();
 
-    public int TotalProduction => Lines.Sum(l => l.Total);
-    public int TotalPlanned => Lines.Sum(l => l.PlannedShift);
-    public int TotalSap => Lines.Sum(l => l.TotalSap);
+    /// <summary>Solo las líneas con plan > 0 — las únicas que cuentan para producción/plan/OEE.</summary>
+    private List<ProductLineMetric> CountedLines => Lines.Where(l => l.PlannedShift > 0).ToList();
+
+    public int TotalProduction => CountedLines.Sum(l => l.Total);
+    public int TotalPlanned => CountedLines.Sum(l => l.PlannedShift);
+    public int TotalSap => CountedLines.Sum(l => l.TotalSap);
     public int RemainingToPlan => Math.Max(0, TotalPlanned - TotalProduction);
 
-    public double Oee => Lines.Count == 0 ? 0 : Lines.Average(l => l.OeeShift);
+    public double Oee => CountedLines.Count == 0 ? 0 : CountedLines.Average(l => l.OeeShift);
     public double SapPercent => TotalProduction <= 0 ? 0 : (double)TotalSap / TotalProduction;
 
     public int LinesWithProduction => Lines.Count(l => l.Total > 0);
     public int LinesWithoutProduction => Lines.Count(l => l.Total == 0);
 
-    public ProductLineMetric? BestLine => Lines
+    public ProductLineMetric? BestLine => CountedLines
         .Where(l => l.Total > 0)
         .OrderByDescending(l => l.OeeShift)
         .FirstOrDefault();
 
-    public ProductLineMetric? WorstLine => Lines
+    public ProductLineMetric? WorstLine => CountedLines
         .Where(l => l.Total > 0)
         .OrderBy(l => l.OeeShift)
         .FirstOrDefault();
