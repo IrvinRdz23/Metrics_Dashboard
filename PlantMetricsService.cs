@@ -119,6 +119,7 @@ public class PlantMetricsService : IPlantMetricsService
         int ordOeeShift = reader.GetOrdinal("OEE_Shift");
         int ordTotal = reader.GetOrdinal("Total");
         int ordTotalSap = reader.GetOrdinal("Total_SAP");
+        int ordProductOrder = reader.GetOrdinal("Product_Order");
         int ordHour = reader.GetOrdinal("Hour_by_Hour");
         int ordShiftDesc = reader.GetOrdinal("Shift_Desc");
 
@@ -153,6 +154,7 @@ public class PlantMetricsService : IPlantMetricsService
                 var line = new ProductLineMetric
                 {
                     ProductDesc = desc,
+                    ProductOrder = reader.IsDBNull(ordProductOrder) ? 0 : reader.GetInt32(ordProductOrder),
                     CycleTimeSecs = (double)(reader.IsDBNull(ordCycleTime) ? 0 : reader.GetDecimal(ordCycleTime)),
                     Total = reader.IsDBNull(ordTotal) ? 0 : reader.GetInt32(ordTotal),
                     AccumulatedRate = reader.IsDBNull(ordAccumRate) ? 0 : reader.GetInt32(ordAccumRate),
@@ -184,6 +186,11 @@ public class PlantMetricsService : IPlantMetricsService
                     line.TotalSap += totalSap;
                 }
             }
+        }
+
+        foreach (var f in furnaces)
+        {
+            f.Lines = f.Lines.OrderBy(l => l.ProductOrder).ToList();
         }
 
         return new PlantDashboardSnapshot
