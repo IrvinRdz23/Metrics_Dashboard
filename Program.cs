@@ -1,12 +1,16 @@
-using PlantMetricsDashboard.Hubs;
-using PlantMetricsDashboard.Services;
+using Metrics_Dashboard.Hubs;
+using Metrics_Dashboard.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
 
-builder.Services.AddSingleton<IPlantMetricsService, PlantMetricsService>();
+// Un solo lector del SP (compartido por el dashboard general y los 6 de detalle).
+builder.Services.AddScoped<IMetricsRawDataService, MetricsRawDataService>();
+builder.Services.AddScoped<IPlantMetricsService, PlantMetricsService>();
+builder.Services.AddScoped<IFurnaceDetailService, FurnaceDetailService>();
+
 builder.Services.AddHostedService<MetricsBroadcastService>();
 
 var app = builder.Build();
