@@ -227,9 +227,16 @@
         padding: 3px 10px; border-radius: 6px; font-size: .68rem; font-weight: 700; letter-spacing: .3px;
         display: inline-block;
     }
-    .page-dots { display: flex; gap: 4px; justify-content: center; margin-top: 6px; }
-    .page-dots .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border); transition: background .2s; }
-    .page-dots .dot.active { background: var(--furnace-color, var(--accent)); }
+    .page-ring-wrap { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 6px; height: 14px; }
+    .page-ring-svg { width: 14px; height: 14px; transform: rotate(-90deg); flex-shrink: 0; }
+    .ring-bg { fill: none; stroke: var(--border); stroke-width: 2.5; }
+    .ring-fill {
+        fill: none; stroke: var(--furnace-color, var(--accent)); stroke-width: 2.5; stroke-linecap: round;
+        stroke-dasharray: 44; stroke-dashoffset: 44;
+    }
+    .ring-fill.animating { animation: ringFill 15s linear forwards; }
+    @@keyframes ringFill { to { stroke-dashoffset: 0; } }
+    .page-ring-label { font-size: .6rem; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
 
     .live-dot {
         width: 8px; height: 8px; border-radius: 50%; background: var(--good);
@@ -349,13 +356,32 @@
         return { page: sorted.slice(idx * PAGE_SIZE, idx * PAGE_SIZE + PAGE_SIZE), totalPages, idx };
     }
 
-    function renderPageDots(f) {
-        const el = document.getElementById('dots-' + f.furnaceId);
-        if (!el) return;
+    // Anillo de progreso: se llena en 15s y al completar la vuelta coincide con el cambio de página.
+    function renderPageRing(f) {
+        const container = document.getElementById('pagering-' + f.furnaceId);
+        if (!container) return;
         const { totalPages, idx } = furnaceLinesPage(f);
-        if (totalPages <= 1) { el.innerHTML = ''; return; }
-        el.innerHTML = Array.from({ length: totalPages }, (_, i) =>
-            `<span class="dot ${i === idx ? 'active' : ''}"></span>`).join('');
+        if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+        let ring = document.getElementById('ringfill-' + f.furnaceId);
+        if (!ring) {
+            container.innerHTML = `
+                <svg class="page-ring-svg" viewBox="0 0 16 16">
+                    <circle class="ring-bg" cx="8" cy="8" r="7"></circle>
+                    <circle class="ring-fill" id="ringfill-${f.furnaceId}" cx="8" cy="8" r="7"></circle>
+                </svg>
+                <span class="page-ring-label" id="pagelabel-${f.furnaceId}"></span>
+            `;
+            ring = document.getElementById('ringfill-' + f.furnaceId);
+        }
+        document.getElementById('pagelabel-' + f.furnaceId).textContent = `${idx + 1}/${totalPages}`;
+        restartRing(ring);
+    }
+
+    function restartRing(ring) {
+        ring.classList.remove('animating');
+        void ring.getBoundingClientRect(); // fuerza reflow para poder reiniciar la animación
+        ring.classList.add('animating');
     }
 
     document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -413,18 +439,55 @@
             <div class="chart-wrap" id="chartwrap-${f.furnaceId}">
                 ${hasProduction ? `<canvas id="chart-${f.furnaceId}"></canvas>` : `<div class="no-plan-box">SIN PRODUCCIÓN<br>EN EL TURNO ACTUAL</div>`}
             </div>
-            <div class="page-dots" id="dots-${f.furnaceId}"></div>
+            <div class="page-ring-wrap" id="pagering-${f.furnaceId}"></div>
             <div class="worst-line" id="worst-${f.furnaceId}"></div>
         `;
         if (hasProduction) {
             setTimeout(() => {
                 charts['f' + f.furnaceId] = new Chart(document.getElementById('chart-' + f.furnaceId), lineBarConfig(f));
                 renderWorstLine(f);
-                renderPageDots(f);
+                renderPageRing(f);
             }, 0);
         }
         return div;
     }
+
+    // Plugin ligero (sin librerías extra) que dibuja, sobre cada barra:
+    // - el % de OEE "dentro" de la barra (con contorno para leerse en cualquier color/tema)
+    // - Producción/Esperado a esta hora pegado a la derecha de la barra
+    const barLabelsPlugin = {
+        id: 'lineBarLabels',
+        afterDatasetsDraw(chart) {
+            const dataset = chart.data.datasets[0];
+            const lines = dataset && dataset.linesRef;
+            if (!lines) return;
+            const meta = chart.getDatasetMeta(0);
+            const ctx = chart.ctx;
+            ctx.save();
+            meta.data.forEach((bar, i) => {
+                const line = lines[i];
+                if (!line || !bar) return;
+                const barLeft = Math.min(bar.x, bar.base);
+                const barRight = Math.max(bar.x, bar.base);
+                const y = bar.y;
+
+                const oeeLabel = Math.round(line.oeeShift * 100) + '%';
+                ctx.font = '700 9px Inter, sans-serif';
+                ctx.textBaseline = 'middle';
+                ctx.textAlign = 'left';
+                ctx.lineWidth = 2.5;
+                ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+                ctx.strokeText(oeeLabel, barLeft + 5, y);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(oeeLabel, barLeft + 5, y);
+
+                ctx.font = '600 8px "JetBrains Mono", monospace';
+                ctx.fillStyle = getCss('--text-faint');
+                ctx.fillText(`${line.total}/${line.accumulatedRate}`, barRight + 5, y);
+            });
+            ctx.restore();
+        }
+    };
 
     function lineBarConfig(f) {
         const top = furnaceLinesPage(f).page;
@@ -436,17 +499,20 @@
                     data: top.map(l => l.oeeShift * 100),
                     backgroundColor: top.map(l => oeeColor(l.oeeShift)),
                     borderRadius: 5,
-                    maxBarThickness: 14
+                    maxBarThickness: 14,
+                    linesRef: top
                 }]
             },
+            plugins: [barLabelsPlugin],
             options: {
                 indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: { duration: 500 },
+                layout: { padding: { right: 50 } },
                 plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toFixed(0) + '% OEE de turno' } } },
                 scales: {
-                    x: { min: 0, ticks: { display: false }, grid: { color: getCss('--grid-line') } },
+                    x: { min: 0, suggestedMax: 100, ticks: { display: false }, grid: { color: getCss('--grid-line') } },
                     y: { ticks: { color: getCss('--text-dim'), font: { size: 10 } }, grid: { display: false } }
                 }
             }
@@ -485,17 +551,25 @@
         if (hasProduction && !hasCanvas) {
             wrap.innerHTML = `<canvas id="chart-${f.furnaceId}"></canvas>`;
             charts['f' + f.furnaceId] = new Chart(document.getElementById('chart-' + f.furnaceId), lineBarConfig(f));
+            renderPageRing(f); // primera vez que aparece la gráfica -> arranca el anillo
         } else if (!hasProduction && hasCanvas) {
             charts['f' + f.furnaceId]?.destroy();
             delete charts['f' + f.furnaceId];
             wrap.innerHTML = `<div class="no-plan-box">SIN PRODUCCIÓN<br>EN EL TURNO ACTUAL</div>`;
+            document.getElementById('pagering-' + f.furnaceId).innerHTML = '';
         } else if (hasProduction && hasCanvas) {
+            // Solo se actualizan los datos de la barra; el anillo NO se reinicia aquí,
+            // así el conteo de 15s sigue su curso normal aunque llegue un refresh de datos.
             const chart = charts['f' + f.furnaceId];
             const cfg = lineBarConfig(f);
             chart.data = cfg.data;
             chart.update('none');
+            const label = document.getElementById('pagelabel-' + f.furnaceId);
+            if (label) {
+                const { totalPages, idx } = furnaceLinesPage(f);
+                label.textContent = totalPages > 1 ? `${idx + 1}/${totalPages}` : '';
+            }
         }
-        renderPageDots(f);
 
         if (isLiveUpdate && prodChanged) {
             card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
@@ -686,9 +760,10 @@
             const chart = charts['f' + f.furnaceId];
             if (chart) {
                 chart.data = lineBarConfig(f).data;
+                // el anillo se reinicia justo aquí, en el mismo instante del cambio de página
                 chart.update('none');
             }
-            renderPageDots(f);
+            renderPageRing(f);
         });
     }, PAGE_ROTATE_MS);
 
