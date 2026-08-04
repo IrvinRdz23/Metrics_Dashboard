@@ -1,7 +1,7 @@
-using Microsoft.Data.SqlClient;
-using PlantMetricsDashboard.Models;
+using Metrics_Dashboard.Models;
+using System.Data.SqlClient;
 
-namespace PlantMetricsDashboard.Services;
+namespace Metrics_Dashboard.Services;
 
 public interface IPlantMetricsService
 {
@@ -49,17 +49,12 @@ public class PlantMetricsService : IPlantMetricsService
     {
         _connectionString = config.GetConnectionString("M2SReportServices") ?? string.Empty;
         _plantListId = config.GetValue<int>("PlantMetrics:PlantListId", 1);
-        _useDemoData = config.GetValue<bool>("PlantMetrics:UseDemoData", true);
         _logger = logger;
     }
 
     public async Task<PlantDashboardSnapshot> GetSnapshotAsync(CancellationToken ct = default)
     {
-        if (_useDemoData)
-        {
-            return BuildDemoSnapshot();
-        }
-
+       
         try
         {
             return await GetSnapshotFromDatabaseAsync(ct);
@@ -115,56 +110,63 @@ public class PlantMetricsService : IPlantMetricsService
 
         while (await reader.ReadAsync(ct))
         {
-            var reportGroup = reader.IsDBNull(ordReportGroup) ? -1 : reader.GetInt32(ordReportGroup);
-            var groupId = reader.IsDBNull(ordGroupId) ? -1 : reader.GetInt32(ordGroupId);
-
-            // Tube Mills (Product_Group_ID = 7) se ignora en todo el dashboard.
-            if (groupId == 7) continue;
-
-            if (string.IsNullOrEmpty(shiftDesc) && !reader.IsDBNull(ordShiftDesc))
+            try
             {
-                shiftDesc = reader.GetString(ordShiftDesc);
-            }
+                var reportGroup = reader.IsDBNull(ordReportGroup) ? -1 : reader.GetInt32(ordReportGroup);
+                var groupId = reader.IsDBNull(ordGroupId) ? -1 : reader.GetInt32(ordGroupId);
 
-            // ---------- Report_Group 1: día/turno acumulado -> cards de horno + modal ----------
-            if (reportGroup == 1 && ProductGroupToFurnace.TryGetValue(groupId, out var mapped))
-            {
-                var furnace = furnaces.First(f => f.FurnaceId == mapped.FurnaceId);
-                var desc = reader.IsDBNull(ordDesc) ? "" : reader.GetString(ordDesc);
+                // Tube Mills (Product_Group_ID = 7) se ignora en todo el dashboard.
+                if (groupId == 7) continue;
 
-                var line = new ProductLineMetric
+                if (string.IsNullOrEmpty(shiftDesc) && !reader.IsDBNull(ordShiftDesc))
                 {
-                    ProductDesc = desc,
-                    CycleTimeSecs = reader.IsDBNull(ordCycleTime) ? 0 : reader.GetDouble(ordCycleTime),
-                    Total = reader.IsDBNull(ordTotal) ? 0 : reader.GetInt32(ordTotal),
-                    AccumulatedRate = reader.IsDBNull(ordAccumRate) ? 0 : reader.GetInt32(ordAccumRate),
-                    PlannedShift = reader.IsDBNull(ordPlannedForOee) ? 0 : reader.GetInt32(ordPlannedForOee),
-                    OeeShift = reader.IsDBNull(ordOeeShift) ? 0 : reader.GetDouble(ordOeeShift),
-                };
+                    shiftDesc = reader.GetString(ordShiftDesc);
+                }
 
-                furnace.Lines.Add(line);
-                linesIndex[(mapped.FurnaceId, desc)] = line;
-            }
-            // ---------- Report_Group 2: hora por hora -> solo tendencia de planta ----------
-            else if (reportGroup == 2)
-            {
-                var hour = reader.IsDBNull(ordHour) ? "" : reader.GetString(ordHour);
-                var total = reader.IsDBNull(ordTotal) ? 0 : reader.GetInt32(ordTotal);
-                if (!string.IsNullOrWhiteSpace(hour) && hour != "-")
+                // ---------- Report_Group 1: día/turno acumulado -> cards de horno + modal ----------
+                if (reportGroup == 1 && ProductGroupToFurnace.TryGetValue(groupId, out var mapped))
                 {
-                    hourlyTotals.TryGetValue(hour, out var acc);
-                    hourlyTotals[hour] = acc + total;
+                    var furnace = furnaces.First(f => f.FurnaceId == mapped.FurnaceId);
+                    var desc = reader.IsDBNull(ordDesc) ? "" : reader.GetString(ordDesc);
+
+                    var line = new ProductLineMetric
+                    {
+                        ProductDesc = desc,
+                        CycleTimeSecs = (double)(reader.IsDBNull(ordCycleTime) ? 0 : reader.GetDecimal(ordCycleTime)),
+                        Total = reader.IsDBNull(ordTotal) ? 0 : reader.GetInt32(ordTotal),
+                        AccumulatedRate = reader.IsDBNull(ordAccumRate) ? 0 : reader.GetInt32(ordAccumRate),
+                        PlannedShift = reader.IsDBNull(ordPlannedForOee) ? 0 : reader.GetInt32(ordPlannedForOee),
+                        OeeShift = reader.IsDBNull(ordOeeShift) ? 0 : reader.GetDouble(ordOeeShift),
+                    };
+
+                    furnace.Lines.Add(line);
+                    linesIndex[(mapped.FurnaceId, desc)] = line;
+                }
+                // ---------- Report_Group 2: hora por hora -> solo tendencia de planta ----------
+                else if (reportGroup == 2)
+                {
+                    var hour = reader.IsDBNull(ordHour) ? "" : reader.GetString(ordHour);
+                    var total = reader.IsDBNull(ordTotal) ? 0 : reader.GetInt32(ordTotal);
+                    if (!string.IsNullOrWhiteSpace(hour) && hour != "-")
+                    {
+                        hourlyTotals.TryGetValue(hour, out var acc);
+                        hourlyTotals[hour] = acc + total;
+                    }
+                }
+                // ---------- Report_Group 3: SAP -> se pega a la línea ya cargada por Report_Group 1 ----------
+                else if (reportGroup == 3 && ProductGroupToFurnace.TryGetValue(groupId, out var mappedSap))
+                {
+                    var desc = reader.IsDBNull(ordDesc) ? "" : reader.GetString(ordDesc);
+                    var totalSap = reader.IsDBNull(ordTotalSap) ? 0 : reader.GetInt32(ordTotalSap);
+                    if (totalSap > 0 && linesIndex.TryGetValue((mappedSap.FurnaceId, desc), out var line))
+                    {
+                        line.TotalSap += totalSap;
+                    }
                 }
             }
-            // ---------- Report_Group 3: SAP -> se pega a la línea ya cargada por Report_Group 1 ----------
-            else if (reportGroup == 3 && ProductGroupToFurnace.TryGetValue(groupId, out var mappedSap))
+            catch(Exception ex)
             {
-                var desc = reader.IsDBNull(ordDesc) ? "" : reader.GetString(ordDesc);
-                var totalSap = reader.IsDBNull(ordTotalSap) ? 0 : reader.GetInt32(ordTotalSap);
-                if (totalSap > 0 && linesIndex.TryGetValue((mappedSap.FurnaceId, desc), out var line))
-                {
-                    line.TotalSap += totalSap;
-                }
+                return (PlantDashboardSnapshot)ex.Data;
             }
         }
 
