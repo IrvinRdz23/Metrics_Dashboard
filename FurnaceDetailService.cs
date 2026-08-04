@@ -59,7 +59,10 @@ public class FurnaceDetailService : IFurnaceDetailService
 
         var linesIndex = new Dictionary<string, ProductLineMetric>();
 
-        foreach (var r in rows.Where(r => r.ReportGroup == 1 && r.PlannedForOee != 0 && groupIds.Contains(r.GroupId)))
+        // Se incluyen TODAS las líneas (incluso con Planned_Shift_for_OEE = 0) para poder
+        // mostrarlas en el detalle; FurnaceDetailSnapshot ya se encarga de no contarlas en
+        // las estadísticas (ver CountedLines en el modelo).
+        foreach (var r in rows.Where(r => r.ReportGroup == 1 && groupIds.Contains(r.GroupId)))
         {
             var line = new ProductLineMetric
             {
