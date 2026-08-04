@@ -99,14 +99,6 @@
         padding: 2px 9px; border-radius: 999px; font-size: .68rem; font-weight: 600; letter-spacing: .3px;
     }
 
-    .nav-strip { display: flex; align-items: center; gap: 5px; }
-    .nav-pill {
-        text-decoration: none; color: var(--text-dim); background: var(--bg); border: 1px solid var(--border);
-        padding: 6px 11px; border-radius: 8px; font-size: .74rem; font-weight: 700; transition: background .15s, color .15s, border-color .15s;
-    }
-    .nav-pill:hover { background: var(--card-hover); color: var(--text); }
-    .nav-pill.active { background: var(--accent); color: #06101f; border-color: transparent; }
-
     .plant-kpi { display: flex; align-items: center; gap: 28px; }
     .kpi-block { text-align: center; min-width: 62px; }
     .kpi-block .value {
@@ -168,7 +160,16 @@
     .furnace-card h2 .fnum {
         width: 20px; height: 20px; border-radius: 6px; background: var(--furnace-color, var(--accent));
         color: #06101f; font-size: .68rem; font-weight: 800; display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
     }
+    .furnace-card h2 .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .detail-link {
+        display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+        width: 21px; height: 21px; border-radius: 6px;
+        background: var(--bg); border: 1px solid var(--border); color: var(--text-faint);
+        text-decoration: none; transition: background .15s, color .15s, border-color .15s;
+    }
+    .detail-link:hover { background: var(--furnace-color, var(--accent)); color: #06101f; border-color: transparent; }
     .oee-block { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
     .furnace-card .oee-pill {
         font-size: .78rem; font-weight: 800; padding: 4px 11px; border-radius: 999px;
@@ -272,16 +273,6 @@
             </div>
         </div>
 
-        <div class="nav-strip controls-collapsible">
-            <a class="nav-pill active" href="/Dashboard">General</a>
-            <a class="nav-pill" href="/Furnace1">1</a>
-            <a class="nav-pill" href="/Furnace2">2</a>
-            <a class="nav-pill" href="/Furnace3">3</a>
-            <a class="nav-pill" href="/Furnace4">4</a>
-            <a class="nav-pill" href="/Furnace5">5</a>
-            <a class="nav-pill" href="/TubeMills">TM</a>
-        </div>
-
         <div class="plant-kpi">
             <div class="kpi-block">
                 <div class="value" id="plantOee">@Model.PlantOee.ToString("P0")</div>
@@ -366,9 +357,13 @@
     }
     function pct(v) { return (v * 100).toFixed(0) + '%'; }
 
+    // Solo las líneas CON plan cuentan para el mini-chart de cada card (las líneas sin
+    // plan solo se muestran en el detalle/modal, no aquí — ver countedLines()).
+    function countedLines(f) { return f.lines.filter(l => l.plannedShift > 0); }
+
     // Carrusel tipo pantalla de aeropuerto: pagina las líneas de 5 en 5, ordenadas por Product_Order.
     function furnaceLinesPage(f) {
-        const sorted = [...f.lines].sort((a, b) => a.productOrder - b.productOrder);
+        const sorted = [...countedLines(f)].sort((a, b) => a.productOrder - b.productOrder);
         const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
         const idx = (furnacePage[f.furnaceId] || 0) % totalPages;
         return { page: sorted.slice(idx * PAGE_SIZE, idx * PAGE_SIZE + PAGE_SIZE), totalPages, idx };
@@ -438,11 +433,16 @@
         div.style.setProperty('--furnace-color', furnaceColor(f.furnaceId));
         div.onclick = () => selectFurnace(f.furnaceId);
 
-        const hasProduction = f.lines.length > 0;
+        const hasProduction = countedLines(f).length > 0;
 
         div.innerHTML = `
             <div class="card-top">
-                <h2><span class="fnum">${f.furnaceId}</span>${f.furnaceName}</h2>
+                <h2>
+                    <span class="fnum">${f.furnaceId}</span><span class="fname">${f.furnaceName}</span>
+                    <a class="detail-link" href="/Furnace${f.furnaceId}" onclick="event.stopPropagation()" title="Ver detalle de ${f.furnaceName}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+                    </a>
+                </h2>
                 <div class="oee-block">
                     <span class="oee-pill ${hasProduction ? '' : 'neutral'}" id="pill-${f.furnaceId}"
                           style="background:${hasProduction ? oeeColor(f.oee) : 'var(--neutral)'}">${hasProduction ? pct(f.oee) : '—'}</span>
@@ -552,7 +552,7 @@
         const pill = document.getElementById('pill-' + f.furnaceId);
         if (!card || !pill) return;
 
-        const hasProduction = f.lines.length > 0;
+        const hasProduction = countedLines(f).length > 0;
         const prodChanged = document.getElementById('prod-' + f.furnaceId).textContent !== f.totalProduction.toLocaleString();
 
         pill.textContent = hasProduction ? pct(f.oee) : '—';

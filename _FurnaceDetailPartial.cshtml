@@ -30,7 +30,7 @@
         --no-plan-border: #a884ff;
         --no-plan-text: #c6b3ff;
         --grid-line: rgba(255,255,255,0.055);
-        --shadow: 0 6px 18px -10px rgba(0,0,0,0.5);
+        --shadow: 0 8px 22px -12px rgba(0,0,0,0.55);
         --flash: rgba(77,163,255,0.35);
     }
     :root[data-theme="light"] {
@@ -52,7 +52,7 @@
         --no-plan-border: #7c3aed;
         --no-plan-text: #6d28d9;
         --grid-line: rgba(0,0,0,0.06);
-        --shadow: 0 6px 18px -12px rgba(20,30,50,0.15);
+        --shadow: 0 8px 22px -14px rgba(20,30,50,0.16);
         --flash: rgba(31,111,235,0.18);
     }
 
@@ -66,48 +66,62 @@
     ::-webkit-scrollbar { width: 7px; height: 7px; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
 
-    .app { height: 100vh; width: 100vw; display: grid; grid-template-rows: auto 1fr; gap: 12px; padding: 14px; }
+    .app {
+        height: 100vh; width: 100vw; display: grid; grid-template-rows: auto 1fr; gap: 12px; padding: 14px;
+        background: var(--bg);
+    }
 
     /* ---------- HEADER ---------- */
-    header { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 20px; gap: 16px; }
+    header {
+        display: flex; align-items: center; justify-content: space-between; gap: 16px;
+        background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 20px;
+        border-top: 3px solid var(--furnace-color);
+    }
     .app.presentation .controls-collapsible { display: none; }
 
     .brand { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-    .brand .logo-dot { width: 32px; height: 32px; border-radius: 9px; background: var(--furnace-color, var(--accent)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .85rem; color: #06101f; flex-shrink: 0; }
-    .brand-text h1 { font-size: 1.05rem; margin: 0; font-weight: 700; letter-spacing: .2px; }
+    .brand .logo-dot {
+        width: 34px; height: 34px; border-radius: 10px; background: var(--furnace-color);
+        display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .85rem; color: #06101f; flex-shrink: 0;
+        box-shadow: 0 4px 12px -3px var(--furnace-color);
+    }
+    .brand-text h1 { font-size: 1.08rem; margin: 0; font-weight: 800; letter-spacing: .2px; }
     .brand-text .subtitle { color: var(--text-dim); font-size: .74rem; display: flex; align-items: center; gap: 8px; margin-top: 2px; }
     .shift-badge { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border); padding: 2px 9px; border-radius: 999px; font-size: .68rem; font-weight: 600; letter-spacing: .3px; }
 
-    .nav-strip { display: flex; align-items: center; gap: 5px; }
-    .nav-pill {
-        text-decoration: none; color: var(--text-dim); background: var(--bg); border: 1px solid var(--border);
-        padding: 6px 11px; border-radius: 8px; font-size: .74rem; font-weight: 700; transition: background .15s, color .15s, border-color .15s;
-    }
-    .nav-pill:hover { background: var(--card-hover); color: var(--text); }
-    .nav-pill.active { background: var(--furnace-color, var(--accent)); color: #06101f; border-color: transparent; }
-
-    .plant-kpi { display: flex; align-items: center; gap: 24px; }
-    .kpi-block { text-align: center; min-width: 56px; }
-    .kpi-block .value { font-size: 1.5rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
-    .kpi-block .label { font-size: .6rem; text-transform: uppercase; letter-spacing: .6px; color: var(--text-faint); margin-top: 4px; font-weight: 600; }
-    .kpi-divider { width: 1px; height: 30px; background: var(--border); }
+    .plant-kpi { display: flex; align-items: center; gap: 22px; }
+    .kpi-block { text-align: center; min-width: 54px; }
+    .kpi-block .value { font-size: 1.45rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
+    .kpi-block .label { font-size: .59rem; text-transform: uppercase; letter-spacing: .6px; color: var(--text-faint); margin-top: 4px; font-weight: 700; }
+    .kpi-divider { width: 1px; height: 28px; background: var(--border); }
 
     .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-    .btn { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 12px; font-size: .78rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background .15s, border-color .15s; }
-    .btn:hover { background: var(--card-hover); border-color: var(--accent); }
+    .btn {
+        background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
+        padding: 8px 12px; font-size: .78rem; font-weight: 600; cursor: pointer; text-decoration: none;
+        display: flex; align-items: center; gap: 6px; transition: background .15s, border-color .15s;
+    }
+    .btn:hover { background: var(--card-hover); border-color: var(--furnace-color); }
 
     /* ---------- BODY ---------- */
     .body-grid { display: grid; grid-template-columns: 1.7fr 1fr; gap: 12px; min-height: 0; }
 
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 0; }
-    .card h2 { font-size: .92rem; margin: 0 0 10px 0; font-weight: 700; display: flex; align-items: center; justify-content: space-between; }
-    .card h2 .count-chip { font-size: .66rem; font-weight: 700; color: var(--text-faint); background: var(--bg); border: 1px solid var(--border); padding: 2px 9px; border-radius: 999px; }
+    .card {
+        background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px;
+        box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 0;
+        border-top: 3px solid var(--furnace-color);
+    }
+    .card h2 {
+        font-size: .86rem; margin: 0 0 10px 0; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+        color: var(--text-dim); display: flex; align-items: center; justify-content: space-between;
+    }
+    .card h2 .count-chip { font-size: .64rem; font-weight: 700; color: var(--text-faint); background: var(--bg); border: 1px solid var(--border); padding: 2px 9px; border-radius: 999px; text-transform: none; letter-spacing: 0; }
 
-    /* ---------- LISTA DE LÍNEAS ---------- */
+    /* ---------- LISTA DE LÍNEAS ACTIVAS ---------- */
     .lines-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; padding-right: 2px; }
     .line-row {
         display: grid; grid-template-columns: minmax(120px, 240px) 1fr 84px; align-items: center; gap: 14px;
-        background: var(--bg); border: 1px solid var(--border-soft); border-radius: 10px; padding: 8px 12px;
+        background: var(--bg); border: 1px solid var(--border-soft); border-radius: 10px; padding: 9px 12px;
         flex: 1 1 0; min-height: 34px; transition: background .8s ease;
     }
     .line-row.flash { background: var(--flash); }
@@ -118,24 +132,36 @@
     .line-bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 6px; transition: width .5s ease; }
     .line-bar-fill span { font-size: .68rem; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
     .line-bar-detail { font-size: .68rem; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; white-space: nowrap; min-width: 68px; }
-    .no-prod-tag { background: var(--no-plan-bg); border: 1px dashed var(--no-plan-border); color: var(--no-plan-text); padding: 4px 10px; border-radius: 6px; font-size: .68rem; font-weight: 700; letter-spacing: .3px; }
+
+    /* ---------- SECCIÓN DE LÍNEAS SIN PRODUCCIÓN (compacta, debajo de la lista) ---------- */
+    .no-prod-section { flex: 0 0 auto; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+    .no-prod-title {
+        font-size: .66rem; font-weight: 800; color: var(--no-plan-text); text-transform: uppercase;
+        letter-spacing: .5px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+    }
+    .no-prod-title .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--no-plan-border); }
+    .no-prod-chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 78px; overflow-y: auto; }
+    .no-prod-chip {
+        background: var(--no-plan-bg); border: 1px solid var(--no-plan-border); color: var(--no-plan-text);
+        padding: 4px 10px; border-radius: 999px; font-size: .68rem; font-weight: 600; white-space: nowrap;
+    }
 
     /* ---------- PANEL DERECHO ---------- */
     .side-stack { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-    .gauge-card { flex: 0 0 auto; align-items: center; }
-    .gauge-wrap { position: relative; width: 100%; max-width: 180px; margin: 0 auto; aspect-ratio: 1.6 / 1; }
+    .gauge-card { flex: 0 0 auto; }
+    .gauge-wrap { position: relative; width: 100%; max-width: 190px; margin: 4px auto 0; aspect-ratio: 1.6 / 1; }
     .gauge-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 6px; }
-    .gauge-center .val { font-size: 1.7rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+    .gauge-center .val { font-size: 1.75rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; line-height: 1; }
     .gauge-center .lab { font-size: .62rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; margin-top: 2px; }
 
     .trend-mini { flex: 1; min-height: 0; }
     .trend-mini .chart-wrap { flex: 1; min-height: 0; }
 
     .chips-card { flex: 0 0 auto; }
-    .chip-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border-soft); font-size: .78rem; }
+    .chip-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-soft); font-size: .8rem; }
     .chip-row:last-child { border-bottom: none; }
     .chip-row .k { color: var(--text-dim); }
-    .chip-row .v { font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .chip-row .v { font-weight: 800; font-family: 'JetBrains Mono', monospace; }
 
     .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 rgba(53,214,143,.6); animation: pulse 1.8s infinite; }
     @@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(53,214,143,.55); } 70% { box-shadow: 0 0 0 8px rgba(53,214,143,0); } 100% { box-shadow: 0 0 0 0 rgba(53,214,143,0); } }
@@ -154,16 +180,6 @@
                     <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
                 </div>
             </div>
-        </div>
-
-        <div class="nav-strip controls-collapsible">
-            <a class="nav-pill" href="/Dashboard">General</a>
-            <a class="nav-pill @(Model.FurnaceId == 1 ? "active" : "")" href="/Furnace1">1</a>
-            <a class="nav-pill @(Model.FurnaceId == 2 ? "active" : "")" href="/Furnace2">2</a>
-            <a class="nav-pill @(Model.FurnaceId == 3 ? "active" : "")" href="/Furnace3">3</a>
-            <a class="nav-pill @(Model.FurnaceId == 4 ? "active" : "")" href="/Furnace4">4</a>
-            <a class="nav-pill @(Model.FurnaceId == 5 ? "active" : "")" href="/Furnace5">5</a>
-            <a class="nav-pill @(Model.FurnaceId == 6 ? "active" : "")" href="/TubeMills">TM</a>
         </div>
 
         <div class="plant-kpi">
@@ -190,13 +206,14 @@
             <div class="kpi-block">
                 <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
                     <span class="live-dot"></span>
-                    <span class="value" style="font-size:.85rem" id="lastUpdate">--:--</span>
+                    <span class="value" style="font-size:.82rem" id="lastUpdate">--:--</span>
                 </div>
                 <div class="label">Última Actualización</div>
             </div>
         </div>
 
         <div class="header-actions controls-collapsible">
+            <a class="btn" href="/Dashboard" title="Volver al dashboard general">📊 General</a>
             <button class="btn" id="toggleTheme">🌗 Tema</button>
             <button class="btn" id="togglePresentation">🖥️ Presentación</button>
         </div>
@@ -206,6 +223,10 @@
         <div class="card">
             <h2>Líneas de Producción <span class="count-chip" id="linesCountChip"></span></h2>
             <div class="lines-list" id="linesList"></div>
+            <div class="no-prod-section" id="noProdSection" style="display:none;">
+                <div class="no-prod-title"><span class="dot"></span>Líneas sin producción en este turno <span id="noProdCount"></span></div>
+                <div class="no-prod-chips" id="noProdChips"></div>
+            </div>
         </div>
 
         <div class="side-stack">
@@ -269,8 +290,14 @@
         document.getElementById('linesCountChip').textContent = snapshot.lines.length + ' líneas';
         document.getElementById('activeLinesVal').textContent = snapshot.linesWithProduction + ' / ' + snapshot.lines.length;
         document.getElementById('noProdVal').textContent = snapshot.linesWithoutProduction;
-        document.getElementById('bestLineVal').textContent = snapshot.bestLine ? `${pct(snapshot.bestLine.oeeShift)}` : '—';
-        document.getElementById('worstLineVal').textContent = snapshot.worstLine ? `${pct(snapshot.worstLine.oeeShift)}` : '—';
+
+        const bestEl = document.getElementById('bestLineVal');
+        const worstEl = document.getElementById('worstLineVal');
+        bestEl.textContent = snapshot.bestLine ? pct(snapshot.bestLine.oeeShift) : '—';
+        bestEl.style.color = snapshot.bestLine ? oeeColor(snapshot.bestLine.oeeShift) : '';
+        worstEl.textContent = snapshot.worstLine ? pct(snapshot.worstLine.oeeShift) : '—';
+        worstEl.style.color = snapshot.worstLine ? oeeColor(snapshot.worstLine.oeeShift) : '';
+
         document.getElementById('sapVal').textContent = pct(snapshot.sapPercent);
 
         renderLinesList(isLiveUpdate);
@@ -278,32 +305,47 @@
         renderTrend();
     }
 
+    // Líneas ACTIVAS (con producción > 0) van a la lista principal con barra.
+    // Líneas SIN producción (incluidas las que ni siquiera tienen plan) van a la
+    // sección compacta de abajo, en morado — nunca cuentan para las estadísticas.
     function renderLinesList(isLiveUpdate) {
-        const container = document.getElementById('linesList');
-        const prevProdById = {};
-        container.querySelectorAll('.line-row').forEach(el => prevProdById[el.dataset.desc] = el.dataset.total);
+        const active = snapshot.lines.filter(l => l.total > 0).sort((a, b) => a.productOrder - b.productOrder);
+        const inactive = snapshot.lines.filter(l => l.total === 0).sort((a, b) => a.productOrder - b.productOrder);
 
-        container.innerHTML = snapshot.lines.map(l => {
-            const zero = l.total === 0;
-            const changed = isLiveUpdate && prevProdById[l.productDesc] !== undefined && prevProdById[l.productDesc] !== String(l.total);
-            const barArea = zero
-                ? `<span class="no-prod-tag">LÍNEA SIN PRODUCCIÓN</span>`
-                : `<div class="line-bar-track">
-                       <div class="line-bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}">
-                           <span>${pct(l.oeeShift)}</span>
-                       </div>
-                   </div>
-                   <span class="line-bar-detail">${l.total.toLocaleString()}/${l.accumulatedRate.toLocaleString()}</span>`;
+        const container = document.getElementById('linesList');
+        const prevTotalByDesc = {};
+        container.querySelectorAll('.line-row').forEach(el => prevTotalByDesc[el.dataset.desc] = el.dataset.total);
+
+        container.innerHTML = active.map(l => {
+            const changed = isLiveUpdate && prevTotalByDesc[l.productDesc] !== undefined && prevTotalByDesc[l.productDesc] !== String(l.total);
             return `
                 <div class="line-row ${changed ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
                     <div class="line-name" title="${l.productDesc}">${l.productDesc}</div>
-                    <div class="line-bar-area">${barArea}</div>
+                    <div class="line-bar-area">
+                        <div class="line-bar-track">
+                            <div class="line-bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}">
+                                <span>${pct(l.oeeShift)}</span>
+                            </div>
+                        </div>
+                        <span class="line-bar-detail">${l.total.toLocaleString()}/${l.accumulatedRate.toLocaleString()}</span>
+                    </div>
                     <div class="line-plan">Plan ${l.plannedShift.toLocaleString()}</div>
                 </div>`;
         }).join('');
 
         if (isLiveUpdate) {
             setTimeout(() => container.querySelectorAll('.line-row.flash').forEach(el => el.classList.remove('flash')), 900);
+        }
+
+        const section = document.getElementById('noProdSection');
+        if (inactive.length === 0) {
+            section.style.display = 'none';
+        } else {
+            section.style.display = '';
+            document.getElementById('noProdCount').textContent = `(${inactive.length})`;
+            document.getElementById('noProdChips').innerHTML = inactive
+                .map(l => `<span class="no-prod-chip" title="SIN PRODUCCIÓN EN EL TURNO">${l.productDesc}</span>`)
+                .join('');
         }
     }
 
@@ -416,7 +458,7 @@
 </body>
 </html>
 @functions {
-    // Un color distinto por horno para que el acento del header/gauge combine con el
+    // Un color distinto por horno para que el acento del header/cards combine con el
     // dashboard general (mismos colores que usa cada card ahí). Tube Mills usa gris-azulado.
     string FurnaceColor(int id) => id switch
     {
