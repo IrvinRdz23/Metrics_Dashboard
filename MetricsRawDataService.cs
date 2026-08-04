@@ -1,5 +1,6 @@
 using Metrics_Dashboard.Models;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace Metrics_Dashboard.Services;
@@ -67,29 +68,83 @@ public class MetricsRawDataService : IMetricsRawDataService
 
         while (await reader.ReadAsync(ct))
         {
-            var rowShiftDesc = reader.IsDBNull(ordShiftDesc) ? "" : reader.GetString(ordShiftDesc);
+            var rowShiftDesc = SafeGetString(reader, ordShiftDesc);
             if (!IsWithinShift(rowShiftDesc, now)) continue;
 
             if (string.IsNullOrEmpty(shiftDesc)) shiftDesc = rowShiftDesc;
 
             rows.Add(new RawMetricRow(
-                ReportGroup: reader.IsDBNull(ordReportGroup) ? -1 : reader.GetInt32(ordReportGroup),
-                GroupId: reader.IsDBNull(ordGroupId) ? -1 : reader.GetInt32(ordGroupId),
-                Desc: reader.IsDBNull(ordDesc) ? "" : reader.GetString(ordDesc),
-                ProductOrder: reader.IsDBNull(ordProductOrder) ? 0 : reader.GetInt32(ordProductOrder),
-                CycleTimeSecs: (double)(reader.IsDBNull(ordCycleTime) ? 0 : reader.GetDecimal(ordCycleTime)),
-                PlannedForOee: reader.IsDBNull(ordPlannedForOee) ? 0 : reader.GetInt32(ordPlannedForOee),
-                AccumRate: reader.IsDBNull(ordAccumRate) ? 0 : reader.GetInt32(ordAccumRate),
-                OeeShift: reader.IsDBNull(ordOeeShift) ? 0 : reader.GetDouble(ordOeeShift),
-                Total: reader.IsDBNull(ordTotal) ? 0 : reader.GetInt32(ordTotal),
-                TotalSap: reader.IsDBNull(ordTotalSap) ? 0 : reader.GetInt32(ordTotalSap),
-                Hour: reader.IsDBNull(ordHour) ? "" : reader.GetString(ordHour),
-                ShiftId: reader.IsDBNull(ordShiftId) ? -1 : reader.GetInt32(ordShiftId),
+                ReportGroup: SafeGetInt(reader, ordReportGroup, -1),
+                GroupId: SafeGetInt(reader, ordGroupId, -1),
+                Desc: SafeGetString(reader, ordDesc),
+                ProductOrder: SafeGetInt(reader, ordProductOrder),
+                CycleTimeSecs: SafeGetDouble(reader, ordCycleTime),
+                PlannedForOee: SafeGetInt(reader, ordPlannedForOee),
+                AccumRate: SafeGetInt(reader, ordAccumRate),
+                OeeShift: SafeGetDouble(reader, ordOeeShift),
+                Total: SafeGetInt(reader, ordTotal),
+                TotalSap: SafeGetInt(reader, ordTotalSap),
+                Hour: SafeGetString(reader, ordHour),
+                ShiftId: SafeGetInt(reader, ordShiftId, -1),
                 ShiftDesc: rowShiftDesc
             ));
         }
 
         return (rows, shiftDesc);
+    }
+
+    // ------------------------------------------------------------------
+    // Lecturas defensivas: este SP arma su resultado con varios UNION ALL y columnas
+    // calculadas con CASE/dynamic SQL, así que NO asumimos el tipo exacto que .NET cree
+    // que debería tener cada columna. Se toma el valor crudo (GetValue) y se convierte
+    // de forma segura sin importar si llega como int, decimal, double o incluso string.
+    // ------------------------------------------------------------------
+    private static int SafeGetInt(SqlDataReader reader, int ordinal, int fallback = 0)
+    {
+        if (reader.IsDBNull(ordinal)) return fallback;
+        var value = reader.GetValue(ordinal);
+        return value switch
+        {
+            int i => i,
+            short s => s,
+            byte b => b,
+            long l => (int)l,
+            decimal d => (int)d,
+            double db => (int)db,
+            float f => (int)f,
+            string str => int.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) ? parsed : fallback,
+            _ => TryConvert(() => Convert.ToInt32(value, CultureInfo.InvariantCulture), fallback)
+        };
+    }
+
+    private static double SafeGetDouble(SqlDataReader reader, int ordinal, double fallback = 0)
+    {
+        if (reader.IsDBNull(ordinal)) return fallback;
+        var value = reader.GetValue(ordinal);
+        return value switch
+        {
+            double db => db,
+            float f => f,
+            decimal d => (double)d,
+            int i => i,
+            short s => s,
+            byte b => b,
+            long l => l,
+            string str => double.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) ? parsed : fallback,
+            _ => TryConvert(() => Convert.ToDouble(value, CultureInfo.InvariantCulture), fallback)
+        };
+    }
+
+    private static string SafeGetString(SqlDataReader reader, int ordinal)
+    {
+        if (reader.IsDBNull(ordinal)) return string.Empty;
+        var value = reader.GetValue(ordinal);
+        return value?.ToString()?.Trim() ?? string.Empty;
+    }
+
+    private static T TryConvert<T>(Func<T> convert, T fallback)
+    {
+        try { return convert(); } catch { return fallback; }
     }
 
     /// <summary>
