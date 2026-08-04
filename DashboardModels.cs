@@ -1,13 +1,16 @@
-namespace PlantMetricsDashboard.Models;
+namespace Metrics_Dashboard.Models;
 
 /// <summary>
 /// Representa una línea/producto individual dentro de un horno (ej. "PTC Clam Shell 1").
-/// Viene de Report_Group=1 (día/turno acumulado) + Report_Group=3 (SAP) del SP.
+/// Viene de Report_Group=1 (día/turno acumulado, turno actual, con plan > 0) + Report_Group=3 (SAP).
 /// </summary>
 public class ProductLineMetric
 {
     public string ProductDesc { get; set; } = string.Empty;
     public double CycleTimeSecs { get; set; }
+
+    /// <summary>Orden de línea tal cual lo define Product_Order en el SP — usado para ordenar el detalle y el carrusel.</summary>
+    public int ProductOrder { get; set; }
 
     /// <summary>Total producido en tiempo real (columna Total, Report_Group=1).</summary>
     public int Total { get; set; }
@@ -29,6 +32,7 @@ public class ProductLineMetric
 /// Agregado por horno (Furnace 1..5) — Product_Group_ID 1 y 6 -> Furnace 1 (clam shells
 /// comparten horno), 2 -> Furnace 2, 3 -> Furnace 3, 4 -> Furnace 4, 5 -> Furnace 5.
 /// Product_Group_ID 7 (Tube Mills) se excluye en todo el dashboard.
+/// Lines siempre viene ordenado ascendente por Product_Order.
 /// </summary>
 public class FurnaceMetric
 {
@@ -53,7 +57,7 @@ public class FurnaceMetric
 
 /// <summary>
 /// Punto de la serie hora por hora (Report_Group=2), sumando Total de todas las líneas
-/// (excepto Tube Mills) para esa hora. No incluye "plan" — no existe un plan por hora real.
+/// (excepto Tube Mills) para esa hora, del turno actual únicamente.
 /// </summary>
 public class HourlyPoint
 {
@@ -68,7 +72,7 @@ public class PlantDashboardSnapshot
 {
     public DateTime GeneratedAt { get; set; } = DateTime.Now;
 
-    /// <summary>Viene directo de Shift_Desc del SP — nunca hardcodeado, el SP ya resuelve el turno por hora.</summary>
+    /// <summary>Viene directo de Shift_Desc del SP — nunca hardcodeado, se detecta por hora actual.</summary>
     public string ShiftDesc { get; set; } = string.Empty;
 
     public List<FurnaceMetric> Furnaces { get; set; } = new();
