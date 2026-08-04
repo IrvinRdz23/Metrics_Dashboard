@@ -221,6 +221,15 @@
     .bar-track { flex: 1; height: 6px; border-radius: 4px; background: var(--grid-line); overflow: hidden; }
     .bar-fill { height: 100%; border-radius: 4px; }
     .close-btn { flex-shrink: 0; }
+    tr.no-prod-row td { color: var(--no-plan-text); }
+    .no-prod-tag {
+        background: var(--no-plan-bg); border: 1px solid var(--no-plan-border); color: var(--no-plan-text);
+        padding: 3px 10px; border-radius: 6px; font-size: .68rem; font-weight: 700; letter-spacing: .3px;
+        display: inline-block;
+    }
+    .page-dots { display: flex; gap: 4px; justify-content: center; margin-top: 6px; }
+    .page-dots .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border); transition: background .2s; }
+    .page-dots .dot.active { background: var(--furnace-color, var(--accent)); }
 
     .live-dot {
         width: 8px; height: 8px; border-radius: 50%; background: var(--good);
@@ -311,6 +320,9 @@
     let snapshot = @Html.Raw(Json.Serialize(Model));
     let selectedFurnaceId = null;
     const charts = {};
+    const furnacePage = {}; // furnaceId -> índice de página actual (carrusel de 5 en 5, cada 15s)
+    const PAGE_SIZE = 5;
+    const PAGE_ROTATE_MS = 15000;
     const FURNACE_COLORS = ['#4da3ff', '#35d68f', '#f2b84b', '#c084fc', '#ff8a5c'];
 
     // Semáforo de OEE: >=85% verde, 70-85% amarillo, <70% rojo. Aplica a plantas, hornos y líneas.
@@ -328,6 +340,23 @@
         return `rgba(${r},${g},${b},${alpha})`;
     }
     function pct(v) { return (v * 100).toFixed(0) + '%'; }
+
+    // Carrusel tipo pantalla de aeropuerto: pagina las líneas de 5 en 5, ordenadas por Product_Order.
+    function furnaceLinesPage(f) {
+        const sorted = [...f.lines].sort((a, b) => a.productOrder - b.productOrder);
+        const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+        const idx = (furnacePage[f.furnaceId] || 0) % totalPages;
+        return { page: sorted.slice(idx * PAGE_SIZE, idx * PAGE_SIZE + PAGE_SIZE), totalPages, idx };
+    }
+
+    function renderPageDots(f) {
+        const el = document.getElementById('dots-' + f.furnaceId);
+        if (!el) return;
+        const { totalPages, idx } = furnaceLinesPage(f);
+        if (totalPages <= 1) { el.innerHTML = ''; return; }
+        el.innerHTML = Array.from({ length: totalPages }, (_, i) =>
+            `<span class="dot ${i === idx ? 'active' : ''}"></span>`).join('');
+    }
 
     document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -384,19 +413,21 @@
             <div class="chart-wrap" id="chartwrap-${f.furnaceId}">
                 ${hasProduction ? `<canvas id="chart-${f.furnaceId}"></canvas>` : `<div class="no-plan-box">SIN PRODUCCIÓN<br>EN EL TURNO ACTUAL</div>`}
             </div>
+            <div class="page-dots" id="dots-${f.furnaceId}"></div>
             <div class="worst-line" id="worst-${f.furnaceId}"></div>
         `;
         if (hasProduction) {
             setTimeout(() => {
                 charts['f' + f.furnaceId] = new Chart(document.getElementById('chart-' + f.furnaceId), lineBarConfig(f));
                 renderWorstLine(f);
+                renderPageDots(f);
             }, 0);
         }
         return div;
     }
 
     function lineBarConfig(f) {
-        const top = [...f.lines].sort((a, b) => b.total - a.total).slice(0, 5);
+        const top = furnaceLinesPage(f).page;
         return {
             type: 'bar',
             data: {
@@ -464,6 +495,7 @@
             chart.data = cfg.data;
             chart.update('none');
         }
+        renderPageDots(f);
 
         if (isLiveUpdate && prodChanged) {
             card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
@@ -577,7 +609,19 @@
             <span class="chip">SAP: ${pct(f.sapPercent)}</span>
             <span class="chip">${f.lines.length} líneas</span>
         `;
-        const rows = [...f.lines].sort((a, b) => b.total - a.total).map(l => `
+        const rows = [...f.lines].sort((a, b) => a.productOrder - b.productOrder).map(l => {
+            if (l.total === 0) {
+                return `
+                <tr class="no-prod-row">
+                    <td>${l.productDesc}</td>
+                    <td><span class="no-prod-tag">LÍNEA SIN PRODUCCIÓN</span></td>
+                    <td class="num">0</td>
+                    <td class="num">${l.accumulatedRate.toLocaleString()}</td>
+                    <td class="num">${l.plannedShift.toLocaleString()}</td>
+                    <td class="num">0</td>
+                </tr>`;
+            }
+            return `
             <tr>
                 <td>${l.productDesc}</td>
                 <td>
@@ -590,7 +634,8 @@
                 <td class="num">${l.accumulatedRate.toLocaleString()}</td>
                 <td class="num">${l.plannedShift.toLocaleString()}</td>
                 <td class="num">${l.totalSap.toLocaleString()}</td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
         document.getElementById('drilldownBody').innerHTML = rows;
     }
 
@@ -628,6 +673,24 @@
     document.getElementById('toggleDate').onclick = () => {
         document.getElementById('datePicker').classList.toggle('open');
     };
+
+    // ---------------------------------------------------------------
+    // CARRUSEL: cada 15s avanza a la siguiente página de líneas por horno
+    // (como los monitores de vuelos en un aeropuerto), sin esperar al refresh de datos.
+    // ---------------------------------------------------------------
+    setInterval(() => {
+        snapshot.furnaces.forEach(f => {
+            const { totalPages } = furnaceLinesPage(f);
+            if (totalPages <= 1) return;
+            furnacePage[f.furnaceId] = ((furnacePage[f.furnaceId] || 0) + 1) % totalPages;
+            const chart = charts['f' + f.furnaceId];
+            if (chart) {
+                chart.data = lineBarConfig(f).data;
+                chart.update('none');
+            }
+            renderPageDots(f);
+        });
+    }, PAGE_ROTATE_MS);
 
     // ---------------------------------------------------------------
     // SIGNALR: conexión + recepción de actualizaciones en vivo
