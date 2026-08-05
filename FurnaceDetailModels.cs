@@ -69,7 +69,16 @@ public class FurnaceDetailSnapshot
     public int RemainingToPlan => Math.Max(0, TotalPlanned - TotalProduction);
 
     public double Oee => CountedLines.Count == 0 ? 0 : CountedLines.Average(l => l.OeeShift);
-    public double SapPercent => TotalProduction <= 0 ? 0 : (double)TotalSap / TotalProduction;
+    public double SapPercent
+    {
+        get
+        {
+            var eligible = CountedLines.Where(l => !l.ExcludedFromSap).ToList();
+            var prod = eligible.Sum(l => l.Total);
+            var sap = eligible.Sum(l => l.TotalSap);
+            return prod <= 0 ? 0 : (double)sap / prod;
+        }
+    }
 
     public int LinesWithProduction => Lines.Count(l => l.Total > 0);
     public int LinesWithoutProduction => Lines.Count(l => l.Total == 0);
