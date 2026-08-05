@@ -73,6 +73,7 @@ public class FurnaceDetailService : IFurnaceDetailService
                 AccumulatedRate = r.AccumRate,
                 PlannedShift = r.PlannedForOee,
                 OeeShift = r.OeeShift,
+                ExcludedFromSap = SapRules.IsExcluded(r.Desc),
             };
             snapshot.Lines.Add(line);
             linesIndex[r.Desc] = line;
