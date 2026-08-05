@@ -105,7 +105,7 @@
     .btn:hover { background: var(--card-hover); border-color: var(--furnace-color); }
 
     /* ---------- BODY ---------- */
-    .body-grid { display: grid; grid-template-rows: 1.35fr 1fr; gap: clamp(10px, 1.1vh, 16px); min-height: 0; }
+    .body-grid { display: grid; grid-template-rows: 1.15fr auto 1fr; gap: clamp(10px, 1.1vh, 16px); min-height: 0; }
 
     .card {
         background: var(--card); border: 1px solid var(--border); border-radius: 20px;
@@ -117,13 +117,21 @@
         display: flex; flex-direction: column; gap: clamp(14px, 1.8vh, 24px); min-height: 0;
         padding: clamp(18px, 2.2vh, 30px) clamp(22px, 2.2vw, 34px);
     }
-    .hero-top { display: flex; align-items: center; justify-content: space-between; }
+    .hero-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
     .hero-title { font-size: clamp(1.05rem, 1.3vw, 1.4rem); font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim); }
-    .oee-badge {
-        font-size: clamp(1.5rem, 2.2vw, 2.4rem); font-weight: 900; font-family: 'JetBrains Mono', monospace;
-        padding: 7px 22px; border-radius: 999px; color: var(--pill-text); text-shadow: 0 1px 3px rgba(0,0,0,.25);
-        transition: background .3s ease;
+
+    /* Dos porcentajes distintos, a propósito con estilos distintos para no confundirlos:
+       OEE = pastilla SÓLIDA con semáforo (ritmo vs lo esperado a esta hora).
+       Avance vs Plan = pastilla de CONTORNO en acento (progreso vs el plan completo). */
+    .hero-badges { display: flex; align-items: flex-end; gap: clamp(14px, 1.6vw, 26px); }
+    .metric-badge { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .badge-label { font-size: clamp(.62rem, .72vw, .78rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .5px; font-weight: 800; }
+    .badge-pill {
+        font-size: clamp(1.4rem, 2vw, 2.1rem); font-weight: 900; font-family: 'JetBrains Mono', monospace;
+        padding: 7px 20px; border-radius: 999px; line-height: 1.1; transition: background .3s ease, color .3s ease;
     }
+    .badge-pill.solid { color: var(--pill-text); text-shadow: 0 1px 3px rgba(0,0,0,.25); }
+    .badge-pill.outline { background: transparent; border: 2.5px solid var(--accent); color: var(--accent); }
 
     .race-track {
         position: relative; height: clamp(64px, 10vh, 110px); border-radius: 18px;
@@ -174,9 +182,16 @@
     .pace-badge.ahead { background: rgba(61,219,152,.14); color: var(--good); border-color: var(--good); }
     .pace-badge.behind { background: rgba(255,107,120,.14); color: var(--bad); border-color: var(--bad); }
 
-    .race-numbers { display: flex; gap: clamp(20px, 3vw, 54px); flex-wrap: wrap; }
-    .rn .rv { font-size: clamp(1.7rem, 2.5vw, 2.9rem); font-weight: 900; font-family: 'JetBrains Mono', monospace; line-height: 1; }
-    .rn .rl { font-size: clamp(.66rem, .8vw, .88rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; margin-top: 5px; }
+    /* ---------- FILA DE MÉTRICOS (su propio carril, en cards) ---------- */
+    .metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(10px, 1vw, 16px); }
+    .metric-card {
+        padding: clamp(14px, 1.8vh, 22px) clamp(12px, 1.4vw, 18px);
+        display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+        transition: transform .12s ease;
+    }
+    .metric-card:hover { transform: translateY(-2px); }
+    .metric-card .mv { font-size: clamp(1.9rem, 2.8vw, 3.2rem); font-weight: 900; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+    .metric-card .ml { font-size: clamp(.66rem, .8vw, .88rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; margin-top: clamp(6px, 1vh, 10px); }
 
     /* ---------- TENDENCIA ---------- */
     .trend-card { padding: clamp(16px, 1.8vh, 26px) clamp(18px, 1.8vw, 26px); display: flex; flex-direction: column; min-height: 0; }
@@ -268,7 +283,16 @@
                 <div class="card hero-panel">
                     <div class="hero-top">
                         <div class="hero-title">Avance del Turno</div>
-                        <div class="oee-badge" id="oeeBadge">-</div>
+                        <div class="hero-badges">
+                            <div class="metric-badge">
+                                <div class="badge-pill solid" id="oeeBadge">-</div>
+                                <div class="badge-label">OEE de Turno</div>
+                            </div>
+                            <div class="metric-badge">
+                                <div class="badge-pill outline" id="progressBadge">-</div>
+                                <div class="badge-label">Avance vs Plan</div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="race-track" id="raceTrack">
@@ -286,14 +310,15 @@
                     </div>
 
                     <div class="pace-badge" id="paceBadge"></div>
-
-                    <div class="race-numbers">
-                        <div class="rn"><div class="rv" id="prodVal">-</div><div class="rl">Producción</div></div>
-                        <div class="rn"><div class="rv" id="expVal">-</div><div class="rl">Esperado a esta hora</div></div>
-                        <div class="rn"><div class="rv" id="remVal">-</div><div class="rl">Faltan por Plan</div></div>
-                        <div class="rn"><div class="rv" id="sapVal">-</div><div class="rl">SAP</div></div>
-                    </div>
                 </div>
+
+                <div class="metrics-row">
+                    <div class="card metric-card"><div class="mv" id="prodVal">-</div><div class="ml">Producción</div></div>
+                    <div class="card metric-card"><div class="mv" id="expVal">-</div><div class="ml">Esperado a esta hora</div></div>
+                    <div class="card metric-card"><div class="mv" id="remVal">-</div><div class="ml">Faltan por Plan</div></div>
+                    <div class="card metric-card"><div class="mv" id="sapVal">-</div><div class="ml">SAP</div></div>
+                </div>
+
                 <div class="card trend-card">
                     <h2>Tendencia por Hora de esta Línea</h2>
                     <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
@@ -308,6 +333,7 @@
         const plan = snapshot.plannedShift;
         const actualPct = plan > 0 ? Math.min(100, (snapshot.total / plan) * 100) : 0;
         const expectedPct = plan > 0 ? Math.min(100, (snapshot.accumulatedRate / plan) * 100) : 0;
+        document.getElementById('progressBadge').textContent = Math.round(actualPct) + '%';
 
         const fill = document.getElementById('raceFill');
         fill.style.width = actualPct + '%';
