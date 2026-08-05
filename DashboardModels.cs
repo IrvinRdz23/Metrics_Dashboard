@@ -26,6 +26,13 @@ public class ProductLineMetric
 
     /// <summary>Acumulado SAP (Report_Group=3, columna Total_SAP).</summary>
     public int TotalSap { get; set; }
+
+    /// <summary>
+    /// Líneas cuyo nombre incluye "CB", "Clam Shell" o "CM1" no participan en el % de SAP
+    /// (ni como numerador ni como denominador) — se marcan aquí para que la UI las muestre
+    /// con "-" en vez de un número/porcentaje. Ver SapRules.IsExcluded.
+    /// </summary>
+    public bool ExcludedFromSap { get; set; }
 }
 
 /// <summary>
@@ -34,6 +41,24 @@ public class ProductLineMetric
 /// Product_Group_ID 7 (Tube Mills) se excluye en todo el dashboard.
 /// Lines siempre viene ordenado ascendente por Product_Order.
 /// </summary>
+/// <summary>
+/// Regla única (compartida por el dashboard general y los 6 de detalle) para decidir qué
+/// líneas NO participan en el % de SAP: cualquier línea cuyo nombre incluya "CB" (como
+/// palabra completa, ej. "... CB", "... CB 2"), "Clam Shell" o "CM1".
+/// </summary>
+public static class SapRules
+{
+    public static bool IsExcluded(string productDesc)
+    {
+        if (string.IsNullOrWhiteSpace(productDesc)) return false;
+        if (productDesc.Contains("Clam Shell", StringComparison.OrdinalIgnoreCase)) return true;
+        if (productDesc.Contains("CM1", StringComparison.OrdinalIgnoreCase)) return true;
+
+        var words = productDesc.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return words.Any(w => string.Equals(w, "CB", StringComparison.OrdinalIgnoreCase));
+    }
+}
+
 public class FurnaceMetric
 {
     public int FurnaceId { get; set; }
@@ -54,7 +79,16 @@ public class FurnaceMetric
     /// <summary>OEE promedio de las líneas CON plan del horno (no producción/plan del horno).</summary>
     public double Oee => CountedLines.Count == 0 ? 0 : CountedLines.Average(l => l.OeeShift);
 
-    public double SapPercent => TotalProduction <= 0 ? 0 : (double)TotalSap / TotalProduction;
+    public double SapPercent
+    {
+        get
+        {
+            var eligible = CountedLines.Where(l => !l.ExcludedFromSap).ToList();
+            var prod = eligible.Sum(l => l.Total);
+            var sap = eligible.Sum(l => l.TotalSap);
+            return prod <= 0 ? 0 : (double)sap / prod;
+        }
+    }
 
     /// <summary>Línea con peor OEE de turno dentro del horno (solo entre las que tienen plan).</summary>
     public ProductLineMetric? WorstLine => CountedLines
