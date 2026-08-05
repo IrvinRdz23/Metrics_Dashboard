@@ -69,6 +69,7 @@ public class PlantMetricsService : IPlantMetricsService
                 AccumulatedRate = r.AccumRate,
                 PlannedShift = r.PlannedForOee,
                 OeeShift = r.OeeShift,
+                ExcludedFromSap = SapRules.IsExcluded(r.Desc),
             };
             furnaces.First(f => f.FurnaceId == furnaceId).Lines.Add(line);
             linesIndex[(furnaceId, r.Desc)] = line;
