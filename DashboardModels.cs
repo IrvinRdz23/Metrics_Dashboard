@@ -9,6 +9,10 @@ public class ProductLineMetric
     public string ProductDesc { get; set; } = string.Empty;
     public double CycleTimeSecs { get; set; }
 
+    /// <summary>Product_List_ID real de tu base — viene de Report_Group 2/3 (en la 1 es NULL,
+    /// así que se empareja por Product_Group_ID+Desc). Es el ID que usa /Line/{id}.</summary>
+    public int ProductListId { get; set; }
+
     /// <summary>Orden de línea tal cual lo define Product_Order en el SP — usado para ordenar el detalle y el carrusel.</summary>
     public int ProductOrder { get; set; }
 

@@ -9,11 +9,32 @@ namespace Metrics_Dashboard.Models;
 /// Se calcula una sola vez por ciclo en IMetricsRawDataService y de ahí se derivan TODOS los
 /// snapshots (el general y los 6 de detalle), para no golpear el SP más de una vez por poll.
 /// </summary>
+/// <summary>
+/// Helper compartido para resolver el Product_List_ID real de cada línea — en Report_Group=1
+/// siempre viene NULL, pero en Report_Group 2 y 3 sí viene. Se usa para poder generar el
+/// link /Line/{id} de cada línea sin tener que tocar el SP.
+/// </summary>
+public static class RawRowsExtensions
+{
+    public static Dictionary<(int GroupId, string Desc), int> BuildProductListIdLookup(this List<RawMetricRow> rows)
+    {
+        var lookup = new Dictionary<(int, string), int>();
+        foreach (var r in rows)
+        {
+            if (r.ProductListId <= 0) continue;
+            var key = (r.GroupId, r.Desc);
+            if (!lookup.ContainsKey(key)) lookup[key] = r.ProductListId;
+        }
+        return lookup;
+    }
+}
+
 public record RawMetricRow(
     int ReportGroup,
     int GroupId,
     string Desc,
     int ProductOrder,
+    int ProductListId,
     double CycleTimeSecs,
     int PlannedForOee,
     int AccumRate,
@@ -48,6 +69,35 @@ public static class FurnaceCatalog
 /// Snapshot completo de UN horno (o Tube Mills), con TODAS sus líneas del turno actual
 /// (no solo un top 5) — es lo que alimenta cada dashboard individual.
 /// </summary>
+/// <summary>
+/// Snapshot de UNA sola línea/celda (ej. "PTC Clam Shell 1"), para su TV individual
+/// montada arriba de esa línea en piso. Se identifica por Product_List_ID — el ID real
+/// de tu base, tomado de las filas de Report_Group 2/3 (en la 1 siempre viene NULL).
+/// </summary>
+public class LineDetailSnapshot
+{
+    public int ProductListId { get; set; }
+    public string ProductDesc { get; set; } = string.Empty;
+    public int FurnaceId { get; set; }
+    public string FurnaceName { get; set; } = string.Empty;
+    public DateTime GeneratedAt { get; set; } = DateTime.Now;
+    public string ShiftDesc { get; set; } = string.Empty;
+
+    public double CycleTimeSecs { get; set; }
+    public int Total { get; set; }
+    public int AccumulatedRate { get; set; }
+    public int PlannedShift { get; set; }
+    public double OeeShift { get; set; }
+    public int TotalSap { get; set; }
+    public bool ExcludedFromSap { get; set; }
+
+    /// <summary>Si no hay plan para este turno (Planned_Shift_for_OEE = 0), la línea existe
+    /// pero no tiene nada que reportar — la vista debe mostrar el estado "sin producción".</summary>
+    public bool HasPlan => PlannedShift > 0;
+
+    public List<HourlyPoint> HourlyTrend { get; set; } = new();
+}
+
 public class FurnaceDetailSnapshot
 {
     public int FurnaceId { get; set; }

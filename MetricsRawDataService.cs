@@ -56,6 +56,7 @@ public class MetricsRawDataService : IMetricsRawDataService
         int ordGroupId = reader.GetOrdinal("Product_Group_ID");
         int ordDesc = reader.GetOrdinal("Product_Desc");
         int ordProductOrder = reader.GetOrdinal("Product_Order");
+        int ordProductListId = reader.GetOrdinal("Product_List_ID");
         int ordCycleTime = reader.GetOrdinal("Cycle_Time_Secs");
         int ordPlannedForOee = reader.GetOrdinal("Planned_Shift_for_OEE");
         int ordAccumRate = reader.GetOrdinal("Accumulated_Rate");
@@ -78,6 +79,7 @@ public class MetricsRawDataService : IMetricsRawDataService
                 GroupId: SafeGetInt(reader, ordGroupId, -1),
                 Desc: SafeGetString(reader, ordDesc),
                 ProductOrder: SafeGetInt(reader, ordProductOrder),
+                ProductListId: SafeGetInt(reader, ordProductListId),
                 CycleTimeSecs: SafeGetDouble(reader, ordCycleTime),
                 PlannedForOee: SafeGetInt(reader, ordPlannedForOee),
                 AccumRate: SafeGetInt(reader, ordAccumRate),

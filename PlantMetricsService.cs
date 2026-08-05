@@ -47,6 +47,7 @@ public class PlantMetricsService : IPlantMetricsService
             .ToList();
 
         var linesIndex = new Dictionary<(int furnaceId, string desc), ProductLineMetric>();
+        var productListIdLookup = rows.BuildProductListIdLookup();
 
         // Mapeo Product_Group_ID -> horno (1..5), tomado del catálogo compartido, sin Tube Mills (7).
         var groupToFurnace = FurnaceCatalog.Map
@@ -63,6 +64,7 @@ public class PlantMetricsService : IPlantMetricsService
             var line = new ProductLineMetric
             {
                 ProductDesc = r.Desc,
+                ProductListId = productListIdLookup.TryGetValue((r.GroupId, r.Desc), out var plid) ? plid : 0,
                 ProductOrder = r.ProductOrder,
                 CycleTimeSecs = r.CycleTimeSecs,
                 Total = r.Total,

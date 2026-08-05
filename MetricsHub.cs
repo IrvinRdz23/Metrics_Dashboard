@@ -7,12 +7,14 @@ namespace Metrics_Dashboard.Hubs;
 /// - Dashboard general -> grupo "General" (se une automático al conectar).
 /// - Dashboards de horno/Tube Mills -> grupo "Furnace-{id}" (se unen explícitamente
 ///   llamando a JoinFurnace(id) desde el cliente, id 1..5 = hornos, 6 = Tube Mills).
+/// - Dashboards de línea individual -> grupo "Line-{productListId}" (JoinLine(id)).
 /// </summary>
 public class MetricsHub : Hub
 {
     public const string GeneralGroup = "General";
 
     public static string FurnaceGroup(int furnaceId) => $"Furnace-{furnaceId}";
+    public static string LineGroup(int lineId) => $"Line-{lineId}";
 
     public override async Task OnConnectedAsync()
     {
@@ -30,5 +32,11 @@ public class MetricsHub : Hub
     public async Task JoinFurnace(int furnaceId)
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, FurnaceGroup(furnaceId));
+    }
+
+    /// <summary>Llamado desde el JS de cada dashboard de línea individual.</summary>
+    public async Task JoinLine(int lineId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, LineGroup(lineId));
     }
 }

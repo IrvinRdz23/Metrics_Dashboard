@@ -241,6 +241,8 @@
         display: inline-block;
     }
     .sap-excluded { color: var(--text-faint); font-weight: 600; }
+    .line-link { color: inherit; text-decoration: none; border-bottom: 1px dashed var(--border); }
+    .line-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
     .page-ring-wrap { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; height: 18px; }
     .page-ring-svg { width: 18px; height: 18px; transform: rotate(-90deg); flex-shrink: 0; }
     .ring-bg { fill: none; stroke: var(--border); stroke-width: 2.5; }
@@ -710,10 +712,13 @@
             const sapCell = l.excludedFromSap
                 ? `<span class="sap-excluded">-</span>`
                 : (l.total === 0 ? '0' : l.totalSap.toLocaleString());
+            const nameCell = l.productListId > 0
+                ? `<a href="/Line/${l.productListId}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>`
+                : l.productDesc;
             if (l.total === 0) {
                 return `
                 <tr class="no-prod-row">
-                    <td>${l.productDesc}</td>
+                    <td>${nameCell}</td>
                     <td><span class="no-prod-tag">LÍNEA SIN PRODUCCIÓN</span></td>
                     <td class="num">0</td>
                     <td class="num">${l.accumulatedRate.toLocaleString()}</td>
@@ -723,7 +728,7 @@
             }
             return `
             <tr>
-                <td>${l.productDesc}</td>
+                <td>${nameCell}</td>
                 <td>
                     <div class="bar-cell">
                         <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}"></div></div>

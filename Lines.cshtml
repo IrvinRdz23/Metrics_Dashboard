@@ -1,0 +1,347 @@
+@model Metrics_Dashboard.Models.LineDetailSnapshot
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Plant Metrics · @Model.ProductDesc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+    :root[data-theme="dark"] {
+        --bg: #0a0e15;
+        --card: #131a28;
+        --card-hover: #1a2338;
+        --border: #263652;
+        --border-soft: rgba(255,255,255,0.07);
+        --text: #f2f5fb;
+        --text-dim: #93a4c2;
+        --text-faint: #62729a;
+        --accent: #55acff;
+        --accent-soft: rgba(85,172,255,0.16);
+        --good: #3ddb98;
+        --warn: #f5c15c;
+        --bad: #ff6b78;
+        --no-plan-bg: rgba(172,138,255,0.14);
+        --no-plan-border: #ac8aff;
+        --no-plan-text: #d1bfff;
+        --grid-line: rgba(255,255,255,0.06);
+        --shadow: 0 10px 26px -12px rgba(0,0,0,0.55);
+        --pill-text: #061018;
+    }
+    :root[data-theme="light"] {
+        --bg: #e7ebf3;
+        --card: #ffffff;
+        --card-hover: #eef2fa;
+        --border: #c3ccdc;
+        --border-soft: rgba(16,24,40,0.08);
+        --text: #0c1526;
+        --text-dim: #46536b;
+        --text-faint: #707f9c;
+        --accent: #1957c2;
+        --accent-soft: rgba(25,87,194,0.11);
+        --good: #0e8f57;
+        --warn: #96650a;
+        --bad: #c22e3e;
+        --no-plan-bg: rgba(109,40,217,0.09);
+        --no-plan-border: #6d28d9;
+        --no-plan-text: #5b21b6;
+        --grid-line: rgba(16,24,40,0.08);
+        --shadow: 0 12px 28px -14px rgba(20,30,60,0.22);
+        --pill-text: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+        margin: 0; padding: 0; height: 100%; overflow: hidden;
+        background: var(--bg); color: var(--text);
+        font-family: 'Inter', 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .app { height: 100vh; width: 100vw; display: grid; grid-template-rows: auto 1fr; gap: clamp(10px, 1.1vh, 16px); padding: clamp(12px, 1.2vh, 18px); }
+
+    header {
+        display: flex; align-items: center; justify-content: space-between; gap: clamp(14px, 1.6vw, 26px);
+        background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+        padding: clamp(12px, 1.5vh, 20px) clamp(20px, 2vw, 32px);
+        border-top: 5px solid var(--furnace-color);
+        box-shadow: var(--shadow);
+    }
+    .app.presentation .controls-collapsible { display: none; }
+
+    .brand { display: flex; align-items: center; gap: clamp(12px, 1.2vw, 18px); min-width: 0; }
+    .furnace-tag {
+        flex-shrink: 0; background: var(--furnace-color); color: #06101f; font-weight: 900;
+        font-size: clamp(.85rem, 1vw, 1.05rem); padding: clamp(8px, 1vh, 12px) clamp(12px, 1.2vw, 16px);
+        border-radius: 12px; text-decoration: none;
+    }
+    .brand-text { min-width: 0; }
+    .brand-text h1 { font-size: clamp(1.4rem, 2.3vw, 2.5rem); margin: 0; font-weight: 900; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .brand-text .subtitle { color: var(--text-dim); font-size: clamp(.85rem, 1vw, 1.05rem); display: flex; align-items: center; gap: 10px; margin-top: 4px; font-weight: 600; }
+    .shift-badge { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border); padding: 3px 12px; border-radius: 999px; font-size: clamp(.72rem, .85vw, .9rem); font-weight: 700; letter-spacing: .3px; }
+
+    .header-right { display: flex; align-items: center; gap: clamp(16px, 2vw, 30px); flex-shrink: 0; }
+    .live-block { display: flex; align-items: center; gap: 8px; }
+    .live-dot { width: 11px; height: 11px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 rgba(61,219,152,.6); animation: pulse 1.8s infinite; }
+    @@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(61,219,152,.55); } 70% { box-shadow: 0 0 0 10px rgba(61,219,152,0); } 100% { box-shadow: 0 0 0 0 rgba(61,219,152,0); } }
+    .live-block .value { font-size: clamp(1rem, 1.3vw, 1.4rem); font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+    .live-block .label { font-size: clamp(.6rem, .72vw, .78rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
+
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .btn {
+        background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 10px;
+        padding: 10px 16px; font-size: clamp(.8rem, .95vw, 1rem); font-weight: 700; cursor: pointer; text-decoration: none;
+        display: flex; align-items: center; gap: 7px; transition: background .15s, border-color .15s;
+    }
+    .btn:hover { background: var(--card-hover); border-color: var(--furnace-color); }
+
+    /* ---------- BODY ---------- */
+    .body-grid { display: grid; grid-template-rows: auto 1fr; gap: clamp(10px, 1.1vh, 16px); min-height: 0; }
+
+    .hero-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(10px, 1vw, 16px); }
+    .hero-card {
+        background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+        padding: clamp(16px, 2vh, 26px) clamp(14px, 1.6vw, 22px);
+        box-shadow: var(--shadow); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+        border-top: 4px solid var(--furnace-color);
+    }
+    .hero-card .hv { font-size: clamp(2.6rem, 5vw, 5.4rem); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
+    .hero-card .hl { font-size: clamp(.78rem, 1vw, 1.05rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .6px; font-weight: 800; margin-top: clamp(6px, 1vh, 10px); }
+    .hero-card.oee-hero .hv { transition: color .3s ease; }
+
+    .lower-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: clamp(10px, 1vw, 16px); min-height: 0; }
+
+    .card {
+        background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+        padding: clamp(16px, 1.8vh, 26px) clamp(18px, 1.8vw, 26px);
+        box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 0;
+        border-top: 4px solid var(--furnace-color);
+    }
+    .card h2 { font-size: clamp(1rem, 1.2vw, 1.3rem); margin: 0 0 clamp(10px, 1.2vh, 16px) 0; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); }
+
+    .progress-card { justify-content: center; }
+    .progress-track { height: clamp(38px, 5vh, 60px); border-radius: 14px; background: var(--grid-line); overflow: hidden; position: relative; }
+    .progress-fill { height: 100%; border-radius: 14px; display: flex; align-items: center; padding-left: 18px; transition: width .6s ease; }
+    .progress-fill span { font-size: clamp(1.1rem, 1.5vw, 1.7rem); font-weight: 900; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.45); font-family: 'JetBrains Mono', monospace; }
+    .progress-caption { display: flex; justify-content: space-between; margin-top: clamp(10px, 1.4vh, 16px); font-size: clamp(.85rem, 1vw, 1.1rem); color: var(--text-dim); font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+    .sap-line { margin-top: clamp(16px, 2vh, 26px); display: flex; justify-content: space-between; align-items: center; padding-top: clamp(14px, 1.8vh, 20px); border-top: 1px solid var(--border-soft); }
+    .sap-line .k { font-size: clamp(.85rem, 1vw, 1.1rem); color: var(--text-dim); font-weight: 700; }
+    .sap-line .v { font-size: clamp(1.3rem, 1.8vw, 2rem); font-weight: 900; font-family: 'JetBrains Mono', monospace; }
+
+    .trend-card .chart-wrap { flex: 1; min-height: 0; }
+
+    /* ---------- ESTADO SIN PRODUCCIÓN ---------- */
+    .no-plan-hero {
+        grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: var(--no-plan-bg); border: 3px dashed var(--no-plan-border); border-radius: 22px;
+        color: var(--no-plan-text); text-align: center; gap: 14px; height: 100%;
+    }
+    .no-plan-hero .big { font-size: clamp(2rem, 4vw, 4rem); font-weight: 900; letter-spacing: .5px; }
+    .no-plan-hero .small { font-size: clamp(1rem, 1.3vw, 1.4rem); font-weight: 700; opacity: .85; }
+</style>
+</head>
+<body>
+<div class="app" id="app" style="--furnace-color: @FurnaceColor(Model.FurnaceId)">
+
+    <header>
+        <div class="brand">
+            <a class="furnace-tag" href="@FurnaceHref(Model.FurnaceId)" title="Ver @Model.FurnaceName completo">@(Model.FurnaceId == 6 ? "TM" : Model.FurnaceId.ToString())</a>
+            <div class="brand-text">
+                <h1 id="lineTitle">@Model.ProductDesc</h1>
+                <div class="subtitle">
+                    <span>@Model.FurnaceName</span>
+                    <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div class="live-block">
+                <span class="live-dot"></span>
+                <div>
+                    <div class="value" id="lastUpdate">--:--</div>
+                    <div class="label">Actualizado</div>
+                </div>
+            </div>
+            <div class="header-actions controls-collapsible">
+                <a class="btn" href="@FurnaceHref(Model.FurnaceId)" title="Volver al horno">📊 @Model.FurnaceName</a>
+                <button class="btn" id="toggleTheme">🌗 Tema</button>
+                <button class="btn" id="togglePresentation">🖥️ Presentación</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="body-grid" id="bodyGrid"></div>
+</div>
+
+<script>
+    let snapshot = @Html.Raw(Json.Serialize(Model));
+    const LINE_ID = @Model.ProductListId;
+    const charts = {};
+
+    function oeeColor(oee) {
+        if (oee >= 0.85) return getCss('--good');
+        if (oee >= 0.70) return getCss('--warn');
+        return getCss('--bad');
+    }
+    function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+    function hexToRgba(hex, alpha) {
+        const h = hex.replace('#', '');
+        const bigint = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+        const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255;
+        return `rgba(${r},${g},${b},${alpha})`;
+    }
+    function pct(v) { return (v * 100).toFixed(0) + '%'; }
+
+    function render() {
+        document.getElementById('lineTitle').textContent = snapshot.productDesc;
+        document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
+        document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+
+        const grid = document.getElementById('bodyGrid');
+
+        if (!snapshot.hasPlan) {
+            grid.innerHTML = `
+                <div class="no-plan-hero">
+                    <div class="big">SIN PRODUCCIÓN EN EL TURNO ACTUAL</div>
+                    <div class="small">Esta línea no tiene plan asignado para el turno vigente</div>
+                </div>`;
+            return;
+        }
+
+        const wasEmpty = !document.getElementById('oeeVal');
+        if (wasEmpty) {
+            grid.innerHTML = `
+                <div class="hero-row">
+                    <div class="hero-card oee-hero"><div class="hv" id="oeeVal">-</div><div class="hl">OEE de Turno</div></div>
+                    <div class="hero-card"><div class="hv" id="prodVal">-</div><div class="hl">Producción</div></div>
+                    <div class="hero-card"><div class="hv" id="expVal">-</div><div class="hl">Esperado a esta hora</div></div>
+                    <div class="hero-card"><div class="hv" id="planVal">-</div><div class="hl">Plan de Turno</div></div>
+                </div>
+                <div class="lower-grid">
+                    <div class="card progress-card">
+                        <h2>Avance del Turno</h2>
+                        <div class="progress-track"><div class="progress-fill" id="progressFill"><span id="progressPct"></span></div></div>
+                        <div class="progress-caption"><span id="progressLeft"></span><span id="progressRight"></span></div>
+                        <div class="sap-line"><span class="k">SAP</span><span class="v" id="sapVal">-</span></div>
+                    </div>
+                    <div class="card trend-card">
+                        <h2>Tendencia por Hora de esta Línea</h2>
+                        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+                    </div>
+                </div>`;
+        }
+
+        const color = oeeColor(snapshot.oeeShift);
+        document.getElementById('oeeVal').textContent = pct(snapshot.oeeShift);
+        document.getElementById('oeeVal').style.color = color;
+        document.getElementById('prodVal').textContent = snapshot.total.toLocaleString();
+        document.getElementById('expVal').textContent = snapshot.accumulatedRate.toLocaleString();
+        document.getElementById('planVal').textContent = snapshot.plannedShift.toLocaleString();
+
+        const progressPct = snapshot.plannedShift > 0 ? Math.min(100, (snapshot.total / snapshot.plannedShift) * 100) : 0;
+        document.getElementById('progressFill').style.width = progressPct + '%';
+        document.getElementById('progressFill').style.background = color;
+        document.getElementById('progressPct').textContent = progressPct.toFixed(0) + '%';
+        document.getElementById('progressLeft').textContent = `${snapshot.total.toLocaleString()} producidas`;
+        document.getElementById('progressRight').textContent = `Plan: ${snapshot.plannedShift.toLocaleString()}`;
+
+        document.getElementById('sapVal').textContent = snapshot.excludedFromSap ? '—' : snapshot.totalSap.toLocaleString();
+
+        renderTrend();
+    }
+
+    function renderTrend() {
+        const canvas = document.getElementById('trendChart');
+        if (!canvas) return;
+        if (charts.trend) {
+            charts.trend.data.labels = snapshot.hourlyTrend.map(h => h.hour);
+            charts.trend.data.datasets[0].data = snapshot.hourlyTrend.map(h => h.production);
+            charts.trend.update('none');
+            return;
+        }
+        charts.trend = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: snapshot.hourlyTrend.map(h => h.hour),
+                datasets: [{
+                    label: 'Producción / hora',
+                    data: snapshot.hourlyTrend.map(h => h.production),
+                    backgroundColor: hexToRgba(getCss('--accent'), .65),
+                    borderRadius: 8, maxBarThickness: 60
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: getCss('--text-dim'), font: { size: 14, weight: '600' } }, grid: { color: getCss('--grid-line') } },
+                    y: { beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } }
+                }
+            }
+        });
+    }
+
+    document.getElementById('toggleTheme').onclick = () => {
+        const html = document.documentElement;
+        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('pm-theme', next);
+        if (charts.trend) { charts.trend.destroy(); charts.trend = null; }
+        document.getElementById('bodyGrid').innerHTML = '';
+        render();
+    };
+    const savedTheme = localStorage.getItem('pm-theme');
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+
+    document.getElementById('togglePresentation').onclick = () => {
+        document.getElementById('app').classList.toggle('presentation');
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen?.().catch(() => {});
+        } else {
+            document.exitFullscreen?.().catch(() => {});
+        }
+        setTimeout(() => Object.values(charts).forEach(c => c && c.resize()), 260);
+    };
+
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl('/hubs/metrics')
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on('LineSnapshotUpdated', (payload) => {
+        if (payload.productListId !== LINE_ID) return;
+        snapshot = payload;
+        render();
+    });
+
+    connection.start()
+        .then(() => connection.invoke('JoinLine', LINE_ID))
+        .catch(err => console.error('SignalR error:', err));
+
+    render();
+</script>
+</body>
+</html>
+@functions {
+    string FurnaceColor(int id) => id switch
+    {
+        1 => "#4da3ff",
+        2 => "#35d68f",
+        3 => "#f2b84b",
+        4 => "#c084fc",
+        5 => "#ff8a5c",
+        6 => "#64748b",
+        _ => "#4da3ff"
+    };
+
+    string FurnaceHref(int id) => id == 6 ? "/TubeMills" : $"/Furnace{id}";
+}

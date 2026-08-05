@@ -58,6 +58,7 @@ public class FurnaceDetailService : IFurnaceDetailService
         };
 
         var linesIndex = new Dictionary<string, ProductLineMetric>();
+        var productListIdLookup = rows.BuildProductListIdLookup();
 
         // Se incluyen TODAS las líneas (incluso con Planned_Shift_for_OEE = 0) para poder
         // mostrarlas en el detalle; FurnaceDetailSnapshot ya se encarga de no contarlas en
@@ -67,6 +68,7 @@ public class FurnaceDetailService : IFurnaceDetailService
             var line = new ProductLineMetric
             {
                 ProductDesc = r.Desc,
+                ProductListId = productListIdLookup.TryGetValue((r.GroupId, r.Desc), out var plid) ? plid : 0,
                 ProductOrder = r.ProductOrder,
                 CycleTimeSecs = r.CycleTimeSecs,
                 Total = r.Total,

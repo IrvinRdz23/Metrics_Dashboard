@@ -136,6 +136,10 @@
     }
     .line-row.flash { background: var(--flash); }
     .line-row .line-name { font-size: clamp(.95rem, 1.15vw, 1.25rem); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .line-link { color: inherit; text-decoration: none; border-bottom: 1px dashed var(--border); }
+    .line-link:hover { color: var(--furnace-color); border-bottom-color: var(--furnace-color); }
+    a.no-prod-chip { text-decoration: none; cursor: pointer; }
+    a.no-prod-chip:hover { background: var(--no-plan-border); color: #fff; }
     .line-row .line-plan { font-size: clamp(.78rem, .9vw, .98rem); color: var(--text-faint); text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
     .line-bar-area { display: flex; align-items: center; gap: clamp(10px, 1.1vw, 16px); min-width: 0; }
     .line-bar-track { flex: 1; height: clamp(26px, 3vh, 36px); border-radius: 8px; background: var(--grid-line); overflow: hidden; position: relative; min-width: 0; }
@@ -330,7 +334,7 @@
             const changed = isLiveUpdate && prevTotalByDesc[l.productDesc] !== undefined && prevTotalByDesc[l.productDesc] !== String(l.total);
             return `
                 <div class="line-row ${changed ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
-                    <div class="line-name" title="${l.productDesc}">${l.productDesc}</div>
+                    <div class="line-name" title="${l.productDesc}">${l.productListId > 0 ? `<a href="/Line/${l.productListId}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>` : l.productDesc}</div>
                     <div class="line-bar-area">
                         <div class="line-bar-track">
                             <div class="line-bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}">
@@ -354,7 +358,9 @@
             section.style.display = '';
             document.getElementById('noProdCount').textContent = `(${inactive.length})`;
             document.getElementById('noProdChips').innerHTML = inactive
-                .map(l => `<span class="no-prod-chip" title="SIN PRODUCCIÓN EN EL TURNO">${l.productDesc}</span>`)
+                .map(l => l.productListId > 0
+                    ? `<a href="/Line/${l.productListId}" class="no-prod-chip" title="Ver TV de esta línea">${l.productDesc}</a>`
+                    : `<span class="no-prod-chip" title="SIN PRODUCCIÓN EN EL TURNO">${l.productDesc}</span>`)
                 .join('');
         }
     }

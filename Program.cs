@@ -6,10 +6,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
 
-// Un solo lector del SP (compartido por el dashboard general y los 6 de detalle).
+// Un solo lector del SP (compartido por el dashboard general, los 6 de horno y las 53 de línea).
 builder.Services.AddScoped<IMetricsRawDataService, MetricsRawDataService>();
 builder.Services.AddScoped<IPlantMetricsService, PlantMetricsService>();
 builder.Services.AddScoped<IFurnaceDetailService, FurnaceDetailService>();
+builder.Services.AddScoped<ILineDetailService, LineDetailService>();
 
 builder.Services.AddHostedService<MetricsBroadcastService>();
 
