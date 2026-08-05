@@ -34,6 +34,7 @@
         --grid-line: rgba(255,255,255,0.06);
         --shadow: 0 10px 26px -12px rgba(0,0,0,0.55);
         --pill-text: #061018;
+        --track-bg: rgba(255,255,255,0.06);
     }
     :root[data-theme="light"] {
         --bg: #e7ebf3;
@@ -55,6 +56,7 @@
         --grid-line: rgba(16,24,40,0.08);
         --shadow: 0 12px 28px -14px rgba(20,30,60,0.22);
         --pill-text: #ffffff;
+        --track-bg: rgba(16,24,40,0.07);
     }
 
     * { box-sizing: border-box; }
@@ -103,44 +105,87 @@
     .btn:hover { background: var(--card-hover); border-color: var(--furnace-color); }
 
     /* ---------- BODY ---------- */
-    .body-grid { display: grid; grid-template-rows: auto 1fr; gap: clamp(10px, 1.1vh, 16px); min-height: 0; }
-
-    .hero-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(10px, 1vw, 16px); }
-    .hero-card {
-        background: var(--card); border: 1px solid var(--border); border-radius: 18px;
-        padding: clamp(16px, 2vh, 26px) clamp(14px, 1.6vw, 22px);
-        box-shadow: var(--shadow); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-        border-top: 4px solid var(--furnace-color);
-    }
-    .hero-card .hv { font-size: clamp(2.6rem, 5vw, 5.4rem); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
-    .hero-card .hl { font-size: clamp(.78rem, 1vw, 1.05rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .6px; font-weight: 800; margin-top: clamp(6px, 1vh, 10px); }
-    .hero-card.oee-hero .hv { transition: color .3s ease; }
-
-    .lower-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: clamp(10px, 1vw, 16px); min-height: 0; }
+    .body-grid { display: grid; grid-template-rows: 1.35fr 1fr; gap: clamp(10px, 1.1vh, 16px); min-height: 0; }
 
     .card {
-        background: var(--card); border: 1px solid var(--border); border-radius: 18px;
-        padding: clamp(16px, 1.8vh, 26px) clamp(18px, 1.8vw, 26px);
-        box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 0;
-        border-top: 4px solid var(--furnace-color);
+        background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+        box-shadow: var(--shadow); border-top: 5px solid var(--furnace-color);
     }
-    .card h2 { font-size: clamp(1rem, 1.2vw, 1.3rem); margin: 0 0 clamp(10px, 1.2vh, 16px) 0; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); }
 
-    .progress-card { justify-content: center; }
-    .progress-track { height: clamp(38px, 5vh, 60px); border-radius: 14px; background: var(--grid-line); overflow: hidden; position: relative; }
-    .progress-fill { height: 100%; border-radius: 14px; display: flex; align-items: center; padding-left: 18px; transition: width .6s ease; }
-    .progress-fill span { font-size: clamp(1.1rem, 1.5vw, 1.7rem); font-weight: 900; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.45); font-family: 'JetBrains Mono', monospace; }
-    .progress-caption { display: flex; justify-content: space-between; margin-top: clamp(10px, 1.4vh, 16px); font-size: clamp(.85rem, 1vw, 1.1rem); color: var(--text-dim); font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    /* ---------- HERO: AVANCE DEL TURNO (tipo carrera hacia la meta) ---------- */
+    .hero-panel {
+        display: flex; flex-direction: column; gap: clamp(14px, 1.8vh, 24px); min-height: 0;
+        padding: clamp(18px, 2.2vh, 30px) clamp(22px, 2.2vw, 34px);
+    }
+    .hero-top { display: flex; align-items: center; justify-content: space-between; }
+    .hero-title { font-size: clamp(1.05rem, 1.3vw, 1.4rem); font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim); }
+    .oee-badge {
+        font-size: clamp(1.5rem, 2.2vw, 2.4rem); font-weight: 900; font-family: 'JetBrains Mono', monospace;
+        padding: 7px 22px; border-radius: 999px; color: var(--pill-text); text-shadow: 0 1px 3px rgba(0,0,0,.25);
+        transition: background .3s ease;
+    }
 
-    .sap-line { margin-top: clamp(16px, 2vh, 26px); display: flex; justify-content: space-between; align-items: center; padding-top: clamp(14px, 1.8vh, 20px); border-top: 1px solid var(--border-soft); }
-    .sap-line .k { font-size: clamp(.85rem, 1vw, 1.1rem); color: var(--text-dim); font-weight: 700; }
-    .sap-line .v { font-size: clamp(1.3rem, 1.8vw, 2rem); font-weight: 900; font-family: 'JetBrains Mono', monospace; }
+    .race-track {
+        position: relative; height: clamp(64px, 10vh, 110px); border-radius: 18px;
+        background: var(--track-bg); border: 2px solid var(--border-soft); overflow: hidden;
+    }
+    .race-fill {
+        position: relative; height: 100%; border-radius: 18px 0 0 18px;
+        transition: width .8s cubic-bezier(.22,1,.36,1); overflow: hidden; min-width: 2px;
+    }
+    .race-fill.full { border-radius: 18px; }
+    .race-shine {
+        position: absolute; top: 0; bottom: 0; width: 55%;
+        background: linear-gradient(100deg, transparent, rgba(255,255,255,.32), transparent);
+        animation: shine 3.4s ease-in-out infinite;
+    }
+    @@keyframes shine { 0% { transform: translateX(-140%); } 100% { transform: translateX(240%); } }
+    .race-fill-label {
+        position: absolute; top: 50%; right: 16px; transform: translateY(-50%);
+        font-size: clamp(1.2rem, 1.9vw, 2rem); font-weight: 900; color: #fff;
+        text-shadow: 0 2px 6px rgba(0,0,0,.5); font-family: 'JetBrains Mono', monospace; white-space: nowrap;
+    }
+    .race-icon {
+        position: absolute; top: 50%; right: 6px; transform: translate(50%, -50%);
+        font-size: clamp(1.5rem, 2.3vw, 2.3rem); animation: bob 1.6s ease-in-out infinite;
+        filter: drop-shadow(0 2px 5px rgba(0,0,0,.4));
+    }
+    @@keyframes bob { 0%, 100% { transform: translate(50%, -58%); } 50% { transform: translate(50%, -42%); } }
 
+    .race-marker { position: absolute; top: -3px; bottom: -3px; width: 0; z-index: 3; }
+    .race-marker-line { position: absolute; top: 0; bottom: 0; left: 0; border-left: 3px dashed rgba(255,255,255,.9); }
+    .race-marker-flag { position: absolute; top: -30px; left: 0; transform: translateX(-50%); font-size: clamp(1.1rem, 1.5vw, 1.5rem); }
+    .race-marker-label {
+        position: absolute; bottom: -32px; left: 0; transform: translateX(-50%);
+        font-size: clamp(.6rem, .72vw, .78rem); font-weight: 800; color: var(--text-dim);
+        background: var(--card); padding: 3px 9px; border-radius: 6px; white-space: nowrap; border: 1px solid var(--border);
+    }
+
+    .race-endcap {
+        position: absolute; top: 50%; right: 14px; transform: translateY(-50%); text-align: right;
+        font-size: clamp(.68rem, .82vw, .92rem); color: var(--text-faint); font-weight: 800; z-index: 1; pointer-events: none;
+    }
+
+    .pace-badge {
+        align-self: flex-start; padding: 9px 20px; border-radius: 999px;
+        font-size: clamp(.88rem, 1.05vw, 1.15rem); font-weight: 800; display: flex; align-items: center; gap: 9px;
+        border: 1.5px solid transparent;
+    }
+    .pace-badge.ahead { background: rgba(61,219,152,.14); color: var(--good); border-color: var(--good); }
+    .pace-badge.behind { background: rgba(255,107,120,.14); color: var(--bad); border-color: var(--bad); }
+
+    .race-numbers { display: flex; gap: clamp(20px, 3vw, 54px); flex-wrap: wrap; }
+    .rn .rv { font-size: clamp(1.7rem, 2.5vw, 2.9rem); font-weight: 900; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+    .rn .rl { font-size: clamp(.66rem, .8vw, .88rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; margin-top: 5px; }
+
+    /* ---------- TENDENCIA ---------- */
+    .trend-card { padding: clamp(16px, 1.8vh, 26px) clamp(18px, 1.8vw, 26px); display: flex; flex-direction: column; min-height: 0; }
+    .trend-card h2 { font-size: clamp(1rem, 1.2vw, 1.3rem); margin: 0 0 clamp(8px, 1vh, 12px) 0; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); }
     .trend-card .chart-wrap { flex: 1; min-height: 0; }
 
     /* ---------- ESTADO SIN PRODUCCIÓN ---------- */
     .no-plan-hero {
-        grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        grid-row: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center;
         background: var(--no-plan-bg); border: 3px dashed var(--no-plan-border); border-radius: 22px;
         color: var(--no-plan-text); text-align: center; gap: 14px; height: 100%;
     }
@@ -217,46 +262,88 @@
             return;
         }
 
-        const wasEmpty = !document.getElementById('oeeVal');
+        const wasEmpty = !document.getElementById('oeeBadge');
         if (wasEmpty) {
             grid.innerHTML = `
-                <div class="hero-row">
-                    <div class="hero-card oee-hero"><div class="hv" id="oeeVal">-</div><div class="hl">OEE de Turno</div></div>
-                    <div class="hero-card"><div class="hv" id="prodVal">-</div><div class="hl">Producción</div></div>
-                    <div class="hero-card"><div class="hv" id="expVal">-</div><div class="hl">Esperado a esta hora</div></div>
-                    <div class="hero-card"><div class="hv" id="planVal">-</div><div class="hl">Plan de Turno</div></div>
+                <div class="card hero-panel">
+                    <div class="hero-top">
+                        <div class="hero-title">Avance del Turno</div>
+                        <div class="oee-badge" id="oeeBadge">-</div>
+                    </div>
+
+                    <div class="race-track" id="raceTrack">
+                        <div class="race-fill" id="raceFill">
+                            <div class="race-shine"></div>
+                            <div class="race-icon">🚀</div>
+                            <div class="race-fill-label" id="raceFillLabel"></div>
+                        </div>
+                        <div class="race-marker" id="raceMarker">
+                            <div class="race-marker-line"></div>
+                            <div class="race-marker-flag">🚩</div>
+                            <div class="race-marker-label">Deberías ir en<br><span id="raceMarkerVal"></span></div>
+                        </div>
+                        <div class="race-endcap"><span id="racePlanVal"></span> plan</div>
+                    </div>
+
+                    <div class="pace-badge" id="paceBadge"></div>
+
+                    <div class="race-numbers">
+                        <div class="rn"><div class="rv" id="prodVal">-</div><div class="rl">Producción</div></div>
+                        <div class="rn"><div class="rv" id="expVal">-</div><div class="rl">Esperado a esta hora</div></div>
+                        <div class="rn"><div class="rv" id="remVal">-</div><div class="rl">Faltan por Plan</div></div>
+                        <div class="rn"><div class="rv" id="sapVal">-</div><div class="rl">SAP</div></div>
+                    </div>
                 </div>
-                <div class="lower-grid">
-                    <div class="card progress-card">
-                        <h2>Avance del Turno</h2>
-                        <div class="progress-track"><div class="progress-fill" id="progressFill"><span id="progressPct"></span></div></div>
-                        <div class="progress-caption"><span id="progressLeft"></span><span id="progressRight"></span></div>
-                        <div class="sap-line"><span class="k">SAP</span><span class="v" id="sapVal">-</span></div>
-                    </div>
-                    <div class="card trend-card">
-                        <h2>Tendencia por Hora de esta Línea</h2>
-                        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-                    </div>
+                <div class="card trend-card">
+                    <h2>Tendencia por Hora de esta Línea</h2>
+                    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
                 </div>`;
         }
 
         const color = oeeColor(snapshot.oeeShift);
-        document.getElementById('oeeVal').textContent = pct(snapshot.oeeShift);
-        document.getElementById('oeeVal').style.color = color;
+        const oeeBadge = document.getElementById('oeeBadge');
+        oeeBadge.textContent = pct(snapshot.oeeShift);
+        oeeBadge.style.background = color;
+
+        const plan = snapshot.plannedShift;
+        const actualPct = plan > 0 ? Math.min(100, (snapshot.total / plan) * 100) : 0;
+        const expectedPct = plan > 0 ? Math.min(100, (snapshot.accumulatedRate / plan) * 100) : 0;
+
+        const fill = document.getElementById('raceFill');
+        fill.style.width = actualPct + '%';
+        fill.style.background = `linear-gradient(90deg, ${hexToRgba(color, .8)}, ${color})`;
+        fill.classList.toggle('full', actualPct >= 99.5);
+        document.getElementById('raceFillLabel').textContent = snapshot.total.toLocaleString();
+
+        const marker = document.getElementById('raceMarker');
+        marker.style.left = expectedPct + '%';
+        document.getElementById('raceMarkerVal').textContent = snapshot.accumulatedRate.toLocaleString();
+        document.getElementById('racePlanVal').textContent = plan.toLocaleString();
+
         document.getElementById('prodVal').textContent = snapshot.total.toLocaleString();
         document.getElementById('expVal').textContent = snapshot.accumulatedRate.toLocaleString();
-        document.getElementById('planVal').textContent = snapshot.plannedShift.toLocaleString();
-
-        const progressPct = snapshot.plannedShift > 0 ? Math.min(100, (snapshot.total / snapshot.plannedShift) * 100) : 0;
-        document.getElementById('progressFill').style.width = progressPct + '%';
-        document.getElementById('progressFill').style.background = color;
-        document.getElementById('progressPct').textContent = progressPct.toFixed(0) + '%';
-        document.getElementById('progressLeft').textContent = `${snapshot.total.toLocaleString()} producidas`;
-        document.getElementById('progressRight').textContent = `Plan: ${snapshot.plannedShift.toLocaleString()}`;
-
+        document.getElementById('remVal').textContent = Math.max(0, plan - snapshot.total).toLocaleString();
         document.getElementById('sapVal').textContent = snapshot.excludedFromSap ? '—' : snapshot.totalSap.toLocaleString();
 
+        const paceBadge = document.getElementById('paceBadge');
+        const diff = snapshot.total - snapshot.accumulatedRate;
+        if (plan > 0 && snapshot.total >= plan) {
+            paceBadge.className = 'pace-badge ahead';
+            paceBadge.innerHTML = `🏆 &nbsp;¡Plan cumplido! ${snapshot.total.toLocaleString()} piezas`;
+        } else if (diff >= 0) {
+            paceBadge.className = 'pace-badge ahead';
+            paceBadge.innerHTML = `🔥 &nbsp;¡Vas adelante! +${diff.toLocaleString()} piezas sobre el ritmo`;
+        } else {
+            paceBadge.className = 'pace-badge behind';
+            paceBadge.innerHTML = `⚠️ &nbsp;Vas ${Math.abs(diff).toLocaleString()} piezas atrás del ritmo`;
+        }
+
         renderTrend();
+    }
+
+    function cumulativeSeries() {
+        let running = 0;
+        return snapshot.hourlyTrend.map(h => (running += h.production));
     }
 
     function renderTrend() {
@@ -265,26 +352,38 @@
         if (charts.trend) {
             charts.trend.data.labels = snapshot.hourlyTrend.map(h => h.hour);
             charts.trend.data.datasets[0].data = snapshot.hourlyTrend.map(h => h.production);
+            charts.trend.data.datasets[1].data = cumulativeSeries();
             charts.trend.update('none');
             return;
         }
         charts.trend = new Chart(canvas, {
-            type: 'bar',
             data: {
                 labels: snapshot.hourlyTrend.map(h => h.hour),
-                datasets: [{
-                    label: 'Producción / hora',
-                    data: snapshot.hourlyTrend.map(h => h.production),
-                    backgroundColor: hexToRgba(getCss('--accent'), .65),
-                    borderRadius: 8, maxBarThickness: 60
-                }]
+                datasets: [
+                    {
+                        type: 'bar', label: 'Producción / hora',
+                        data: snapshot.hourlyTrend.map(h => h.production),
+                        backgroundColor: hexToRgba(getCss('--accent'), .6),
+                        borderRadius: 8, maxBarThickness: 56, yAxisID: 'y', order: 2
+                    },
+                    {
+                        type: 'line', label: 'Acumulado del turno',
+                        data: cumulativeSeries(),
+                        borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .12),
+                        fill: true, tension: .35, pointRadius: 5, pointBackgroundColor: getCss('--good'),
+                        pointBorderColor: getCss('--card'), pointBorderWidth: 2, borderWidth: 3,
+                        yAxisID: 'y1', order: 1
+                    }
+                ]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { labels: { color: getCss('--text-dim'), font: { size: 14, weight: '600' }, boxWidth: 14 } } },
                 scales: {
-                    x: { ticks: { color: getCss('--text-dim'), font: { size: 14, weight: '600' } }, grid: { color: getCss('--grid-line') } },
-                    y: { beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } }
+                    x: { ticks: { color: getCss('--text-dim'), font: { size: 14 } }, grid: { color: getCss('--grid-line') } },
+                    y: { position: 'left', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
+                    y1: { position: 'right', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { display: false } }
                 }
             }
         });
