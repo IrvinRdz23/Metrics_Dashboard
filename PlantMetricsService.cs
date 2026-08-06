@@ -98,11 +98,37 @@ public class PlantMetricsService : IPlantMetricsService
             f.Lines = f.Lines.OrderBy(l => l.ProductOrder).ToList();
         }
 
+        // ---------- Carrusel de la barra superior: Core Builders / End of Line / Tube Mills ----------
+        // Core Builders y End of Line se dividen con la MISMA regla que ya usamos para el
+        // % de SAP (CB / Clam Shell / CM1 = Core Builders, el resto = End of Line), pero
+        // aquí sobre Furnace 1-5. Tube Mills es aparte, sin distinción, aunque nunca
+        // aparece como card en el grid del dashboard general.
+        var furnaceCountedRows = rows.Where(r => r.ReportGroup == 1 && r.PlannedForOee != 0 && groupToFurnace.ContainsKey(r.GroupId)).ToList();
+        var coreBuilderRows = furnaceCountedRows.Where(r => SapRules.IsExcluded(r.Desc)).ToList();
+        var endOfLineRows = furnaceCountedRows.Where(r => !SapRules.IsExcluded(r.Desc)).ToList();
+        var tubeMillsRows = rows.Where(r => r.ReportGroup == 1 && r.PlannedForOee != 0 && r.GroupId == 7).ToList();
+
+        static KpiGroup BuildKpiGroup(string label, List<RawMetricRow> countedRows) => new()
+        {
+            Label = label,
+            TotalProduction = countedRows.Sum(r => r.Total),
+            TotalPlanned = countedRows.Sum(r => r.PlannedForOee),
+            Oee = countedRows.Count == 0 ? 0 : countedRows.Average(r => r.OeeShift)
+        };
+
+        var topKpiGroups = new List<KpiGroup>
+        {
+            BuildKpiGroup("Core Builders", coreBuilderRows),
+            BuildKpiGroup("End of Line", endOfLineRows),
+            BuildKpiGroup("Tube Mills", tubeMillsRows)
+        };
+
         return new PlantDashboardSnapshot
         {
             ShiftDesc = shiftDesc,
             Furnaces = furnaces,
-            HourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList()
+            HourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList(),
+            TopKpiGroups = topKpiGroups
         };
     }
 
@@ -112,6 +138,12 @@ public class PlantMetricsService : IPlantMetricsService
         Furnaces = Enumerable.Range(1, 5)
             .Select(id => new FurnaceMetric { FurnaceId = id, FurnaceName = $"Furnace {id}" })
             .ToList(),
-        HourlyTrend = new List<HourlyPoint>()
+        HourlyTrend = new List<HourlyPoint>(),
+        TopKpiGroups = new List<KpiGroup>
+        {
+            new() { Label = "Core Builders" },
+            new() { Label = "End of Line" },
+            new() { Label = "Tube Mills" }
+        }
     };
 }
