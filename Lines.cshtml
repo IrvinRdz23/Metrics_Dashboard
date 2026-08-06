@@ -193,9 +193,11 @@
     .metric-card .mv { font-size: clamp(1.9rem, 2.8vw, 3.2rem); font-weight: 900; font-family: 'JetBrains Mono', monospace; line-height: 1; }
     .metric-card .ml { font-size: clamp(.66rem, .8vw, .88rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; margin-top: clamp(6px, 1vh, 10px); }
 
-    /* ---------- TENDENCIA ---------- */
+    /* ---------- TENDENCIA (2 columnas: producción por hora + tiempo de ciclo) ---------- */
+    .lower-row { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(10px, 1.1vh, 16px); min-height: 0; }
     .trend-card { padding: clamp(16px, 1.8vh, 26px) clamp(18px, 1.8vw, 26px); display: flex; flex-direction: column; min-height: 0; }
-    .trend-card h2 { font-size: clamp(1rem, 1.2vw, 1.3rem); margin: 0 0 clamp(8px, 1vh, 12px) 0; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); }
+    .trend-card h2 { font-size: clamp(1rem, 1.2vw, 1.3rem); margin: 0; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); }
+    .trend-card .subtitle-note { font-size: clamp(.66rem, .78vw, .82rem); color: var(--text-faint); font-weight: 600; margin: 3px 0 clamp(8px, 1vh, 12px) 0; text-transform: none; letter-spacing: 0; }
     .trend-card .chart-wrap { flex: 1; min-height: 0; }
 
     /* ---------- ESTADO SIN PRODUCCIÓN ---------- */
@@ -319,9 +321,17 @@
                     <div class="card metric-card"><div class="mv" id="sapVal">-</div><div class="ml">SAP</div></div>
                 </div>
 
-                <div class="card trend-card">
-                    <h2>Tendencia por Hora de esta Línea</h2>
-                    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+                <div class="lower-row">
+                    <div class="card trend-card">
+                        <h2>Tendencia por Hora de esta Línea</h2>
+                        <div class="subtitle-note">Piezas producidas por hora</div>
+                        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+                    </div>
+                    <div class="card trend-card">
+                        <h2>Tiempo de Ciclo: Real vs. Teórico</h2>
+                        <div class="subtitle-note">Aproximado por hora (seg/pieza) · banda = rango normal del turno</div>
+                        <div class="chart-wrap"><canvas id="cycleTimeChart"></canvas></div>
+                    </div>
                 </div>`;
         }
 
@@ -365,6 +375,7 @@
         }
 
         renderTrend();
+        renderCycleTimeChart();
     }
 
     function cumulativeSeries() {
@@ -415,12 +426,107 @@
         });
     }
 
+    // ---------------------------------------------------------------
+    // TIEMPO DE CICLO: REAL (aprox. por hora) vs. TEÓRICO (Cycle_Time_Secs), con una
+    // banda de "rango normal" = media ± 1 desviación estándar del turno actual.
+    // El real es una aproximación (segundos disponibles / piezas de esa hora, ya
+    // restando descansos) — no es una medición por pieza, así que la banda es más una
+    // guía de qué tan estable ha ido la línea que una campana de Gauss de verdad.
+    // ---------------------------------------------------------------
+    function renderCycleTimeChart() {
+        const canvas = document.getElementById('cycleTimeChart');
+        if (!canvas) return;
+
+        const points = snapshot.cycleTimeTrend || [];
+        const labels = points.map(p => p.hour);
+        const actual = points.map(p => p.actualCycleTimeSecs);
+        const theoretical = labels.map(() => snapshot.cycleTimeSecs);
+        const mean = snapshot.actualCycleTimeMean;
+        const stdDev = snapshot.actualCycleTimeStdDev;
+        const hasBand = mean != null && stdDev != null;
+        // Estructura de 4 datasets SIEMPRE fija (aunque la banda esté vacía) para que la
+        // actualización en vivo no truene si la banda aparece a medio turno (cuando ya
+        // hay 2+ horas con datos y por fin se puede calcular la desviación estándar).
+        const upperBand = hasBand ? labels.map(() => mean + stdDev) : labels.map(() => null);
+        const lowerBand = hasBand ? labels.map(() => Math.max(0, mean - stdDev)) : labels.map(() => null);
+
+        const barColor = (v) => {
+            if (v == null) return 'transparent';
+            if (v <= snapshot.cycleTimeSecs * 1.05) return hexToRgba(getCss('--good'), .75);
+            if (v <= snapshot.cycleTimeSecs * 1.2) return hexToRgba(getCss('--warn'), .75);
+            return hexToRgba(getCss('--bad'), .75);
+        };
+
+        if (charts.cycleTime) {
+            const ds = charts.cycleTime.data.datasets;
+            charts.cycleTime.data.labels = labels;
+            ds[0].data = upperBand;
+            ds[1].data = lowerBand;
+            ds[2].data = actual; ds[2].backgroundColor = actual.map(barColor);
+            ds[3].data = theoretical;
+            charts.cycleTime.update('none');
+            return;
+        }
+
+        const datasets = [
+            {
+                type: 'line', label: 'Rango normal (±1σ)', data: upperBand,
+                borderColor: 'transparent', backgroundColor: hexToRgba(getCss('--accent'), .12),
+                pointRadius: 0, fill: '+1', order: 3, spanGaps: false
+            },
+            {
+                type: 'line', label: '', data: lowerBand,
+                borderColor: 'transparent', backgroundColor: 'transparent',
+                pointRadius: 0, fill: false, order: 3, spanGaps: false
+            },
+            {
+                type: 'bar', label: 'Tiempo de ciclo real (seg)',
+                data: actual, backgroundColor: actual.map(barColor),
+                borderRadius: 6, maxBarThickness: 44, order: 1
+            },
+            {
+                type: 'line', label: 'Tiempo de ciclo teórico (seg)', data: theoretical,
+                borderColor: getCss('--text-dim'), borderDash: [7, 5], borderWidth: 2.5,
+                pointRadius: 0, fill: false, order: 0
+            }
+        ];
+
+        charts.cycleTime = new Chart(canvas, {
+            data: { labels, datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: getCss('--text-dim'), font: { size: 13, weight: '600' }, boxWidth: 14,
+                            filter: (item) => item.text !== ''
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (c) => c.raw == null ? 'Sin producción esa hora' : `${c.dataset.label}: ${Number(c.raw).toFixed(1)}s`
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
+                    y: {
+                        beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') },
+                        title: { display: true, text: 'Segundos / pieza', color: getCss('--text-faint'), font: { size: 12, weight: '600' } }
+                    }
+                }
+            }
+        });
+    }
+
     document.getElementById('toggleTheme').onclick = () => {
         const html = document.documentElement;
         const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
         html.setAttribute('data-theme', next);
         localStorage.setItem('pm-theme', next);
         if (charts.trend) { charts.trend.destroy(); charts.trend = null; }
+        if (charts.cycleTime) { charts.cycleTime.destroy(); charts.cycleTime = null; }
         document.getElementById('bodyGrid').innerHTML = '';
         render();
     };

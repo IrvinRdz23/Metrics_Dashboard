@@ -74,6 +74,18 @@ public static class FurnaceCatalog
 /// montada arriba de esa línea en piso. Se identifica por Product_List_ID — el ID real
 /// de tu base, tomado de las filas de Report_Group 2/3 (en la 1 siempre viene NULL).
 /// </summary>
+/// <summary>
+/// Tiempo de ciclo REAL aproximado de una hora: segundos disponibles para producir en esa
+/// hora (3600 menos el traslape con descansos) ÷ piezas producidas. Null si no hubo
+/// producción esa hora (no se puede estimar).
+/// </summary>
+public class CycleTimePoint
+{
+    public string Hour { get; set; } = string.Empty;
+    public int Production { get; set; }
+    public double? ActualCycleTimeSecs { get; set; }
+}
+
 public class LineDetailSnapshot
 {
     public int ProductListId { get; set; }
@@ -96,6 +108,15 @@ public class LineDetailSnapshot
     public bool HasPlan => PlannedShift > 0;
 
     public List<HourlyPoint> HourlyTrend { get; set; } = new();
+
+    /// <summary>Tiempo de ciclo real aproximado por hora del turno actual (ver CycleTimePoint).</summary>
+    public List<CycleTimePoint> CycleTimeTrend { get; set; } = new();
+
+    /// <summary>Media y desviación estándar del tiempo de ciclo real, calculadas SOLO con las
+    /// horas del turno actual que tuvieron producción. Null si hay menos de 2 muestras válidas
+    /// (no alcanza para una desviación estándar con sentido).</summary>
+    public double? ActualCycleTimeMean { get; set; }
+    public double? ActualCycleTimeStdDev { get; set; }
 }
 
 public class FurnaceDetailSnapshot

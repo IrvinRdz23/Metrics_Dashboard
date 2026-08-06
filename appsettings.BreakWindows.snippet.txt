@@ -1,0 +1,30 @@
+Agrega esto DENTRO de tu sección "PlantMetrics" existente en appsettings.json
+(al lado de PlantListId, PollingIntervalSeconds, etc.). No reemplaces todo el archivo,
+solo fusiona la llave "BreakWindows":
+
+{
+  "PlantMetrics": {
+    "PlantListId": 1,
+    "PollingIntervalSeconds": 60,
+
+    "BreakWindows": {
+      "1": [
+        { "Start": "09:00", "End": "09:30" },
+        { "Start": "12:00", "End": "12:30" }
+      ],
+      "2": [
+        { "Start": "17:30", "End": "18:00" },
+        { "Start": "20:30", "End": "21:00" }
+      ],
+      "3": [
+        { "Start": "00:30", "End": "01:00" },
+        { "Start": "03:30", "End": "04:00" }
+      ]
+    }
+  }
+}
+
+NOTA: Los descansos de Turno 1 (09:00-09:30 y 12:00-12:30) son los reales que me diste.
+Los de Turno 2 y Turno 3 son un PLACEHOLDER (mismo patrón: dos descansos de 30 min,
+repartidos a lo largo del turno) — cámbialos aquí en cuanto tengas los horarios reales,
+no hace falta tocar ningún archivo .cs.
