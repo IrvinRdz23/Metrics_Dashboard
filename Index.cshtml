@@ -108,31 +108,6 @@
         gap: clamp(14px, 1.4vw, 22px);
         }
 
-        .logo-chip {
-        background: #ffffff;
-        border-radius: 10px;
-        padding: clamp(5px, .5vw, 8px) clamp(9px, .9vw, 14px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 8px rgba(0,0,0,.18);
-        flex-shrink: 0;
-        }
-
-        .logo-chip img {
-        height: clamp(26px, 2.6vh, 38px);
-        width: auto;
-        display: block;
-        object-fit: contain;
-        }
-
-        .brand-divider {
-        width: 1px;
-        height: clamp(32px, 3.6vh, 48px);
-        background: var(--border);
-        flex-shrink: 0;
-        }
-
         .brand-text h1 {
         font-size: clamp(1.35rem, 1.7vw, 1.85rem);
         margin: 0;
@@ -167,20 +142,62 @@
         gap: clamp(18px, 2.2vw, 34px);
         }
 
-        .kpi-group-indicator {
+        .kpi-cluster {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 6px;
-        min-width: clamp(96px, 8vw, 130px);
+        gap: clamp(8px, 1vh, 12px);
         }
 
-        .kpi-group-name {
-        font-size: clamp(.78rem, .95vw, 1rem);
-        font-weight: 800;
+        .kpi-cluster-row {
+        display: flex;
+        align-items: center;
+        gap: clamp(18px, 2.2vw, 34px);
+        }
+
+        /* Badge del carrusel Core Builders / End of Line / Tube Mills, debajo de los
+           métricos. La franja de relleno avanza durante los 15s hasta el próximo cambio;
+           formal y visible, sin robarle protagonismo a los números de arriba. */
+        .kpi-group-badge {
+        position: relative;
+        overflow: hidden;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: clamp(6px, .8vh, 9px) clamp(20px, 2vw, 30px);
+        border-radius: 999px;
+        border: 1.5px solid var(--accent);
+        background: var(--card);
+        min-width: clamp(160px, 14vw, 220px);
+        }
+
+        .kpi-group-badge .fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 0%;
+        background: var(--accent-soft);
+        z-index: 0;
+        }
+
+        .kpi-group-badge .fill.animating {
+        animation: badgeFill 15s linear forwards;
+        }
+
+        @@keyframes badgeFill {
+        from { width: 0%; }
+        to { width: 100%; }
+        }
+
+        .kpi-group-badge .label-text {
+        position: relative;
+        z-index: 1;
         color: var(--accent);
-        text-align: center;
-        letter-spacing: .2px;
+        font-size: clamp(.76rem, .88vw, .92rem);
+        font-weight: 800;
+        letter-spacing: .6px;
+        text-transform: uppercase;
         white-space: nowrap;
         }
 
@@ -718,15 +735,9 @@
 
         <header>
             <div class="brand">
-                <div class="logo-chip">
-                    <img src="~/images/m2s.png" alt="M2S" />
-                </div>
-                <div class="logo-chip">
-                    <img src="~/images/MAHLE-Logo.png" alt="MAHLE" />
-                </div>
-                <div class="brand-divider"></div>
+                <img src="~/images/m2s.png" style="width: 60px;" />
                 <div class="brand-text">
-                    <h1>Plant Metrics · Planta 1</h1>
+                    <h1><img src="~/images/MAHLE-Logo.png" style="width: 80px; margin:20px,0,0,0" /> · Planta 1</h1>
                     <div class="subtitle">
                         <span id="dateLabel"></span>
                         <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
@@ -735,24 +746,27 @@
             </div>
 
             <div class="plant-kpi">
-                <div class="kpi-group-indicator">
-                    <div class="kpi-group-name" id="kpiGroupName">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].Label : "")</div>
-                    <div class="page-ring-wrap" id="kpiRing"></div>
-                </div>
-                <div class="kpi-divider"></div>
-                <div class="kpi-block">
-                    <div class="value" id="plantOee">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].Oee.ToString("P0") : "0%")</div>
-                    <div class="label">OEE</div>
-                </div>
-                <div class="kpi-divider"></div>
-                <div class="kpi-block">
-                    <div class="value" id="plantProd">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].TotalProduction.ToString("N0") : "0")</div>
-                    <div class="label">Producción</div>
-                </div>
-                <div class="kpi-divider"></div>
-                <div class="kpi-block">
-                    <div class="value" id="plantPlanned">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].TotalPlanned.ToString("N0") : "0")</div>
-                    <div class="label">Plan de Turno</div>
+                <div class="kpi-cluster">
+                    <div class="kpi-cluster-row">
+                        <div class="kpi-block">
+                            <div class="value" id="plantOee">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].Oee.ToString("P0") : "0%")</div>
+                            <div class="label">OEE</div>
+                        </div>
+                        <div class="kpi-divider"></div>
+                        <div class="kpi-block">
+                            <div class="value" id="plantProd">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].TotalProduction.ToString("N0") : "0")</div>
+                            <div class="label">Producción</div>
+                        </div>
+                        <div class="kpi-divider"></div>
+                        <div class="kpi-block">
+                            <div class="value" id="plantPlanned">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].TotalPlanned.ToString("N0") : "0")</div>
+                            <div class="label">Plan de Turno</div>
+                        </div>
+                    </div>
+                    <div class="kpi-group-badge" id="kpiGroupBadge">
+                        <div class="fill" id="kpiGroupFill"></div>
+                        <span class="label-text" id="kpiGroupName">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].Label : "")</span>
+                    </div>
                 </div>
                 <div class="kpi-divider"></div>
                 <div class="kpi-block">
@@ -900,8 +914,9 @@
 
         // ---------------------------------------------------------------
         // CARRUSEL DE LA BARRA SUPERIOR: Core Builders / End of Line / Tube Mills,
-        // rota cada 15s con su propio anillo (independiente del refresh de datos, igual
-        // que el carrusel de líneas por horno — el índice no se reinicia con cada snapshot).
+        // rota cada 15s con una badge que se va rellenando (independiente del refresh
+        // de datos, igual que el carrusel de líneas por horno — el índice no se
+        // reinicia con cada snapshot, solo cuando de verdad toca cambiar de grupo).
         // ---------------------------------------------------------------
         function renderKpiGroup(isLiveUpdate) {
         const groups = snapshot.topKpiGroups || [];
@@ -917,8 +932,12 @@
         document.getElementById('plantProd').textContent = group.totalProduction.toLocaleString();
         document.getElementById('plantPlanned').textContent = group.totalPlanned.toLocaleString();
 
-        const ring = ensureRing('kpiRing', 'kpi-ring');
-        if (!isLiveUpdate) restartRing(ring);
+        if (!isLiveUpdate) {
+        const fill = document.getElementById('kpiGroupFill');
+        fill.classList.remove('animating');
+        void fill.getBoundingClientRect(); // fuerza reflow para reiniciar la animación
+        fill.classList.add('animating');
+        }
         }
 
         setInterval(() => {
