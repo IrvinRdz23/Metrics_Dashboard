@@ -105,20 +105,31 @@
         .brand {
         display: flex;
         align-items: center;
-        gap: clamp(10px, 1vw, 16px);
+        gap: clamp(14px, 1.4vw, 22px);
         }
 
-        .brand .logo-dot {
-        width: clamp(38px, 3vw, 50px);
-        height: clamp(38px, 3vw, 50px);
-        border-radius: 12px;
-        background: var(--accent);
+        .logo-chip {
+        background: #ffffff;
+        border-radius: 10px;
+        padding: clamp(5px, .5vw, 8px) clamp(9px, .9vw, 14px);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: 800;
-        font-size: clamp(.95rem, 1vw, 1.15rem);
-        color: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,.18);
+        flex-shrink: 0;
+        }
+
+        .logo-chip img {
+        height: clamp(26px, 2.6vh, 38px);
+        width: auto;
+        display: block;
+        object-fit: contain;
+        }
+
+        .brand-divider {
+        width: 1px;
+        height: clamp(32px, 3.6vh, 48px);
+        background: var(--border);
         flex-shrink: 0;
         }
 
@@ -153,7 +164,24 @@
         .plant-kpi {
         display: flex;
         align-items: center;
-        gap: clamp(20px, 2.6vw, 44px);
+        gap: clamp(18px, 2.2vw, 34px);
+        }
+
+        .kpi-group-indicator {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        min-width: clamp(96px, 8vw, 130px);
+        }
+
+        .kpi-group-name {
+        font-size: clamp(.78rem, .95vw, 1rem);
+        font-weight: 800;
+        color: var(--accent);
+        text-align: center;
+        letter-spacing: .2px;
+        white-space: nowrap;
         }
 
         .kpi-block {
@@ -690,9 +718,15 @@
 
         <header>
             <div class="brand">
-                <img src="~/images/m2s.png" style="width: 60px;" />
+                <div class="logo-chip">
+                    <img src="~/images/m2s.png" alt="M2S" />
+                </div>
+                <div class="logo-chip">
+                    <img src="~/images/MAHLE-Logo.png" alt="MAHLE" />
+                </div>
+                <div class="brand-divider"></div>
                 <div class="brand-text">
-                    <h1><img src="~/images/MAHLE-Logo.png" style="width: 80px; margin:20px,0,0,0" /> · Planta 1</h1>
+                    <h1>Plant Metrics · Planta 1</h1>
                     <div class="subtitle">
                         <span id="dateLabel"></span>
                         <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
@@ -701,18 +735,23 @@
             </div>
 
             <div class="plant-kpi">
-                <div class="kpi-block">
-                    <div class="value" id="plantOee">@Model.PlantOee.ToString("P0")</div>
-                    <div class="label">OEE Planta (turno actual)</div>
+                <div class="kpi-group-indicator">
+                    <div class="kpi-group-name" id="kpiGroupName">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].Label : "")</div>
+                    <div class="page-ring-wrap" id="kpiRing"></div>
                 </div>
                 <div class="kpi-divider"></div>
                 <div class="kpi-block">
-                    <div class="value" id="plantProd">@Model.TotalProduction.ToString("N0")</div>
+                    <div class="value" id="plantOee">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].Oee.ToString("P0") : "0%")</div>
+                    <div class="label">OEE</div>
+                </div>
+                <div class="kpi-divider"></div>
+                <div class="kpi-block">
+                    <div class="value" id="plantProd">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].TotalProduction.ToString("N0") : "0")</div>
                     <div class="label">Producción</div>
                 </div>
                 <div class="kpi-divider"></div>
                 <div class="kpi-block">
-                    <div class="value" id="plantPlanned">@Model.TotalPlanned.ToString("N0")</div>
+                    <div class="value" id="plantPlanned">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].TotalPlanned.ToString("N0") : "0")</div>
                     <div class="label">Plan de Turno</div>
                 </div>
                 <div class="kpi-divider"></div>
@@ -766,6 +805,8 @@
         const furnacePage = {}; // furnaceId -> índice de página actual (carrusel de 5 en 5, cada 15s)
         const PAGE_SIZE = 5;
         const PAGE_ROTATE_MS = 15000;
+        const KPI_ROTATE_MS = 15000;
+        let kpiGroupIndex = 0;
         const FURNACE_COLORS = ['#4da3ff', '#35d68f', '#f2b84b', '#c084fc', '#ff8a5c'];
 
         // Semáforo de OEE: >=85% verde, 70-85% amarillo, <70% rojo. Aplica a plantas, hornos y líneas.
@@ -796,32 +837,40 @@
         return { page: sorted.slice(idx * PAGE_SIZE, idx * PAGE_SIZE + PAGE_SIZE), totalPages, idx };
         }
 
-        // Anillo de progreso: se llena en 15s y al completar la vuelta coincide con el cambio de página.
+        // Helper genérico de anillo de progreso (lo usan tanto las cards de horno como el
+        // indicador de categoría del header): se llena en 15s y al completar coincide con el cambio.
+        function restartRing(ring) {
+        ring.classList.remove('animating');
+        void ring.getBoundingClientRect(); // fuerza reflow para poder reiniciar la animación
+        ring.classList.add('animating');
+        }
+
+        function ensureRing(containerId, ringIdPrefix) {
+        const container = document.getElementById(containerId);
+        let ring = document.getElementById(ringIdPrefix + '-fill');
+        if (!ring) {
+        container.innerHTML = `
+        <svg class="page-ring-svg" viewBox="0 0 16 16">
+        <circle class="ring-bg" cx="8" cy="8" r="7"></circle>
+        <circle class="ring-fill" id="${ringIdPrefix}-fill" cx="8" cy="8" r="7"></circle>
+        </svg>
+        <span class="page-ring-label" id="${ringIdPrefix}-label"></span>
+        `;
+        ring = document.getElementById(ringIdPrefix + '-fill');
+        }
+        return ring;
+        }
+
+        // Anillo de progreso de las cards de horno: se llena en 15s y al completar la vuelta coincide con el cambio de página.
         function renderPageRing(f) {
         const container = document.getElementById('pagering-' + f.furnaceId);
         if (!container) return;
         const { totalPages, idx } = furnaceLinesPage(f);
         if (totalPages <= 1) { container.innerHTML = ''; return; }
 
-        let ring = document.getElementById('ringfill-' + f.furnaceId);
-        if (!ring) {
-        container.innerHTML = `
-        <svg class="page-ring-svg" viewBox="0 0 16 16">
-        <circle class="ring-bg" cx="8" cy="8" r="7"></circle>
-        <circle class="ring-fill" id="ringfill-${f.furnaceId}" cx="8" cy="8" r="7"></circle>
-        </svg>
-        <span class="page-ring-label" id="pagelabel-${f.furnaceId}"></span>
-        `;
-        ring = document.getElementById('ringfill-' + f.furnaceId);
-        }
-        document.getElementById('pagelabel-' + f.furnaceId).textContent = `${idx + 1}/${totalPages}`;
+        const ring = ensureRing('pagering-' + f.furnaceId, 'ring-' + f.furnaceId);
+        document.getElementById('ring-' + f.furnaceId + '-label').textContent = `${idx + 1}/${totalPages}`;
         restartRing(ring);
-        }
-
-        function restartRing(ring) {
-        ring.classList.remove('animating');
-        void ring.getBoundingClientRect(); // fuerza reflow para poder reiniciar la animación
-        ring.classList.add('animating');
         }
 
         document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -830,12 +879,8 @@
         // RENDER
         // ---------------------------------------------------------------
         function render(isLiveUpdate) {
-        const plantOeeEl = document.getElementById('plantOee');
-        plantOeeEl.textContent = pct(snapshot.plantOee);
-        plantOeeEl.style.color = oeeColor(snapshot.plantOee);
+        renderKpiGroup(isLiveUpdate);
 
-        document.getElementById('plantProd').textContent = snapshot.totalProduction.toLocaleString();
-        document.getElementById('plantPlanned').textContent = snapshot.totalPlanned.toLocaleString();
         document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
         document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 
@@ -852,6 +897,36 @@
         }
         applySelection();
         }
+
+        // ---------------------------------------------------------------
+        // CARRUSEL DE LA BARRA SUPERIOR: Core Builders / End of Line / Tube Mills,
+        // rota cada 15s con su propio anillo (independiente del refresh de datos, igual
+        // que el carrusel de líneas por horno — el índice no se reinicia con cada snapshot).
+        // ---------------------------------------------------------------
+        function renderKpiGroup(isLiveUpdate) {
+        const groups = snapshot.topKpiGroups || [];
+        if (groups.length === 0) return;
+        if (kpiGroupIndex >= groups.length) kpiGroupIndex = 0;
+        const group = groups[kpiGroupIndex];
+
+        document.getElementById('kpiGroupName').textContent = group.label;
+
+        const oeeEl = document.getElementById('plantOee');
+        oeeEl.textContent = pct(group.oee);
+        oeeEl.style.color = oeeColor(group.oee);
+        document.getElementById('plantProd').textContent = group.totalProduction.toLocaleString();
+        document.getElementById('plantPlanned').textContent = group.totalPlanned.toLocaleString();
+
+        const ring = ensureRing('kpiRing', 'kpi-ring');
+        if (!isLiveUpdate) restartRing(ring);
+        }
+
+        setInterval(() => {
+        const groups = snapshot.topKpiGroups || [];
+        if (groups.length === 0) return;
+        kpiGroupIndex = (kpiGroupIndex + 1) % groups.length;
+        renderKpiGroup(false);
+        }, KPI_ROTATE_MS);
 
         function buildFurnaceCard(f) {
         const div = document.createElement('div');
@@ -1009,7 +1084,7 @@
         const cfg = lineBarConfig(f);
         chart.data = cfg.data;
         chart.update('none');
-        const label = document.getElementById('pagelabel-' + f.furnaceId);
+        const label = document.getElementById('ring-' + f.furnaceId + '-label');
         if (label) {
         const { totalPages, idx } = furnaceLinesPage(f);
         label.textContent = totalPages > 1 ? `${idx + 1}/${totalPages}` : '';
