@@ -113,6 +113,18 @@ public class HourlyPoint
 /// <summary>
 /// Payload completo que se manda a la vista y se retransmite por SignalR.
 /// </summary>
+/// <summary>
+/// Métricos (OEE/Producción/Plan) de un subconjunto de líneas para el carrusel de la
+/// barra superior del dashboard general: Core Builders, End of Line, Tube Mills.
+/// </summary>
+public class KpiGroup
+{
+    public string Label { get; set; } = string.Empty;
+    public int TotalProduction { get; set; }
+    public int TotalPlanned { get; set; }
+    public double Oee { get; set; }
+}
+
 public class PlantDashboardSnapshot
 {
     public DateTime GeneratedAt { get; set; } = DateTime.Now;
@@ -122,6 +134,14 @@ public class PlantDashboardSnapshot
 
     public List<FurnaceMetric> Furnaces { get; set; } = new();
     public List<HourlyPoint> HourlyTrend { get; set; } = new();
+
+    /// <summary>
+    /// Los 3 grupos que rotan en la barra superior, en este orden fijo:
+    /// [0] Core Builders (líneas CB/Clam Shell/CM1, mismo criterio que SapRules.IsExcluded),
+    /// [1] End of Line (el resto de líneas de Furnace 1-5, las que sí cuentan SAP),
+    /// [2] Tube Mills (Product_Group_ID = 7, sin distinción — nunca aparece como card en el grid).
+    /// </summary>
+    public List<KpiGroup> TopKpiGroups { get; set; } = new();
 
     public int TotalProduction => Furnaces.Sum(f => f.TotalProduction);
     public int TotalPlanned => Furnaces.Sum(f => f.TotalPlanned);
