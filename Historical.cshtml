@@ -531,6 +531,58 @@
         min-height: 0;
         }
 
+        /* ---------- LOADER: se muestra al cambiar de fecha/turno, mientras recarga ---------- */
+        .loading-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(4,7,14,.78);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        }
+
+        .loading-overlay.open {
+        display: flex;
+        }
+
+        .loading-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+        text-align: center;
+        padding: 40px 50px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: var(--shadow);
+        }
+
+        .spinner {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        border: 5px solid var(--border);
+        border-top-color: var(--accent);
+        animation: spin .9s linear infinite;
+        }
+
+        @@keyframes spin {
+        to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+        font-size: clamp(1rem, 1.3vw, 1.25rem);
+        font-weight: 700;
+        color: var(--text);
+        line-height: 1.5;
+        }
+
+        .loading-text b {
+        color: var(--accent);
+        }
+
         /* ---------- PANEL DE DRILL-DOWN (cross-filter) ---------- */
         .drilldown-overlay {
         position: fixed;
@@ -766,8 +818,8 @@
                 <div class="brand-text">
                     <h1><img src="~/images/MAHLE-Logo.png" style="width: 80px; margin:20px,0,0,0" /> · Planta 1</h1>
                     <div class="subtitle">
-                        <span id="dateLabel"></span>
-                        <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
+                        <span id="dateLabel">@FormatSpanishDate(Model.HistoricalDate)</span>
+                        <span class="shift-badge" id="shiftLabel">Turno @Model.HistoricalShiftId</span>
                     </div>
                 </div>
             </div>
@@ -818,6 +870,13 @@
         </header>
 
         <div class="grid-main" id="grid"></div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-box">
+            <div class="spinner"></div>
+            <div class="loading-text" id="loadingText">Recolectando datos...</div>
+        </div>
     </div>
 
     <div class="drilldown-overlay" id="drilldownOverlay">
@@ -916,7 +975,8 @@
         restartRing(ring);
         }
 
-        document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+        // (la fecha/turno del reporte ya vienen fijas del servidor arriba en el header —
+        // no se pisan con la fecha real de hoy, esto es un histórico)
 
         // ---------------------------------------------------------------
         // RENDER
@@ -924,7 +984,6 @@
         function render(isLiveUpdate) {
         renderKpiGroup(isLiveUpdate);
 
-        document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
 
         const grid = document.getElementById('grid');
         const isFirstRender = grid.children.length === 0;
@@ -1410,11 +1469,26 @@
         // ---------------------------------------------------------------
         // PICKER DE FECHA/TURNO: precargado con lo que ya se está viendo (viene del
         // servidor en el propio snapshot), listo para que solo cambien y le den "Ver".
+        // Al enviar, se muestra el loader ANTES de que el navegador navegue a la nueva
+        // URL, para que no se vea una pantalla en blanco mientras el SP responde.
         // ---------------------------------------------------------------
         if (snapshot.historicalDate) {
         document.getElementById('pickerDate').value = snapshot.historicalDate.substring(0, 10);
         }
         document.getElementById('pickerShift').value = String(snapshot.historicalShiftId || 1);
+
+        document.getElementById('historicalPicker').addEventListener('submit', () => {
+        const dateVal = document.getElementById('pickerDate').value;
+        const shiftVal = document.getElementById('pickerShift').value;
+        const dateObj = dateVal ? new Date(dateVal + 'T00:00:00') : null;
+        const dateText = dateObj
+        ? dateObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+        : 'la fecha seleccionada';
+        document.getElementById('loadingText').innerHTML = `Recolectando datos de<br><b>${dateText}</b><br>Turno ${shiftVal}`;
+        document.getElementById('loadingOverlay').classList.add('open');
+        // No se hace preventDefault: el formulario sigue su curso normal (GET),
+        // el loader solo se queda pintado encima mientras el navegador carga la nueva página.
+        });
 
         // No hay SignalR aquí — esto es una foto fija de un día/turno que ya pasó, no en
         // vivo. Un solo render con lo que ya mandó el servidor.
@@ -1422,3 +1496,15 @@
     </script>
 </body>
 </html>
+@functions {
+    // Nombres en español a mano (no CultureInfo/es-MX) porque el proyecto corre con
+    // InvariantGlobalization=true, que rompe el formato de fechas por cultura.
+    string FormatSpanishDate(DateTime? date)
+    {
+        if (date == null) return "";
+        var d = date.Value;
+        string[] days = { "domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado" };
+        string[] months = { "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre" };
+        return $"{days[(int)d.DayOfWeek]} {d.Day} de {months[d.Month - 1]} de {d.Year}";
+    }
+}
