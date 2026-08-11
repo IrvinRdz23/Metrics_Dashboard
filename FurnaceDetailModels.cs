@@ -43,7 +43,8 @@ public record RawMetricRow(
     int TotalSap,
     string Hour,
     int ShiftId,
-    string ShiftDesc);
+    string ShiftDesc,
+    string EventDateShort = "");
 
 /// <summary>
 /// Catálogo único de "hornos" para todo el proyecto — incluye Tube Mills como el horno #6.
