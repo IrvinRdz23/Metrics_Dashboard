@@ -7,12 +7,11 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Plant Metrics · Dashboard General</title>
+    <title>Plant Metrics · Histórico</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <style>
         :root[data-theme="dark"] {
         --bg: #0a0e15;
@@ -199,6 +198,43 @@
         letter-spacing: .6px;
         text-transform: uppercase;
         white-space: nowrap;
+        }
+
+        /* Picker de fecha/turno del histórico — vive en el mismo espacio del header donde
+           el dashboard en vivo pone "Última Actualización". */
+        .historical-controls {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        }
+
+        .historical-badge {
+        background: var(--no-plan-bg);
+        color: var(--no-plan-text);
+        border: 1px solid var(--no-plan-border);
+        padding: 3px 12px;
+        border-radius: 999px;
+        font-size: clamp(.68rem, .8vw, .85rem);
+        font-weight: 800;
+        letter-spacing: .3px;
+        }
+
+        .historical-picker {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        }
+
+        .historical-picker input, .historical-picker select {
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 7px 10px;
+        font-size: clamp(.8rem, .9vw, .95rem);
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
         }
 
         .kpi-block {
@@ -760,17 +796,22 @@
                     </div>
                 </div>
                 <div class="kpi-divider"></div>
-                <div class="kpi-block">
-                    <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
-                        <span class="live-dot"></span>
-                        <span class="value" style="font-size:.88rem" id="lastUpdate">--:--</span>
-                    </div>
-                    <div class="label">Última Actualización</div>
+                <div class="historical-controls">
+                    <div class="historical-badge">📅 Histórico</div>
+                    <form class="historical-picker" id="historicalPicker" method="get" action="/Dashboard/Historical">
+                        <input type="date" id="pickerDate" name="date" min="@ViewData["MinDate"]" max="@ViewData["MaxDate"]" />
+                        <select id="pickerShift" name="shiftId">
+                            <option value="1">Turno 1</option>
+                            <option value="2">Turno 2</option>
+                            <option value="3">Turno 3</option>
+                        </select>
+                        <button type="submit" class="btn">Ver</button>
+                    </form>
                 </div>
             </div>
 
             <div class="header-actions controls-collapsible">
-                <a class="btn" href="/Dashboard/Historical" title="Ver histórico">📅</a>
+                <a class="btn" href="/Dashboard" title="Volver al dashboard en vivo">🔴 En vivo</a>
                 <button class="btn" id="toggleTheme">🌗</button>
                 <button class="btn" id="togglePresentation">🖥️</button>
             </div>
@@ -799,7 +840,7 @@
 
     <script>
         // ---------------------------------------------------------------
-        // Estado inicial servido por el servidor (primer render, sin esperar SignalR)
+        // Estado inicial servido por el servidor — foto fija de ese día/turno, sin SignalR.
         // ---------------------------------------------------------------
         let snapshot = @Html.Raw(Json.Serialize(Model));
         let selectedFurnaceId = null;
@@ -884,7 +925,6 @@
         renderKpiGroup(isLiveUpdate);
 
         document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
-        document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 
         const grid = document.getElementById('grid');
         const isFirstRender = grid.children.length === 0;
@@ -1368,20 +1408,16 @@
         }, PAGE_ROTATE_MS);
 
         // ---------------------------------------------------------------
-        // SIGNALR: conexión + recepción de actualizaciones en vivo
+        // PICKER DE FECHA/TURNO: precargado con lo que ya se está viendo (viene del
+        // servidor en el propio snapshot), listo para que solo cambien y le den "Ver".
         // ---------------------------------------------------------------
-        const connection = new signalR.HubConnectionBuilder()
-        .withUrl('/hubs/metrics')
-        .withAutomaticReconnect()
-        .build();
+        if (snapshot.historicalDate) {
+        document.getElementById('pickerDate').value = snapshot.historicalDate.substring(0, 10);
+        }
+        document.getElementById('pickerShift').value = String(snapshot.historicalShiftId || 1);
 
-        connection.on('SnapshotUpdated', (newSnapshot) => {
-        snapshot = newSnapshot;
-        render(true);
-        });
-
-        connection.start().catch(err => console.error('SignalR error:', err));
-
+        // No hay SignalR aquí — esto es una foto fija de un día/turno que ya pasó, no en
+        // vivo. Un solo render con lo que ya mandó el servidor.
         render(false);
     </script>
 </body>

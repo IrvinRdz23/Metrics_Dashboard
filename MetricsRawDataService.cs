@@ -8,13 +8,19 @@ namespace Metrics_Dashboard.Services;
 public interface IMetricsRawDataService
 {
     /// <summary>
-    /// Ejecuta [dbo].[Plant_Metrics_Production_Reports] UNA vez y regresa todas las filas
+    /// Ejecuta [dbo].[Plant_Metrics_Production_Reports] para HOY y regresa todas las filas
     /// del turno vigente (detectado por hora real contra el rango en Shift_Desc), de
     /// TODOS los Product_Group_ID (incluyendo el 7 / Tube Mills — cada consumidor decide
     /// si lo usa o lo excluye). De aquí se derivan tanto el dashboard general como los 6
     /// dashboards de detalle por horno, sin volver a golpear la base de datos.
     /// </summary>
     Task<(List<RawMetricRow> Rows, string ShiftDesc)> FetchCurrentShiftRowsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Igual que arriba pero para un día pasado y un turno específico (1, 2 o 3) — usado por
+    /// el histórico. No hay detección de "hora actual" aquí: se filtra directo por Shift_ID.
+    /// </summary>
+    Task<(List<RawMetricRow> Rows, string ShiftDesc)> FetchHistoricalRowsAsync(DateTime date, int shiftId, CancellationToken ct = default);
 }
 
 public class MetricsRawDataService : IMetricsRawDataService
@@ -33,9 +39,26 @@ public class MetricsRawDataService : IMetricsRawDataService
 
     public async Task<(List<RawMetricRow> Rows, string ShiftDesc)> FetchCurrentShiftRowsAsync(CancellationToken ct = default)
     {
-        var rows = new List<RawMetricRow>();
-        string shiftDesc = string.Empty;
+        var all = await ExecuteAndReadAllRowsAsync(DateTime.Today, ct);
         var now = DateTime.Now.TimeOfDay;
+        var filtered = all.Where(r => IsWithinShift(r.ShiftDesc, now)).ToList();
+        var shiftDesc = filtered.FirstOrDefault()?.ShiftDesc ?? string.Empty;
+        return (filtered, shiftDesc);
+    }
+
+    public async Task<(List<RawMetricRow> Rows, string ShiftDesc)> FetchHistoricalRowsAsync(DateTime date, int shiftId, CancellationToken ct = default)
+    {
+        var all = await ExecuteAndReadAllRowsAsync(date.Date, ct);
+        var filtered = all.Where(r => r.ShiftId == shiftId).ToList();
+        var shiftDesc = filtered.FirstOrDefault()?.ShiftDesc ?? string.Empty;
+        return (filtered, shiftDesc);
+    }
+
+    /// <summary>Ejecuta el SP para una fecha dada y regresa TODAS las filas (los 3 turnos,
+    /// sin filtrar todavía) — cada método público de arriba decide cómo filtrarlas.</summary>
+    private async Task<List<RawMetricRow>> ExecuteAndReadAllRowsAsync(DateTime date, CancellationToken ct)
+    {
+        var rows = new List<RawMetricRow>();
 
         await using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync(ct);
@@ -46,7 +69,7 @@ public class MetricsRawDataService : IMetricsRawDataService
             CommandTimeout = 30
         };
 
-        cmd.Parameters.AddWithValue("@Start_Date", DateTime.Today);
+        cmd.Parameters.AddWithValue("@Start_Date", date);
         cmd.Parameters.AddWithValue("@Plant_List_ID", _plantListId);
         cmd.Parameters.AddWithValue("@Get_Daily_Report", true);
 
@@ -69,11 +92,6 @@ public class MetricsRawDataService : IMetricsRawDataService
 
         while (await reader.ReadAsync(ct))
         {
-            var rowShiftDesc = SafeGetString(reader, ordShiftDesc);
-            if (!IsWithinShift(rowShiftDesc, now)) continue;
-
-            if (string.IsNullOrEmpty(shiftDesc)) shiftDesc = rowShiftDesc;
-
             rows.Add(new RawMetricRow(
                 ReportGroup: SafeGetInt(reader, ordReportGroup, -1),
                 GroupId: SafeGetInt(reader, ordGroupId, -1),
@@ -88,11 +106,11 @@ public class MetricsRawDataService : IMetricsRawDataService
                 TotalSap: SafeGetInt(reader, ordTotalSap),
                 Hour: SafeGetString(reader, ordHour),
                 ShiftId: SafeGetInt(reader, ordShiftId, -1),
-                ShiftDesc: rowShiftDesc
+                ShiftDesc: SafeGetString(reader, ordShiftDesc)
             ));
         }
 
-        return (rows, shiftDesc);
+        return rows;
     }
 
     // ------------------------------------------------------------------
@@ -152,6 +170,7 @@ public class MetricsRawDataService : IMetricsRawDataService
     /// <summary>
     /// ¿La hora actual cae dentro del rango que trae este Shift_Desc? (ej. "Shift 1 06:00-15:20").
     /// Soporta turnos que cruzan medianoche. Nada hardcodeado: el rango sale del propio SP.
+    /// Solo se usa para el modo EN VIVO — el histórico filtra directo por Shift_ID.
     /// </summary>
     private static bool IsWithinShift(string shiftDesc, TimeSpan now)
     {

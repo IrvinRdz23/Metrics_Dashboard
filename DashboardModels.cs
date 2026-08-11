@@ -147,6 +147,11 @@ public class PlantDashboardSnapshot
     /// la meta de producción por hora (Plan / horas de turno) en las gráficas de tendencia.</summary>
     public double ShiftDurationHours { get; set; } = 8.0;
 
+    /// <summary>true cuando este snapshot viene del histórico (no en vivo, sin SignalR).</summary>
+    public bool IsHistorical { get; set; } = false;
+    public DateTime? HistoricalDate { get; set; }
+    public int? HistoricalShiftId { get; set; }
+
     /// <summary>
     /// Furnaces incluye Furnace 1-5 Y Tube Mills (FurnaceId = 6) al final — Tube Mills solo se
     /// usa para el 6to recuadro del grid (que alterna con la tendencia cada 15s) y para el

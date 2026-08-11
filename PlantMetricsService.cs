@@ -6,6 +6,9 @@ public interface IPlantMetricsService
 {
     Task<PlantDashboardSnapshot> GetSnapshotAsync(CancellationToken ct = default);
 
+    /// <summary>Snapshot histórico de un día pasado + un turno específico (1, 2 o 3).</summary>
+    Task<PlantDashboardSnapshot> GetHistoricalSnapshotAsync(DateTime date, int shiftId, CancellationToken ct = default);
+
     /// <summary>Construye el snapshot general a partir de filas ya obtenidas (sin volver a golpear el SP).</summary>
     PlantDashboardSnapshot BuildFromRows(List<RawMetricRow> rows, string shiftDesc);
 }
@@ -40,6 +43,28 @@ public class PlantMetricsService : IPlantMetricsService
         {
             _logger.LogError(ex, "Error obteniendo snapshot general de Plant_Metrics_Production_Reports");
             return EmptySnapshot();
+        }
+    }
+
+    public async Task<PlantDashboardSnapshot> GetHistoricalSnapshotAsync(DateTime date, int shiftId, CancellationToken ct = default)
+    {
+        try
+        {
+            var (rows, shiftDesc) = await _rawDataService.FetchHistoricalRowsAsync(date, shiftId, ct);
+            var snapshot = BuildFromRows(rows, shiftDesc);
+            snapshot.IsHistorical = true;
+            snapshot.HistoricalDate = date.Date;
+            snapshot.HistoricalShiftId = shiftId;
+            return snapshot;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo histórico de {Date} turno {ShiftId}", date, shiftId);
+            var empty = EmptySnapshot();
+            empty.IsHistorical = true;
+            empty.HistoricalDate = date.Date;
+            empty.HistoricalShiftId = shiftId;
+            return empty;
         }
     }
 
