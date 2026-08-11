@@ -11,9 +11,12 @@ public interface IPlantMetricsService
 }
 
 /// <summary>
-/// Dashboard GENERAL (los 5 hornos, sin Tube Mills) — Product_Group_ID 7 se excluye aquí.
-/// Ya no ejecuta el SP directamente: usa IMetricsRawDataService, que se comparte con
-/// IFurnaceDetailService para que el SP se llame una sola vez por ciclo.
+/// Dashboard GENERAL. Furnaces incluye 1-5 (los que sí se muestran como card fija) y también
+/// Tube Mills al final (FurnaceId=6, solo para el 6to recuadro que alterna con la tendencia
+/// cada 15s) — pero TotalProduction/TotalPlanned/PlantOee siguen excluyendo Tube Mills (ver
+/// esas propiedades en PlantDashboardSnapshot). Ya no ejecuta el SP directamente: usa
+/// IMetricsRawDataService, que se comparte con IFurnaceDetailService para que el SP se
+/// llame una sola vez por ciclo.
 /// </summary>
 public class PlantMetricsService : IPlantMetricsService
 {
@@ -123,9 +126,39 @@ public class PlantMetricsService : IPlantMetricsService
             BuildKpiGroup("Tube Mills", tubeMillsRows)
         };
 
+        // ---------- Tube Mills como Furnace #6 (para el 6to recuadro del grid, que alterna con
+        // la tendencia cada 15s, y para el modal si le dan clic) — nunca cuenta en TotalProduction/
+        // TotalPlanned/PlantOee (ver esas propiedades en el modelo, ya filtran FurnaceId<=5). ----------
+        var tubeMills = new FurnaceMetric { FurnaceId = 6, FurnaceName = "Tube Mills" };
+        var tubeMillsLinesIndex = new Dictionary<string, ProductLineMetric>();
+        foreach (var r in rows.Where(r => r.ReportGroup == 1 && r.GroupId == 7))
+        {
+            var line = new ProductLineMetric
+            {
+                ProductDesc = r.Desc,
+                ProductListId = productListIdLookup.TryGetValue((r.GroupId, r.Desc), out var tmPlid) ? tmPlid : 0,
+                ProductOrder = r.ProductOrder,
+                CycleTimeSecs = r.CycleTimeSecs,
+                Total = r.Total,
+                AccumulatedRate = r.AccumRate,
+                PlannedShift = r.PlannedForOee,
+                OeeShift = r.OeeShift,
+                ExcludedFromSap = SapRules.IsExcluded(r.Desc),
+            };
+            tubeMills.Lines.Add(line);
+            tubeMillsLinesIndex[r.Desc] = line;
+        }
+        foreach (var r in rows.Where(r => r.ReportGroup == 3 && r.GroupId == 7 && r.TotalSap > 0))
+        {
+            if (tubeMillsLinesIndex.TryGetValue(r.Desc, out var line)) line.TotalSap += r.TotalSap;
+        }
+        tubeMills.Lines = tubeMills.Lines.OrderBy(l => l.ProductOrder).ToList();
+        furnaces.Add(tubeMills);
+
         return new PlantDashboardSnapshot
         {
             ShiftDesc = shiftDesc,
+            ShiftDurationHours = ShiftTimeHelper.GetDurationHours(shiftDesc),
             Furnaces = furnaces,
             HourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList(),
             TopKpiGroups = topKpiGroups
@@ -137,6 +170,7 @@ public class PlantMetricsService : IPlantMetricsService
         ShiftDesc = string.Empty,
         Furnaces = Enumerable.Range(1, 5)
             .Select(id => new FurnaceMetric { FurnaceId = id, FurnaceName = $"Furnace {id}" })
+            .Append(new FurnaceMetric { FurnaceId = 6, FurnaceName = "Tube Mills" })
             .ToList(),
         HourlyTrend = new List<HourlyPoint>(),
         TopKpiGroups = new List<KpiGroup>

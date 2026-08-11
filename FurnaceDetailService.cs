@@ -54,7 +54,8 @@ public class FurnaceDetailService : IFurnaceDetailService
         {
             FurnaceId = furnaceId,
             FurnaceName = info.Name,
-            ShiftDesc = shiftDesc
+            ShiftDesc = shiftDesc,
+            ShiftDurationHours = ShiftTimeHelper.GetDurationHours(shiftDesc)
         };
 
         var linesIndex = new Dictionary<string, ProductLineMetric>();

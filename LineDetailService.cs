@@ -103,6 +103,7 @@ public class LineDetailService : ILineDetailService
             FurnaceId = furnaceId,
             FurnaceName = furnaceName,
             ShiftDesc = shiftDesc,
+            ShiftDurationHours = ShiftTimeHelper.GetDurationHours(shiftDesc),
             CycleTimeSecs = mainRow?.CycleTimeSecs ?? 0,
             Total = mainRow?.Total ?? 0,
             AccumulatedRate = mainRow?.AccumRate ?? 0,

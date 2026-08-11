@@ -383,6 +383,11 @@
         return snapshot.hourlyTrend.map(h => (running += h.production));
     }
 
+    function idealHourlyRate() {
+        const hours = snapshot.shiftDurationHours || 8;
+        return hours > 0 ? snapshot.plannedShift / hours : 0;
+    }
+
     function renderTrend() {
         const canvas = document.getElementById('trendChart');
         if (!canvas) return;
@@ -390,6 +395,7 @@
             charts.trend.data.labels = snapshot.hourlyTrend.map(h => h.hour);
             charts.trend.data.datasets[0].data = snapshot.hourlyTrend.map(h => h.production);
             charts.trend.data.datasets[1].data = cumulativeSeries();
+            charts.trend.data.datasets[2].data = snapshot.hourlyTrend.map(() => idealHourlyRate());
             charts.trend.update('none');
             return;
         }
@@ -410,6 +416,12 @@
                         fill: true, tension: .35, pointRadius: 5, pointBackgroundColor: getCss('--good'),
                         pointBorderColor: getCss('--card'), pointBorderWidth: 2, borderWidth: 3,
                         yAxisID: 'y1', order: 1
+                    },
+                    {
+                        type: 'line', label: 'Meta de producción / hora',
+                        data: snapshot.hourlyTrend.map(() => idealHourlyRate()),
+                        borderColor: getCss('--text-faint'), borderDash: [7, 5], borderWidth: 2,
+                        pointRadius: 0, fill: false, yAxisID: 'y', order: 3
                     }
                 ]
             },

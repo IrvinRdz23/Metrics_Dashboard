@@ -94,6 +94,7 @@ public class LineDetailSnapshot
     public string FurnaceName { get; set; } = string.Empty;
     public DateTime GeneratedAt { get; set; } = DateTime.Now;
     public string ShiftDesc { get; set; } = string.Empty;
+    public double ShiftDurationHours { get; set; } = 8.0;
 
     public double CycleTimeSecs { get; set; }
     public int Total { get; set; }
@@ -125,6 +126,7 @@ public class FurnaceDetailSnapshot
     public string FurnaceName { get; set; } = string.Empty;
     public DateTime GeneratedAt { get; set; } = DateTime.Now;
     public string ShiftDesc { get; set; } = string.Empty;
+    public double ShiftDurationHours { get; set; } = 8.0;
 
     /// <summary>TODAS las líneas del turno actual (incluidas las que no tienen plan),
     /// ordenadas por Product_Order. Las que no tienen plan no cuentan para nada — ver CountedLines.</summary>

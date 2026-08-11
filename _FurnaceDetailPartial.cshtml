@@ -143,6 +143,7 @@
     .line-row .line-plan { font-size: clamp(.78rem, .9vw, .98rem); color: var(--text-faint); text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
     .line-bar-area { display: flex; align-items: center; gap: clamp(10px, 1.1vw, 16px); min-width: 0; }
     .line-bar-track { flex: 1; height: clamp(26px, 3vh, 36px); border-radius: 8px; background: var(--grid-line); overflow: hidden; position: relative; min-width: 0; }
+    .target-marker { position: absolute; top: -2px; bottom: -2px; width: 0; border-left: 2px dashed rgba(255,255,255,.55); z-index: 2; }
     .line-bar-fill { height: 100%; border-radius: 8px; display: flex; align-items: center; padding-left: 10px; transition: width .5s ease; }
     .line-bar-fill span { font-size: clamp(.85rem, 1vw, 1.1rem); font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
     .line-bar-detail { font-size: clamp(.78rem, .9vw, .98rem); color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-weight: 700; white-space: nowrap; min-width: 96px; }
@@ -337,6 +338,7 @@
                     <div class="line-name" title="${l.productDesc}">${l.productListId > 0 ? `<a href="/Line/${l.productListId}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>` : l.productDesc}</div>
                     <div class="line-bar-area">
                         <div class="line-bar-track">
+                            <div class="target-marker" style="left:85%"></div>
                             <div class="line-bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}">
                                 <span>${pct(l.oeeShift)}</span>
                             </div>
@@ -403,11 +405,17 @@
         return snapshot.hourlyTrend.map(h => (running += h.production));
     }
 
+    function idealHourlyRate() {
+        const hours = snapshot.shiftDurationHours || 8;
+        return hours > 0 ? snapshot.totalPlanned / hours : 0;
+    }
+
     function renderTrend() {
         if (charts.trend) {
             charts.trend.data.labels = snapshot.hourlyTrend.map(h => h.hour);
             charts.trend.data.datasets[0].data = snapshot.hourlyTrend.map(h => h.production);
             charts.trend.data.datasets[1].data = cumulativeSeries();
+            charts.trend.data.datasets[2].data = snapshot.hourlyTrend.map(() => idealHourlyRate());
             charts.trend.update('none');
             return;
         }
@@ -416,7 +424,8 @@
                 labels: snapshot.hourlyTrend.map(h => h.hour),
                 datasets: [
                     { type: 'bar', label: 'Producción / hora', data: snapshot.hourlyTrend.map(h => h.production), backgroundColor: hexToRgba(getCss('--accent'), .55), borderRadius: 6, maxBarThickness: 34, yAxisID: 'y', order: 2 },
-                    { type: 'line', label: 'Acumulado', data: cumulativeSeries(), borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .12), fill: true, tension: .35, pointRadius: 3, yAxisID: 'y1', order: 1 }
+                    { type: 'line', label: 'Acumulado', data: cumulativeSeries(), borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .12), fill: true, tension: .35, pointRadius: 3, yAxisID: 'y1', order: 1 },
+                    { type: 'line', label: 'Meta de producción / hora', data: snapshot.hourlyTrend.map(() => idealHourlyRate()), borderColor: getCss('--text-faint'), borderDash: [7, 5], borderWidth: 2, pointRadius: 0, fill: false, yAxisID: 'y', order: 3 }
                 ]
             },
             options: {

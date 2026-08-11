@@ -143,15 +143,24 @@ public class PlantDashboardSnapshot
     /// </summary>
     public List<KpiGroup> TopKpiGroups { get; set; } = new();
 
-    public int TotalProduction => Furnaces.Sum(f => f.TotalProduction);
-    public int TotalPlanned => Furnaces.Sum(f => f.TotalPlanned);
+    /// <summary>Duración del turno actual en horas, parseada de Shift_Desc — usada para calcular
+    /// la meta de producción por hora (Plan / horas de turno) en las gráficas de tendencia.</summary>
+    public double ShiftDurationHours { get; set; } = 8.0;
 
-    /// <summary>OEE promedio de TODAS las líneas de TODOS los hornos (simple, no ponderado).</summary>
+    /// <summary>
+    /// Furnaces incluye Furnace 1-5 Y Tube Mills (FurnaceId = 6) al final — Tube Mills solo se
+    /// usa para el 6to recuadro del grid (que alterna con la tendencia cada 15s) y para el
+    /// modal de detalle si se le da clic; nunca se cuenta en los totales de abajo.
+    /// </summary>
+    public int TotalProduction => Furnaces.Where(f => f.FurnaceId <= 5).Sum(f => f.TotalProduction);
+    public int TotalPlanned => Furnaces.Where(f => f.FurnaceId <= 5).Sum(f => f.TotalPlanned);
+
+    /// <summary>OEE promedio de TODAS las líneas de Furnace 1-5 (Tube Mills no cuenta aquí).</summary>
     public double PlantOee
     {
         get
         {
-            var allLines = Furnaces.SelectMany(f => f.Lines).ToList();
+            var allLines = Furnaces.Where(f => f.FurnaceId <= 5).SelectMany(f => f.Lines).ToList();
             return allLines.Count == 0 ? 0 : allLines.Average(l => l.OeeShift);
         }
     }
