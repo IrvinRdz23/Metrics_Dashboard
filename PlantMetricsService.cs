@@ -10,7 +10,7 @@ public interface IPlantMetricsService
     Task<PlantDashboardSnapshot> GetHistoricalSnapshotAsync(DateTime date, int shiftId, CancellationToken ct = default);
 
     /// <summary>Construye el snapshot general a partir de filas ya obtenidas (sin volver a golpear el SP).</summary>
-    PlantDashboardSnapshot BuildFromRows(List<RawMetricRow> rows, string shiftDesc);
+    PlantDashboardSnapshot BuildFromRows(List<RawMetricRow> rows, string shiftDesc, bool isLiveToday = true);
 }
 
 /// <summary>
@@ -51,7 +51,7 @@ public class PlantMetricsService : IPlantMetricsService
         try
         {
             var (rows, shiftDesc) = await _rawDataService.FetchHistoricalRowsAsync(date, shiftId, ct);
-            var snapshot = BuildFromRows(rows, shiftDesc);
+            var snapshot = BuildFromRows(rows, shiftDesc, isLiveToday: false);
             snapshot.IsHistorical = true;
             snapshot.HistoricalDate = date.Date;
             snapshot.HistoricalShiftId = shiftId;
@@ -68,7 +68,7 @@ public class PlantMetricsService : IPlantMetricsService
         }
     }
 
-    public PlantDashboardSnapshot BuildFromRows(List<RawMetricRow> rows, string shiftDesc)
+    public PlantDashboardSnapshot BuildFromRows(List<RawMetricRow> rows, string shiftDesc, bool isLiveToday = true)
     {
         var furnaces = Enumerable.Range(1, 5)
             .Select(id => new FurnaceMetric { FurnaceId = id, FurnaceName = $"Furnace {id}" })
@@ -182,7 +182,7 @@ public class PlantMetricsService : IPlantMetricsService
 
         var hourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList();
         var plantTotalPlanned = furnaces.Where(f => f.FurnaceId <= 5).Sum(f => f.TotalPlanned);
-        ShiftTimeHelper.ApplyExpectedCumulative(hourlyTrend, shiftDesc, ShiftTimeHelper.GetDurationHours(shiftDesc), plantTotalPlanned);
+        ShiftTimeHelper.ApplyExpectedCumulative(hourlyTrend, shiftDesc, ShiftTimeHelper.GetDurationHours(shiftDesc), plantTotalPlanned, isLiveToday);
 
         return new PlantDashboardSnapshot
         {
