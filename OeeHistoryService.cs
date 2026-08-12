@@ -19,16 +19,24 @@ public interface IOeeHistoryService
 
 /// <summary>
 /// Arma las 4 graficas de OEE historico (Turno/Diario/Semanal/Mensual) y su detalle.
-/// Diseno pensado para no golpear la base de mas de lo necesario:
-///   - Turno y Diario: una llamada @Get_Daily_Report por dia (cada una ya trae los 3 turnos).
-///   - Semanal: una llamada @Get_Weekly_Report por SEMANA (7 dias en un solo query).
-///   - Mensual: una llamada @Get_Monthly_Report por ANO (los 12 meses en un solo query).
-/// El turno/dia/semana/mes que esta en curso sale "vivo" solo porque su fecha cae dentro
-/// del rango que se le pide al SP - no hace falta logica extra para eso.
+///
+/// RENDIMIENTO: para CUALQUIER dia que ya paso, los datos salen de la tabla
+/// PlantMetrics_OeeHistory (rapidisimo, un SELECT indexado) en vez de llamar al SP.
+/// El SP pesado SOLO se llama para HOY (el turno/dia/semana/mes en curso, que sigue
+/// siendo en vivo). OeeHistoryBackfillService es quien va llenando esa tabla poco a
+/// poco en segundo plano - mientras el backfill no haya llegado a un dia todavia,
+/// este servicio cae de regreso al SP para ese dia especifico (mas lento, pero nunca
+/// se queda sin datos).
+///
+/// Ya no se usan los modos @Get_Weekly_Report/@Get_Monthly_Report del SP: semanal y
+/// mensual ahora se arman sumando dias individuales (la misma fuente ya probada de
+/// Turno/Diario), lo cual tambien quita el riesgo de que el formato de esos 2 modos
+/// no fuera exactamente el que yo habia asumido.
 /// </summary>
 public class OeeHistoryService : IOeeHistoryService
 {
     private readonly IMetricsRawDataService _rawDataService;
+    private readonly IOeeHistoryStorageService _storage;
     private readonly ILogger<OeeHistoryService> _logger;
 
     private static readonly Regex ShiftTimeRegex = new(@"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})", RegexOptions.Compiled);
@@ -39,14 +47,14 @@ public class OeeHistoryService : IOeeHistoryService
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
     };
 
-    // Cuántas llamadas al SP se hacen AL MISMO TIEMPO en vez de una tras otra. Con esto,
-    // pedir 14 días toma lo mismo que ~3 llamadas seguidas, no 14. Si tu SQL Server se ve
-    // muy presionado con esto, bájale este número; si aguanta bien, puedes subirlo.
-    private const int MaxParallelFetches = 5;
+    // Cuantas consultas de dia se hacen AL MISMO TIEMPO. La mayoria son lecturas rapidas de
+    // la tabla; esto solo importa de verdad para el dia de HOY (que sigue yendo al SP).
+    private const int MaxParallelFetches = 6;
 
-    public OeeHistoryService(IMetricsRawDataService rawDataService, ILogger<OeeHistoryService> logger)
+    public OeeHistoryService(IMetricsRawDataService rawDataService, IOeeHistoryStorageService storage, ILogger<OeeHistoryService> logger)
     {
         _rawDataService = rawDataService;
+        _storage = storage;
         _logger = logger;
     }
 
@@ -59,7 +67,7 @@ public class OeeHistoryService : IOeeHistoryService
         var daysNeeded = Math.Max(1, (int)Math.Ceiling(count / 3.0));
         var dates = Enumerable.Range(0, daysNeeded).Select(i => today.AddDays(-i)).ToList();
 
-        var rowsByDate = await FetchDaysInParallelAsync(dates, ct);
+        var rowsByDate = await FetchDaysAsync(dates, ct);
 
         var bars = new List<OeeHistoryBar>();
         foreach (var date in dates)
@@ -92,7 +100,7 @@ public class OeeHistoryService : IOeeHistoryService
 
     public async Task<List<OeeHistoryDetailBar>> GetShiftDetailAsync(DateTime date, int shiftId, CancellationToken ct = default)
     {
-        var rows = await SafeFetchDayAsync(date, ct);
+        var rows = await GetDayDataAsync(date, ct);
         var shiftRows = rows.Where(r => r.ReportGroup == 1 && r.ShiftId == shiftId && r.PlannedForOee != 0).ToList();
 
         return FurnaceCatalog.Map
@@ -118,37 +126,14 @@ public class OeeHistoryService : IOeeHistoryService
     {
         var today = DateTime.Today;
         var dates = Enumerable.Range(0, days).Select(i => today.AddDays(-i)).OrderBy(d => d).ToList();
+        var rowsByDate = await FetchDaysAsync(dates, ct);
 
-        var rowsByDate = await FetchDaysInParallelAsync(dates, ct);
-
-        var bars = new List<OeeHistoryBar>();
-        foreach (var date in dates)
-        {
-            var rows = rowsByDate.TryGetValue(date, out var r) ? r : new List<RawMetricRow>();
-            var counted = rows.Where(x => x.ReportGroup == 1 && x.PlannedForOee != 0).ToList();
-            if (counted.Count == 0)
-            {
-                bars.Add(new OeeHistoryBar { Label = FormatShortDate(date), Date = date, IsCurrent = date == today });
-                continue;
-            }
-
-            bars.Add(new OeeHistoryBar
-            {
-                Label = FormatShortDate(date),
-                Date = date,
-                Oee = counted.Average(x => x.OeeShift),
-                TotalProduction = counted.Sum(x => x.Total),
-                TotalPlanned = counted.Sum(x => x.PlannedForOee),
-                IsCurrent = date == today
-            });
-        }
-
-        return bars;
+        return dates.Select(date => BuildDayBar(date, rowsByDate.TryGetValue(date, out var r) ? r : new List<RawMetricRow>(), today)).ToList();
     }
 
     public async Task<List<OeeHistoryDetailBar>> GetDailyDetailAsync(DateTime date, CancellationToken ct = default)
     {
-        var rows = await SafeFetchDayAsync(date, ct);
+        var rows = await GetDayDataAsync(date, ct);
         var counted = rows.Where(r => r.ReportGroup == 1 && r.PlannedForOee != 0).ToList();
 
         return new[] { 1, 2, 3 }.Select(shiftId =>
@@ -169,26 +154,33 @@ public class OeeHistoryService : IOeeHistoryService
     public async Task<List<OeeHistoryBar>> GetWeeklyHistoryAsync(int weeks, CancellationToken ct = default)
     {
         var today = DateTime.Today;
-        var thisMonday = today.AddDays(-(int)((7 + (today.DayOfWeek - DayOfWeek.Monday)) % 7));
+        var thisMonday = MondayOf(today);
         var mondays = Enumerable.Range(0, weeks).Select(i => thisMonday.AddDays(-7 * i)).OrderBy(d => d).ToList();
 
-        var rowsByMonday = await FetchWeeksInParallelAsync(mondays, ct);
+        var allDays = mondays.SelectMany(m => Enumerable.Range(0, 7).Select(i => m.AddDays(i)))
+            .Where(d => d <= today)
+            .Distinct()
+            .ToList();
+        var rowsByDate = await FetchDaysAsync(allDays, ct);
 
         var bars = new List<OeeHistoryBar>();
-        foreach (var mondayOfWeek in mondays)
+        foreach (var monday in mondays)
         {
-            var rows = rowsByMonday.TryGetValue(mondayOfWeek, out var r) ? r : new List<RawMetricRow>();
-            var counted = rows.Where(x => x.ReportGroup == 1 && x.PlannedForOee != 0).ToList();
+            var weekDays = Enumerable.Range(0, 7).Select(i => monday.AddDays(i)).Where(d => d <= today);
+            var counted = weekDays
+                .SelectMany(d => rowsByDate.TryGetValue(d, out var r) ? r : new List<RawMetricRow>())
+                .Where(x => x.ReportGroup == 1 && x.PlannedForOee != 0)
+                .ToList();
 
-            var isoWeek = System.Globalization.ISOWeek.GetWeekOfYear(mondayOfWeek);
+            var isoWeek = System.Globalization.ISOWeek.GetWeekOfYear(monday);
             bars.Add(new OeeHistoryBar
             {
                 Label = "Sem " + isoWeek,
-                Date = mondayOfWeek,
+                Date = monday,
                 Oee = counted.Count == 0 ? 0 : counted.Average(x => x.OeeShift),
                 TotalProduction = counted.Sum(x => x.Total),
                 TotalPlanned = counted.Sum(x => x.PlannedForOee),
-                IsCurrent = today >= mondayOfWeek && today < mondayOfWeek.AddDays(7)
+                IsCurrent = today >= monday && today < monday.AddDays(7)
             });
         }
 
@@ -197,23 +189,24 @@ public class OeeHistoryService : IOeeHistoryService
 
     public async Task<List<OeeHistoryDetailBar>> GetWeeklyDetailAsync(DateTime anyDateInWeek, CancellationToken ct = default)
     {
-        var monday = anyDateInWeek.AddDays(-(int)((7 + (anyDateInWeek.DayOfWeek - DayOfWeek.Monday)) % 7));
-        var rows = await SafeFetchWeekAsync(monday, ct);
-        var counted = rows.Where(r => r.ReportGroup == 1 && r.PlannedForOee != 0 && !string.IsNullOrWhiteSpace(r.EventDateShort)).ToList();
+        var today = DateTime.Today;
+        var monday = MondayOf(anyDateInWeek);
+        var days = Enumerable.Range(0, 7).Select(i => monday.AddDays(i)).Where(d => d <= today).ToList();
+        var rowsByDate = await FetchDaysAsync(days, ct);
 
         var result = new List<OeeHistoryDetailBar>();
-        for (int i = 0; i < 7; i++)
+        foreach (var day in days)
         {
-            var day = monday.AddDays(i);
-            var lines = counted.Where(r => TryParseEventDate(r.EventDateShort, out var d) && d.Date == day.Date).ToList();
+            var lines = (rowsByDate.TryGetValue(day, out var r) ? r : new List<RawMetricRow>())
+                .Where(x => x.ReportGroup == 1 && x.PlannedForOee != 0).ToList();
             if (lines.Count == 0) continue;
 
             result.Add(new OeeHistoryDetailBar
             {
                 Label = SpanishDays[(int)day.DayOfWeek] + " " + day.Day,
-                Oee = lines.Average(r => r.OeeShift),
-                TotalProduction = lines.Sum(r => r.Total),
-                TotalPlanned = lines.Sum(r => r.PlannedForOee)
+                Oee = lines.Average(x => x.OeeShift),
+                TotalProduction = lines.Sum(x => x.Total),
+                TotalPlanned = lines.Sum(x => x.PlannedForOee)
             });
         }
         return result;
@@ -226,29 +219,38 @@ public class OeeHistoryService : IOeeHistoryService
         var today = DateTime.Today;
         var startMonth = new DateTime(today.Year, today.Month, 1).AddMonths(-(months - 1));
 
-        var years = Enumerable.Range(0, months)
-            .Select(i => startMonth.AddMonths(i).Year)
-            .Distinct()
-            .ToList();
-
-        var byYear = new Dictionary<int, List<MonthlyRawRow>>();
-        var yearResults = await Task.WhenAll(years.Select(y => SafeFetchYearAsync(new DateTime(y, 6, 1), ct)));
-        for (int i = 0; i < years.Count; i++) byYear[years[i]] = yearResults[i];
+        var allDays = new List<DateTime>();
+        for (int i = 0; i < months; i++)
+        {
+            var monthDate = startMonth.AddMonths(i);
+            var daysInMonth = DateTime.DaysInMonth(monthDate.Year, monthDate.Month);
+            for (int d = 1; d <= daysInMonth; d++)
+            {
+                var day = new DateTime(monthDate.Year, monthDate.Month, d);
+                if (day <= today) allDays.Add(day);
+            }
+        }
+        var rowsByDate = await FetchDaysAsync(allDays, ct);
 
         var bars = new List<OeeHistoryBar>();
         for (int i = 0; i < months; i++)
         {
             var monthDate = startMonth.AddMonths(i);
-            var rows = byYear.TryGetValue(monthDate.Year, out var yearRows) ? yearRows : new List<MonthlyRawRow>();
-            var counted = rows.Where(r => r.ReportGroup == 1 && r.MonthNumber == monthDate.Month && r.PlannedForOee != 0).ToList();
+            var daysInMonth = DateTime.DaysInMonth(monthDate.Year, monthDate.Month);
+            var counted = Enumerable.Range(1, daysInMonth)
+                .Select(d => new DateTime(monthDate.Year, monthDate.Month, d))
+                .Where(d => d <= today)
+                .SelectMany(d => rowsByDate.TryGetValue(d, out var r) ? r : new List<RawMetricRow>())
+                .Where(x => x.ReportGroup == 1 && x.PlannedForOee != 0)
+                .ToList();
 
             bars.Add(new OeeHistoryBar
             {
                 Label = SpanishMonths[monthDate.Month - 1].Substring(0, 3) + " " + monthDate.ToString("yy"),
                 Date = monthDate,
-                Oee = counted.Count == 0 ? 0 : counted.Average(r => r.Oee),
-                TotalProduction = counted.Sum(r => r.Total),
-                TotalPlanned = counted.Sum(r => r.PlannedForOee),
+                Oee = counted.Count == 0 ? 0 : counted.Average(x => x.OeeShift),
+                TotalProduction = counted.Sum(x => x.Total),
+                TotalPlanned = counted.Sum(x => x.PlannedForOee),
                 IsCurrent = monthDate.Year == today.Year && monthDate.Month == today.Month
             });
         }
@@ -258,36 +260,35 @@ public class OeeHistoryService : IOeeHistoryService
 
     public async Task<List<OeeHistoryDetailBar>> GetMonthlyDetailAsync(int year, int month, CancellationToken ct = default)
     {
+        var today = DateTime.Today;
+        var daysInMonth = DateTime.DaysInMonth(year, month);
+        var days = Enumerable.Range(1, daysInMonth)
+            .Select(d => new DateTime(year, month, d))
+            .Where(d => d <= today)
+            .ToList();
+
+        var rowsByDate = await FetchDaysAsync(days, ct);
         var firstOfMonth = new DateTime(year, month, 1);
-        var lastOfMonth = firstOfMonth.AddMonths(1).AddDays(-1);
-
-        var mondays = new List<DateTime>();
-        var cursor = firstOfMonth.AddDays(-(int)((7 + (firstOfMonth.DayOfWeek - DayOfWeek.Monday)) % 7));
-        while (cursor <= lastOfMonth)
-        {
-            mondays.Add(cursor);
-            cursor = cursor.AddDays(7);
-        }
-
-        var rowsByMonday = await FetchWeeksInParallelAsync(mondays, ct);
 
         var result = new List<OeeHistoryDetailBar>();
-        int weekNum = 1;
-        foreach (var monday in mondays)
-        {
-            var rows = rowsByMonday.TryGetValue(monday, out var r) ? r : new List<RawMetricRow>();
-            var counted = rows.Where(x =>
-                x.ReportGroup == 1 && x.PlannedForOee != 0 && !string.IsNullOrWhiteSpace(x.EventDateShort) &&
-                TryParseEventDate(x.EventDateShort, out var d) && d.Month == month && d.Year == year).ToList();
+        var weekGroups = days.GroupBy(d => ((d - MondayOf(firstOfMonth)).Days) / 7);
 
-            if (counted.Count > 0)
+        int weekNum = 1;
+        foreach (var group in weekGroups.OrderBy(g => g.Key))
+        {
+            var lines = group
+                .SelectMany(d => rowsByDate.TryGetValue(d, out var r) ? r : new List<RawMetricRow>())
+                .Where(x => x.ReportGroup == 1 && x.PlannedForOee != 0)
+                .ToList();
+
+            if (lines.Count > 0)
             {
                 result.Add(new OeeHistoryDetailBar
                 {
                     Label = "Sem " + weekNum,
-                    Oee = counted.Average(x => x.OeeShift),
-                    TotalProduction = counted.Sum(x => x.Total),
-                    TotalPlanned = counted.Sum(x => x.PlannedForOee)
+                    Oee = lines.Average(x => x.OeeShift),
+                    TotalProduction = lines.Sum(x => x.Total),
+                    TotalPlanned = lines.Sum(x => x.PlannedForOee)
                 });
             }
             weekNum++;
@@ -297,19 +298,42 @@ public class OeeHistoryService : IOeeHistoryService
 
     // ============================== HELPERS ==============================
 
-    private async Task<Dictionary<DateTime, List<RawMetricRow>>> FetchDaysInParallelAsync(List<DateTime> dates, CancellationToken ct)
+    private OeeHistoryBar BuildDayBar(DateTime date, List<RawMetricRow> rows, DateTime today)
     {
-        var result = new ConcurrentDictionary<DateTime, List<RawMetricRow>>();
-        await Parallel.ForEachAsync(dates, new ParallelOptions { MaxDegreeOfParallelism = MaxParallelFetches, CancellationToken = ct },
-            async (date, token) => { result[date] = await SafeFetchDayAsync(date, token); });
-        return new Dictionary<DateTime, List<RawMetricRow>>(result);
+        var counted = rows.Where(r => r.ReportGroup == 1 && r.PlannedForOee != 0).ToList();
+        if (counted.Count == 0)
+        {
+            return new OeeHistoryBar { Label = FormatShortDate(date), Date = date, IsCurrent = date == today };
+        }
+        return new OeeHistoryBar
+        {
+            Label = FormatShortDate(date),
+            Date = date,
+            Oee = counted.Average(r => r.OeeShift),
+            TotalProduction = counted.Sum(r => r.Total),
+            TotalPlanned = counted.Sum(r => r.PlannedForOee),
+            IsCurrent = date == today
+        };
     }
 
-    private async Task<Dictionary<DateTime, List<RawMetricRow>>> FetchWeeksInParallelAsync(List<DateTime> mondays, CancellationToken ct)
+    /// <summary>Un dia PASADO -> lee de la tabla (rapido). HOY -> siempre en vivo por el SP.
+    /// Si el backfill todavia no llego a un dia pasado, cae de regreso al SP como respaldo.</summary>
+    private async Task<List<RawMetricRow>> GetDayDataAsync(DateTime date, CancellationToken ct)
+    {
+        if (date.Date < DateTime.Today)
+        {
+            var stored = await _storage.GetStoredDayAsync(date, ct);
+            if (stored.Count > 0) return stored;
+            return await SafeFetchDayAsync(date, ct); // el backfill aun no llega aqui -> respaldo con el SP
+        }
+        return await SafeFetchDayAsync(date, ct);
+    }
+
+    private async Task<Dictionary<DateTime, List<RawMetricRow>>> FetchDaysAsync(List<DateTime> dates, CancellationToken ct)
     {
         var result = new ConcurrentDictionary<DateTime, List<RawMetricRow>>();
-        await Parallel.ForEachAsync(mondays, new ParallelOptions { MaxDegreeOfParallelism = MaxParallelFetches, CancellationToken = ct },
-            async (monday, token) => { result[monday] = await SafeFetchWeekAsync(monday, token); });
+        await Parallel.ForEachAsync(dates.Distinct(), new ParallelOptions { MaxDegreeOfParallelism = MaxParallelFetches, CancellationToken = ct },
+            async (date, token) => { result[date] = await GetDayDataAsync(date, token); });
         return new Dictionary<DateTime, List<RawMetricRow>>(result);
     }
 
@@ -319,20 +343,7 @@ public class OeeHistoryService : IOeeHistoryService
         catch (Exception ex) { _logger.LogError(ex, "Error obteniendo dia {Date} para OEE historico", date); return new(); }
     }
 
-    private async Task<List<RawMetricRow>> SafeFetchWeekAsync(DateTime monday, CancellationToken ct)
-    {
-        try { return await _rawDataService.FetchWeekRowsAsync(monday, ct); }
-        catch (Exception ex) { _logger.LogError(ex, "Error obteniendo semana de {Date} para OEE historico", monday); return new(); }
-    }
-
-    private async Task<List<MonthlyRawRow>> SafeFetchYearAsync(DateTime anyDateInYear, CancellationToken ct)
-    {
-        try { return await _rawDataService.FetchYearMonthlyRowsAsync(anyDateInYear, ct); }
-        catch (Exception ex) { _logger.LogError(ex, "Error obteniendo ano de {Date} para OEE historico", anyDateInYear); return new(); }
-    }
-
-    private static bool TryParseEventDate(string eventDateShort, out DateTime date)
-        => DateTime.TryParse(eventDateShort.Replace("/", "-"), out date);
+    private static DateTime MondayOf(DateTime date) => date.AddDays(-(int)((7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7));
 
     private static string FormatShortDate(DateTime d) => SpanishDays[(int)d.DayOfWeek] + " " + d.Day.ToString("00");
 
