@@ -35,8 +35,14 @@ public static class ShiftTimeHelper
     /// turno transcurrida). Es la línea amarilla que compite contra el acumulado real (verde)
     /// en las gráficas de tendencia — de dónde sale el inicio del turno también lo dice el
     /// propio Shift_Desc, nada hardcodeado.
+    ///
+    /// IMPORTANTE: para la hora que está EN CURSO ahora mismo (solo aplica si isLiveToday=true,
+    /// es decir, estamos viendo el turno de HOY en vivo), se usa la hora real de "ahora" en vez
+    /// de asumir que la hora ya se completó — si no, se sobreestima contra el Accumulated_Rate
+    /// real que reporta el SP para ese mismo instante. Para horas ya completadas, o para
+    /// cualquier turno histórico (isLiveToday=false), sí se asume la hora completa.
     /// </summary>
-    public static void ApplyExpectedCumulative(List<HourlyPoint> hourlyTrend, string? shiftDesc, double shiftDurationHours, int totalPlanned)
+    public static void ApplyExpectedCumulative(List<HourlyPoint> hourlyTrend, string? shiftDesc, double shiftDurationHours, int totalPlanned, bool isLiveToday = true)
     {
         if (hourlyTrend.Count == 0 || totalPlanned <= 0 || shiftDurationHours <= 0) return;
 
@@ -45,13 +51,23 @@ public static class ShiftTimeHelper
 
         var shiftStart = new TimeSpan(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), 0);
         var totalMinutes = shiftDurationHours * 60.0;
+        var now = DateTime.Now.TimeOfDay;
 
         foreach (var point in hourlyTrend)
         {
             if (!TimeSpan.TryParse(point.Hour, out var bucketEnd)) continue;
             if (bucketEnd == TimeSpan.Zero) bucketEnd = TimeSpan.FromHours(24); // "00:00" = fin del día
 
-            var elapsed = bucketEnd - shiftStart;
+            var effectiveTime = bucketEnd;
+
+            if (isLiveToday)
+            {
+                var bucketStart = bucketEnd - TimeSpan.FromHours(1);
+                var nowIsWithinBucket = now >= bucketStart && now < bucketEnd;
+                if (nowIsWithinBucket) effectiveTime = now; // la hora sigue corriendo -> usa "ahora", no el fin de hora
+            }
+
+            var elapsed = effectiveTime - shiftStart;
             if (elapsed < TimeSpan.Zero) elapsed += TimeSpan.FromHours(24); // turno cruza medianoche
 
             var fraction = Math.Min(1.0, elapsed.TotalMinutes / totalMinutes);
