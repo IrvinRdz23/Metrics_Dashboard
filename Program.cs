@@ -12,11 +12,9 @@ builder.Services.AddScoped<IPlantMetricsService, PlantMetricsService>();
 builder.Services.AddScoped<IFurnaceDetailService, FurnaceDetailService>();
 builder.Services.AddScoped<ILineDetailService, LineDetailService>();
 builder.Services.AddScoped<IOeeHistoryService, OeeHistoryService>();
-builder.Services.AddScoped<IOeeHistoryStorageService, OeeHistoryStorageService>();
 builder.Services.AddSingleton<IBreakScheduleService, BreakScheduleService>();
 
 builder.Services.AddHostedService<MetricsBroadcastService>();
-builder.Services.AddHostedService<OeeHistoryBackfillService>();
 
 var app = builder.Build();
 

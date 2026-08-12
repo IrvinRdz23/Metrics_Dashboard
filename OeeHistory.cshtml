@@ -151,10 +151,10 @@
 <script>
     const OEE_TARGET = 85;
     const LEVEL_META = {
-        shift:   { title: 'OEE por Turno',   captionBase: 'Últimos {n} turnos',   count: 15, refreshMs: 60000 },
-        daily:   { title: 'OEE Diario',      captionBase: 'Últimos {n} días',     count: 14, refreshMs: 60000 },
-        weekly:  { title: 'OEE Semanal',     captionBase: 'Últimas {n} semanas',  count: 12, refreshMs: 90000 },
-        monthly: { title: 'OEE Mensual',     captionBase: 'Últimos {n} meses',    count: 12, refreshMs: 120000 }
+        shift:   { title: 'OEE por Turno',   caption: 'Turnos de esta semana',              refreshMs: 60000 },
+        daily:   { title: 'OEE Diario',      caption: 'Esta semana y la pasada',            refreshMs: 60000 },
+        weekly:  { title: 'OEE Semanal',     caption: 'Todas las semanas del año actual',   refreshMs: 90000 },
+        monthly: { title: 'OEE Mensual',     caption: 'Todos los meses del año actual',     refreshMs: 120000 }
     };
 
     let currentLevel = 'daily';
@@ -309,13 +309,12 @@
 
         document.querySelectorAll('.level-tab').forEach(t => t.classList.toggle('active', t.dataset.level === level));
         document.getElementById('chartTitle').textContent = meta.title;
-        const caption = meta.captionBase.replace('{n}', meta.count) + ' · objetivo 85% · clic en una barra para ver el detalle';
-        document.getElementById('chartCaption').textContent = caption;
-        document.getElementById('printSubtitle').innerHTML = `${meta.title.replace('OEE ', '')} · ${meta.captionBase.replace('{n}', meta.count)} · Generado el <span id="printDate2">${new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}</span>`;
+        document.getElementById('chartCaption').textContent = meta.caption + ' · objetivo 85% · clic en una barra para ver el detalle';
+        document.getElementById('printSubtitle').innerHTML = `${meta.title.replace('OEE ', '')} · ${meta.caption} · Generado el <span id="printDate2">${new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}</span>`;
 
-        if (!opts.silent) showLoading(`Cargando OEE ${meta.title.toLowerCase()}...`);
+        if (!opts.silent) showLoading(`Cargando OEE ${meta.title.toLowerCase()}... esto puede tardar un poco, sobre todo en Semanal.`);
         try {
-            const bars = await fetchWithTimeout(`/OeeHistory/Data?level=${level}&count=${meta.count}`, 60000);
+            const bars = await fetchWithTimeout(`/OeeHistory/Data?level=${level}`, 90000);
             if (requestId !== levelRequestId) return; // llegó tarde, ya no aplica (el usuario cambió de pestaña)
             currentBars = bars;
             renderKpis(currentBars);

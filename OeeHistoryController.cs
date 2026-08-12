@@ -13,24 +13,24 @@ public class OeeHistoryController : Controller
         _historyService = historyService;
     }
 
-    // GET /OeeHistory  -> vista, precargada con Diario (últimos 14 días) para el primer render
+    // GET /OeeHistory  -> vista, precargada con Diario (esta semana + la pasada)
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
-        var bars = await _historyService.GetDailyHistoryAsync(14, ct);
+        var bars = await _historyService.GetDailyHistoryAsync(ct);
         return View(bars);
     }
 
-    // GET /OeeHistory/Data?level=shift|daily|weekly|monthly&count=N
+    // GET /OeeHistory/Data?level=shift|daily|weekly|monthly
     [HttpGet("Data")]
-    public async Task<IActionResult> Data(string level, int count, CancellationToken ct)
+    public async Task<IActionResult> Data(string level, CancellationToken ct)
     {
         var bars = (level?.ToLowerInvariant()) switch
         {
-            "shift" => await _historyService.GetShiftHistoryAsync(count > 0 ? count : 15, ct),
-            "weekly" => await _historyService.GetWeeklyHistoryAsync(count > 0 ? count : 12, ct),
-            "monthly" => await _historyService.GetMonthlyHistoryAsync(count > 0 ? count : 12, ct),
-            _ => await _historyService.GetDailyHistoryAsync(count > 0 ? count : 14, ct)
+            "shift" => await _historyService.GetShiftHistoryAsync(ct),
+            "weekly" => await _historyService.GetWeeklyHistoryAsync(ct),
+            "monthly" => await _historyService.GetMonthlyHistoryAsync(ct),
+            _ => await _historyService.GetDailyHistoryAsync(ct)
         };
         return Json(bars);
     }
