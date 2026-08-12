@@ -318,13 +318,22 @@ public class OeeHistoryService : IOeeHistoryService
 
     /// <summary>Un dia PASADO -> lee de la tabla (rapido). HOY -> siempre en vivo por el SP.
     /// Si el backfill todavia no llego a un dia pasado, cae de regreso al SP como respaldo.</summary>
+    /// <summary>Un día PASADO ya revisado (con o sin datos) -> lee de la tabla (rápido).
+    /// Un día pasado que NUNCA se ha revisado -> se pide al SP una sola vez y se guarda para
+    /// la próxima (así se "autocura": la próxima vez que alguien lo pida, ya sale de la tabla).
+    /// HOY -> siempre en vivo por el SP, nunca se guarda mientras el turno/día sigue corriendo.</summary>
     private async Task<List<RawMetricRow>> GetDayDataAsync(DateTime date, CancellationToken ct)
     {
         if (date.Date < DateTime.Today)
         {
-            var stored = await _storage.GetStoredDayAsync(date, ct);
-            if (stored.Count > 0) return stored;
-            return await SafeFetchDayAsync(date, ct); // el backfill aun no llega aqui -> respaldo con el SP
+            if (await _storage.IsDayStoredAsync(date, ct))
+            {
+                return await _storage.GetStoredDayAsync(date, ct);
+            }
+
+            var rows = await SafeFetchDayAsync(date, ct);
+            await _storage.UpsertDayAsync(date, rows, ct);
+            return rows;
         }
         return await SafeFetchDayAsync(date, ct);
     }

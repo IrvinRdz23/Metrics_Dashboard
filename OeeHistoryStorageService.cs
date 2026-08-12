@@ -37,6 +37,11 @@ public class OeeHistoryStorageService : IOeeHistoryStorageService
 
         try
         {
+            // Si el día está marcado como "revisado, sin datos", no hace falta ni consultar
+            // la tabla de líneas — ya sabemos que va a venir vacía.
+            var (isStored, hasData) = await GetDayMarkerAsync(date, ct);
+            if (isStored && !hasData) return rows;
+
             await using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync(ct);
 
@@ -81,27 +86,39 @@ public class OeeHistoryStorageService : IOeeHistoryStorageService
 
     public async Task<bool> IsDayStoredAsync(DateTime date, CancellationToken ct = default)
     {
+        var (isStored, _) = await GetDayMarkerAsync(date, ct);
+        return isStored;
+    }
+
+    /// <summary>Consulta la tabla "marcador" (PlantMetrics_OeeHistory_Days): ¿ya se revisó
+    /// este día contra el SP? Y si sí, ¿tuvo producción o no? Esto es lo que evita volver a
+    /// pegarle al SP por días vacíos (fines de semana, etc.) una y otra vez.</summary>
+    private async Task<(bool IsStored, bool HasData)> GetDayMarkerAsync(DateTime date, CancellationToken ct)
+    {
         try
         {
             await using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync(ct);
             await using var cmd = new SqlCommand(
-                "SELECT TOP 1 1 FROM dbo.PlantMetrics_OeeHistory WHERE EventDate = @EventDate", conn);
+                "SELECT HasData FROM dbo.PlantMetrics_OeeHistory_Days WHERE EventDate = @EventDate", conn);
             cmd.Parameters.AddWithValue("@EventDate", date.Date);
             var result = await cmd.ExecuteScalarAsync(ct);
-            return result != null;
+            return result == null ? (false, false) : (true, Convert.ToBoolean(result));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checando si {Date} ya está en PlantMetrics_OeeHistory", date);
-            return false;
+            _logger.LogError(ex, "Error checando el marcador de {Date} en PlantMetrics_OeeHistory_Days", date);
+            return (false, false);
         }
     }
 
     public async Task UpsertDayAsync(DateTime date, List<RawMetricRow> rawRows, CancellationToken ct = default)
     {
+        // Ojo: NO hay "if (lines.Count == 0) return;" aquí a propósito. Un día sin producción
+        // (fin de semana, etc.) igual se debe MARCAR como revisado — si no, se vuelve a
+        // consultar al SP cada vez que alguien lo pide, que es justo lo que hacía lentas las
+        // gráficas Semanal/Mensual (que casi siempre incluyen algún día vacío).
         var lines = rawRows.Where(r => r.ReportGroup == 1).ToList();
-        if (lines.Count == 0) return;
 
         // El SAP (Report_Group=3) viene aparte del SP — se pega a cada línea antes de guardar,
         // igual que hacen PlantMetricsService/FurnaceDetailService con datos en vivo.
@@ -149,6 +166,20 @@ public class OeeHistoryStorageService : IOeeHistoryStorageService
                 ins.Parameters.AddWithValue("@TotalSap", sap);
 
                 await ins.ExecuteNonQueryAsync(ct);
+            }
+
+            // Marca el día como "revisado" sin importar si tuvo datos o no (MERGE por si ya
+            // existía el marcador de un backfill anterior).
+            await using (var mark = new SqlCommand(@"
+                MERGE dbo.PlantMetrics_OeeHistory_Days AS target
+                USING (SELECT @EventDate AS EventDate) AS src
+                ON target.EventDate = src.EventDate
+                WHEN MATCHED THEN UPDATE SET HasData = @HasData, CapturedAt = GETDATE()
+                WHEN NOT MATCHED THEN INSERT (EventDate, HasData, CapturedAt) VALUES (@EventDate, @HasData, GETDATE());", conn, tx))
+            {
+                mark.Parameters.AddWithValue("@EventDate", date.Date);
+                mark.Parameters.AddWithValue("@HasData", lines.Count > 0);
+                await mark.ExecuteNonQueryAsync(ct);
             }
 
             await tx.CommitAsync(ct);

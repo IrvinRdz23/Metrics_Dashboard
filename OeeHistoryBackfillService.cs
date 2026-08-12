@@ -67,15 +67,11 @@ public class OeeHistoryBackfillService : BackgroundService
                 var rows = await rawData.FetchDayRowsAsync(cursor, ct);
                 var hasData = rows.Any(r => r.ReportGroup == 1 && r.PlannedForOee != 0);
 
-                if (hasData)
-                {
-                    await storage.UpsertDayAsync(cursor, rows, ct);
-                    consecutiveEmpty = 0;
-                }
-                else
-                {
-                    consecutiveEmpty++;
-                }
+                // Se guarda SIEMPRE (con o sin datos) para marcar el día como revisado y que
+                // no se vuelva a consultar al SP por él — "sin datos" también es una respuesta
+                // válida que vale la pena recordar (fin de semana, día sin turno, etc.).
+                await storage.UpsertDayAsync(cursor, rows, ct);
+                consecutiveEmpty = hasData ? 0 : consecutiveEmpty + 1;
             }
 
             var daysBackSoFar = (DateTime.Today - cursor).Days;
@@ -108,10 +104,7 @@ public class OeeHistoryBackfillService : BackgroundService
         if (await storage.IsDayStoredAsync(yesterday, ct)) return;
 
         var rows = await rawData.FetchDayRowsAsync(yesterday, ct);
-        if (rows.Any(r => r.ReportGroup == 1 && r.PlannedForOee != 0))
-        {
-            await storage.UpsertDayAsync(yesterday, rows, ct);
-            _logger.LogInformation("Guardado automatico de ayer ({Date}) en PlantMetrics_OeeHistory.", yesterday);
-        }
+        await storage.UpsertDayAsync(yesterday, rows, ct); // se guarda aunque no haya tenido producción
+        _logger.LogInformation("Guardado automatico de ayer ({Date}) en PlantMetrics_OeeHistory.", yesterday);
     }
 }

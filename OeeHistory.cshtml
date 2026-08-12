@@ -1,0 +1,468 @@
+@model List<Metrics_Dashboard.Models.OeeHistoryBar>
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Plant Metrics · OEE Histórico</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+    :root[data-theme="dark"] {
+        --bg: #0a0e15; --card: #131a28; --card-hover: #1a2338; --border: #263652; --border-soft: rgba(255,255,255,0.07);
+        --text: #f2f5fb; --text-dim: #93a4c2; --text-faint: #62729a;
+        --accent: #55acff; --accent-soft: rgba(85,172,255,0.16);
+        --good: #3ddb98; --warn: #f5c15c; --bad: #ff6b78;
+        --grid-line: rgba(255,255,255,0.06); --shadow: 0 10px 26px -12px rgba(0,0,0,0.55);
+    }
+    :root[data-theme="light"] {
+        --bg: #e7ebf3; --card: #ffffff; --card-hover: #eef2fa; --border: #c3ccdc; --border-soft: rgba(16,24,40,0.08);
+        --text: #0c1526; --text-dim: #46536b; --text-faint: #707f9c;
+        --accent: #1957c2; --accent-soft: rgba(25,87,194,0.11);
+        --good: #0e8f57; --warn: #96650a; --bad: #c22e3e;
+        --grid-line: rgba(16,24,40,0.08); --shadow: 0 12px 28px -14px rgba(20,30,60,0.22);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+        margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--text);
+        font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased;
+    }
+    .page { max-width: 1280px; margin: 0 auto; padding: 20px 24px 60px; }
+
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+    .level-tabs { display: flex; gap: 6px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 5px; }
+    .level-tab {
+        border: none; background: transparent; color: var(--text-dim); font-weight: 700; font-size: .88rem;
+        padding: 9px 18px; border-radius: 9px; cursor: pointer; transition: background .15s, color .15s;
+    }
+    .level-tab.active { background: var(--accent); color: #06101f; }
+    .level-tab:hover:not(.active) { background: var(--card-hover); color: var(--text); }
+
+    .toolbar-actions { display: flex; align-items: center; gap: 10px; }
+    .btn {
+        background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 10px;
+        padding: 10px 16px; font-size: .85rem; font-weight: 700; cursor: pointer; text-decoration: none;
+        display: flex; align-items: center; gap: 7px; transition: background .15s, border-color .15s;
+    }
+    .btn:hover { background: var(--card-hover); border-color: var(--accent); }
+    .btn:disabled { opacity: .55; cursor: default; }
+    .btn-primary { background: var(--accent); color: #06101f; border-color: transparent; }
+    .btn-primary:hover { filter: brightness(1.08); }
+
+    #printArea { background: var(--bg); }
+
+    .print-header { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
+    .logo-chip { background: #fff; border-radius: 10px; padding: 6px 10px; display: flex; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+    .logo-chip img { height: 30px; width: auto; display: block; }
+    .print-title h1 { margin: 0; font-size: 1.4rem; font-weight: 800; }
+    .print-title .sub { color: var(--text-dim); font-size: .85rem; font-weight: 600; margin-top: 3px; }
+
+    .card {
+        background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+        padding: 20px 22px; box-shadow: var(--shadow); margin-bottom: 16px;
+    }
+    .card h2 { font-size: .92rem; margin: 0 0 4px 0; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); }
+    .card .caption { font-size: .78rem; color: var(--text-faint); font-weight: 600; margin-bottom: 14px; }
+    .chart-card .chart-wrap { height: 340px; position: relative; }
+    .detail-card .chart-wrap { height: 260px; position: relative; }
+
+    .kpi-row { display: flex; gap: 26px; margin-bottom: 16px; flex-wrap: wrap; }
+    .kpi-mini { text-align: left; }
+    .kpi-mini .v { font-size: 1.7rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+    .kpi-mini .l { font-size: .68rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; margin-top: 2px; }
+
+    .detail-head { display: flex; justify-content: space-between; align-items: flex-start; }
+    .legend-note { font-size: .74rem; color: var(--text-faint); font-weight: 600; display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-faint); font-weight: 600; }
+
+    .loading-overlay {
+        position: fixed; inset: 0; background: rgba(4,7,14,.7); display: none; align-items: center; justify-content: center; z-index: 100;
+    }
+    .loading-overlay.open { display: flex; }
+    .loading-box { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 34px 44px; background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); }
+    .spinner { width: 44px; height: 44px; border-radius: 50%; border: 5px solid var(--border); border-top-color: var(--accent); animation: spin .9s linear infinite; }
+    @@keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-weight: 700; color: var(--text); }
+</style>
+</head>
+<body>
+<div class="page">
+    <div class="toolbar">
+        <div class="level-tabs" id="levelTabs">
+            <button class="level-tab" data-level="shift">Turno</button>
+            <button class="level-tab active" data-level="daily">Diario</button>
+            <button class="level-tab" data-level="weekly">Semanal</button>
+            <button class="level-tab" data-level="monthly">Mensual</button>
+        </div>
+        <div class="toolbar-actions">
+            <a class="btn" href="/Dashboard" title="Volver al dashboard en vivo">🔴 En vivo</a>
+            <button class="btn" id="toggleTheme">🌗 Tema</button>
+            <button class="btn btn-primary" id="exportPdfBtn">📄 Exportar PDF</button>
+        </div>
+    </div>
+
+    <div id="printArea">
+        <div class="print-header">
+            <div class="logo-chip"><img src="~/images/m2s.png" alt="M2S" /></div>
+            <div class="logo-chip"><img src="~/images/MAHLE-Logo.png" alt="MAHLE" /></div>
+            <div class="print-title">
+                <h1>Reporte de OEE · Planta 1</h1>
+                <div class="sub" id="printSubtitle">Diario · Últimos 14 días · Generado el <span id="printDate"></span></div>
+            </div>
+        </div>
+
+        <div class="card chart-card">
+            <h2 id="chartTitle">OEE Diario</h2>
+            <div class="caption" id="chartCaption">Últimos 14 días · objetivo 85% · clic en una barra para ver el detalle</div>
+            <div class="kpi-row" id="kpiRow"></div>
+            <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+            <div class="legend-note"><span class="legend-dot"></span> Contorno azul = el turno/día/semana/mes que está en curso ahora mismo (en vivo)</div>
+        </div>
+
+        <div class="card detail-card" id="detailCard" style="display:none;">
+            <div class="detail-head">
+                <div>
+                    <h2 id="detailTitle">Detalle</h2>
+                    <div class="caption" id="detailCaption"></div>
+                </div>
+                <button class="btn" id="closeDetailBtn">Cerrar ✕</button>
+            </div>
+            <div class="chart-wrap"><canvas id="detailChart"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-box">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">Cargando…</div>
+    </div>
+</div>
+
+<script>
+    const OEE_TARGET = 85;
+    const LEVEL_META = {
+        shift:   { title: 'OEE por Turno',   captionBase: 'Últimos {n} turnos',   count: 15, refreshMs: 60000 },
+        daily:   { title: 'OEE Diario',      captionBase: 'Últimos {n} días',     count: 14, refreshMs: 60000 },
+        weekly:  { title: 'OEE Semanal',     captionBase: 'Últimas {n} semanas',  count: 12, refreshMs: 90000 },
+        monthly: { title: 'OEE Mensual',     captionBase: 'Últimos {n} meses',    count: 12, refreshMs: 120000 }
+    };
+
+    let currentLevel = 'daily';
+    let currentBars = @Html.Raw(Json.Serialize(Model));
+    let refreshTimer = null;
+    const charts = {};
+
+    function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+    function hexToRgba(hex, alpha) {
+        const h = hex.replace('#', '');
+        const bigint = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+        const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255;
+        return `rgba(${r},${g},${b},${alpha})`;
+    }
+    function oeeColor(oee) {
+        if (oee >= 0.85) return getCss('--good');
+        if (oee >= 0.70) return getCss('--warn');
+        return getCss('--bad');
+    }
+    function pct(v) { return (v * 100).toFixed(0) + '%'; }
+
+    document.getElementById('printDate').textContent = new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    // ---------------------------------------------------------------
+    // LÍNEA DE META (85%) — para gráficas de barras VERTICALES (eje Y = OEE%).
+    // ---------------------------------------------------------------
+    const targetLinePlugin = {
+        id: 'targetLineY',
+        afterDatasetsDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            if (!chartArea || !scales.y) return;
+            const yPix = scales.y.getPixelForValue(OEE_TARGET);
+            if (yPix < chartArea.top || yPix > chartArea.bottom) return;
+            ctx.save();
+            ctx.setLineDash([6, 4]);
+            ctx.strokeStyle = getCss('--text-faint');
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(chartArea.left, yPix);
+            ctx.lineTo(chartArea.right, yPix);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = getCss('--text-faint');
+            ctx.font = '700 11px Inter, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('Meta 85%', chartArea.right - 4, yPix - 6);
+            ctx.restore();
+        }
+    };
+
+    function buildBarChartConfig(bars, onClickBar) {
+        return {
+            type: 'bar',
+            data: {
+                labels: bars.map(b => b.label),
+                datasets: [{
+                    data: bars.map(b => b.oee * 100),
+                    backgroundColor: bars.map(b => oeeColor(b.oee)),
+                    borderColor: bars.map(b => b.isCurrent ? getCss('--accent') : 'transparent'),
+                    borderWidth: bars.map(b => b.isCurrent ? 3 : 0),
+                    borderRadius: 6,
+                    maxBarThickness: 46
+                }]
+            },
+            plugins: [targetLinePlugin],
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                animation: { duration: 400 },
+                onClick: (evt, elements) => {
+                    if (!elements.length || !onClickBar) return;
+                    onClickBar(bars[elements[0].index]);
+                },
+                onHover: (evt, elements) => { evt.native.target.style.cursor = elements.length && onClickBar ? 'pointer' : 'default'; },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (c) => {
+                                const b = bars[c.dataIndex];
+                                return [`OEE: ${(b.oee * 100).toFixed(0)}%`, `Producción: ${b.totalProduction.toLocaleString()}`, `Plan: ${b.totalPlanned.toLocaleString()}`];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: getCss('--text-dim'), font: { size: 11 } }, grid: { display: false } },
+                    y: { min: 0, suggestedMax: 100, ticks: { color: getCss('--text-dim'), callback: v => v + '%' }, grid: { color: getCss('--grid-line') } }
+                }
+            }
+        };
+    }
+
+    function renderKpis(bars) {
+        const withData = bars.filter(b => b.totalPlanned > 0);
+        const avgOee = withData.length ? withData.reduce((s, b) => s + b.oee, 0) / withData.length : 0;
+        const totalProd = bars.reduce((s, b) => s + b.totalProduction, 0);
+        const totalPlan = bars.reduce((s, b) => s + b.totalPlanned, 0);
+        const current = bars.find(b => b.isCurrent);
+
+        document.getElementById('kpiRow').innerHTML = `
+            <div class="kpi-mini"><div class="v" style="color:${oeeColor(avgOee)}">${pct(avgOee)}</div><div class="l">OEE Promedio del Periodo</div></div>
+            <div class="kpi-mini"><div class="v">${totalProd.toLocaleString()}</div><div class="l">Producción Total</div></div>
+            <div class="kpi-mini"><div class="v">${totalPlan.toLocaleString()}</div><div class="l">Plan Total</div></div>
+            ${current ? `<div class="kpi-mini"><div class="v" style="color:${oeeColor(current.oee)}">${pct(current.oee)}</div><div class="l">🔴 En Vivo Ahora</div></div>` : ''}
+        `;
+    }
+
+    function renderMainChart(bars) {
+        const canvas = document.getElementById('mainChart');
+        if (charts.main) charts.main.destroy();
+        if (bars.length === 0 || bars.every(b => b.totalPlanned === 0)) {
+            canvas.style.display = 'none';
+            let empty = document.getElementById('emptyState');
+            if (!empty) {
+                empty = document.createElement('div');
+                empty.id = 'emptyState';
+                empty.className = 'empty-state';
+                empty.textContent = 'No hay datos para este periodo todavía.';
+                canvas.parentElement.appendChild(empty);
+            }
+            return;
+        }
+        canvas.style.display = 'block';
+        document.getElementById('emptyState')?.remove();
+        charts.main = new Chart(canvas, buildBarChartConfig(bars, (bar) => loadDetail(bar)));
+    }
+
+    // ---------------------------------------------------------------
+    // NIVEL (Turno / Diario / Semanal / Mensual)
+    // ---------------------------------------------------------------
+    let levelRequestId = 0; // evita que una respuesta vieja (lenta) sobre-escriba una más nueva
+
+    // fetch() no tiene límite de tiempo por default — si el servidor se cuelga, la pantalla se
+    // queda pegada para siempre sin avisar nada. Con AbortController le ponemos un tope.
+    async function fetchWithTimeout(url, timeoutMs) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const res = await fetch(url, { signal: controller.signal });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return await res.json();
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    async function loadLevel(level, opts) {
+        opts = opts || {};
+        currentLevel = level;
+        const meta = LEVEL_META[level];
+        const requestId = ++levelRequestId;
+
+        document.querySelectorAll('.level-tab').forEach(t => t.classList.toggle('active', t.dataset.level === level));
+        document.getElementById('chartTitle').textContent = meta.title;
+        const caption = meta.captionBase.replace('{n}', meta.count) + ' · objetivo 85% · clic en una barra para ver el detalle';
+        document.getElementById('chartCaption').textContent = caption;
+        document.getElementById('printSubtitle').innerHTML = `${meta.title.replace('OEE ', '')} · ${meta.captionBase.replace('{n}', meta.count)} · Generado el <span id="printDate2">${new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}</span>`;
+
+        if (!opts.silent) showLoading(`Cargando OEE ${meta.title.toLowerCase()}...`);
+        try {
+            const bars = await fetchWithTimeout(`/OeeHistory/Data?level=${level}&count=${meta.count}`, 60000);
+            if (requestId !== levelRequestId) return; // llegó tarde, ya no aplica (el usuario cambió de pestaña)
+            currentBars = bars;
+            renderKpis(currentBars);
+            renderMainChart(currentBars);
+            if (!opts.silent) hideDetail();
+        } catch (err) {
+            if (requestId !== levelRequestId) return;
+            console.error('Error cargando nivel', level, err);
+            if (!opts.silent) {
+                const isTimeout = err.name === 'AbortError';
+                alert(isTimeout
+                    ? 'Se tardó demasiado en cargar. Intenta de nuevo — si sigue pasando, avísale a Irvin.'
+                    : 'No se pudo cargar esta gráfica. Intenta de nuevo.');
+            }
+        } finally {
+            if (requestId === levelRequestId && !opts.silent) hideLoading();
+        }
+
+        restartRefreshTimer();
+    }
+
+    function restartRefreshTimer() {
+        if (refreshTimer) clearInterval(refreshTimer);
+        const meta = LEVEL_META[currentLevel];
+        refreshTimer = setInterval(() => loadLevel(currentLevel, { silent: true }), meta.refreshMs);
+    }
+
+    document.querySelectorAll('.level-tab').forEach(tab => {
+        tab.addEventListener('click', () => loadLevel(tab.dataset.level));
+    });
+
+    // ---------------------------------------------------------------
+    // DETALLE (drill-down): por horno+TubeMills / por turno / por día / por semana
+    // ---------------------------------------------------------------
+    const DETAIL_LABEL = { shift: 'por Horno', daily: 'por Turno', weekly: 'por Día', monthly: 'por Semana' };
+
+    async function loadDetail(bar) {
+        showLoading('Cargando detalle...');
+        try {
+            const params = new URLSearchParams({ level: currentLevel, date: bar.date.substring(0, 10) });
+            if (currentLevel === 'shift') params.set('shiftId', bar.shiftId);
+            const detailBars = await fetchWithTimeout(`/OeeHistory/Detail?${params.toString()}`, 45000);
+
+            document.getElementById('detailTitle').textContent = `Detalle ${DETAIL_LABEL[currentLevel]} · ${bar.label}`;
+            document.getElementById('detailCaption').textContent = detailBars.length
+                ? 'Objetivo 85% por línea/agrupación'
+                : 'No hay líneas con plan en este periodo.';
+
+            if (charts.detail) charts.detail.destroy();
+            const canvas = document.getElementById('detailChart');
+            if (detailBars.length > 0) {
+                charts.detail = new Chart(canvas, buildBarChartConfig(detailBars.map(d => ({ ...d, isCurrent: false, date: bar.date })), null));
+            }
+            document.getElementById('detailCard').style.display = '';
+            document.getElementById('detailCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } catch (err) {
+            console.error('Error cargando detalle', err);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    function hideDetail() {
+        document.getElementById('detailCard').style.display = 'none';
+        if (charts.detail) { charts.detail.destroy(); delete charts.detail; }
+    }
+    document.getElementById('closeDetailBtn').addEventListener('click', hideDetail);
+
+    // ---------------------------------------------------------------
+    // LOADER
+    // ---------------------------------------------------------------
+    function showLoading(text) {
+        document.getElementById('loadingText').textContent = text || 'Cargando...';
+        document.getElementById('loadingOverlay').classList.add('open');
+    }
+    function hideLoading() { document.getElementById('loadingOverlay').classList.remove('open'); }
+
+    // ---------------------------------------------------------------
+    // TEMA
+    // ---------------------------------------------------------------
+    document.getElementById('toggleTheme').addEventListener('click', () => {
+        const html = document.documentElement;
+        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('pm-theme', next);
+        renderMainChart(currentBars);
+    });
+    const savedTheme = localStorage.getItem('pm-theme');
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+
+    // ---------------------------------------------------------------
+    // EXPORTAR PDF: captura #printArea (logos + título + gráficas visibles) y arma un PDF
+    // con estilo — todo del lado del cliente, sin volver a pegarle al servidor.
+    // ---------------------------------------------------------------
+    document.getElementById('exportPdfBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('exportPdfBtn');
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '⏳ Generando...';
+        try {
+            const target = document.getElementById('printArea');
+            const canvas = await html2canvas(target, {
+                backgroundColor: getCss('--bg'),
+                scale: 2,
+                useCORS: true
+            });
+            const imgData = canvas.toDataURL('image/png');
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 24;
+
+            const imgWidth = pageWidth - margin * 2;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            let heightLeft = imgHeight;
+            let position = margin;
+
+            pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+            heightLeft -= (pageHeight - margin * 2);
+
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight + margin;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+                heightLeft -= (pageHeight - margin * 2);
+            }
+
+            const dateStr = new Date().toISOString().substring(0, 10);
+            pdf.save(`OEE_${currentLevel}_${dateStr}.pdf`);
+        } catch (err) {
+            console.error('Error generando PDF', err);
+            alert('No se pudo generar el PDF. Revisa la consola.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    });
+
+    // ---------------------------------------------------------------
+    // ARRANQUE: ya viene "Diario" precargado del servidor (sin esperar el primer fetch).
+    // ---------------------------------------------------------------
+    renderKpis(currentBars);
+    renderMainChart(currentBars);
+    restartRefreshTimer();
+</script>
+</body>
+</html>
