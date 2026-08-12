@@ -180,12 +180,16 @@ public class PlantMetricsService : IPlantMetricsService
         tubeMills.Lines = tubeMills.Lines.OrderBy(l => l.ProductOrder).ToList();
         furnaces.Add(tubeMills);
 
+        var hourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList();
+        var plantTotalPlanned = furnaces.Where(f => f.FurnaceId <= 5).Sum(f => f.TotalPlanned);
+        ShiftTimeHelper.ApplyExpectedCumulative(hourlyTrend, shiftDesc, ShiftTimeHelper.GetDurationHours(shiftDesc), plantTotalPlanned);
+
         return new PlantDashboardSnapshot
         {
             ShiftDesc = shiftDesc,
             ShiftDurationHours = ShiftTimeHelper.GetDurationHours(shiftDesc),
             Furnaces = furnaces,
-            HourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList(),
+            HourlyTrend = hourlyTrend,
             TopKpiGroups = topKpiGroups
         };
     }

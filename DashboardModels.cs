@@ -108,6 +108,11 @@ public class HourlyPoint
 {
     public string Hour { get; set; } = string.Empty; // "07:00", "08:00", ...
     public int Production { get; set; }
+
+    /// <summary>Acumulado que "deberíamos llevar" a esta hora si el ritmo fuera perfectamente
+    /// parejo a lo largo del turno (Plan × fracción de turno transcurrida a esta hora). Se
+    /// calcula en ShiftTimeHelper.ApplyExpectedCumulative — nunca hardcodeado.</summary>
+    public int ExpectedCumulative { get; set; }
 }
 
 /// <summary>

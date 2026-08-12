@@ -405,17 +405,12 @@
         return snapshot.hourlyTrend.map(h => (running += h.production));
     }
 
-    function idealHourlyRate() {
-        const hours = snapshot.shiftDurationHours || 8;
-        return hours > 0 ? snapshot.totalPlanned / hours : 0;
-    }
-
     function renderTrend() {
         if (charts.trend) {
             charts.trend.data.labels = snapshot.hourlyTrend.map(h => h.hour);
             charts.trend.data.datasets[0].data = snapshot.hourlyTrend.map(h => h.production);
             charts.trend.data.datasets[1].data = cumulativeSeries();
-            charts.trend.data.datasets[2].data = snapshot.hourlyTrend.map(() => idealHourlyRate());
+            charts.trend.data.datasets[2].data = snapshot.hourlyTrend.map(h => h.expectedCumulative);
             charts.trend.update('none');
             return;
         }
@@ -425,7 +420,7 @@
                 datasets: [
                     { type: 'bar', label: 'Producción / hora', data: snapshot.hourlyTrend.map(h => h.production), backgroundColor: hexToRgba(getCss('--accent'), .55), borderRadius: 6, maxBarThickness: 34, yAxisID: 'y', order: 2 },
                     { type: 'line', label: 'Acumulado', data: cumulativeSeries(), borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .12), fill: true, tension: .35, pointRadius: 3, yAxisID: 'y1', order: 1 },
-                    { type: 'line', label: 'Meta de producción / hora', data: snapshot.hourlyTrend.map(() => idealHourlyRate()), borderColor: getCss('--text-faint'), borderDash: [7, 5], borderWidth: 2, pointRadius: 0, fill: false, yAxisID: 'y', order: 3 }
+                    { type: 'line', label: 'Acumulado esperado', data: snapshot.hourlyTrend.map(h => h.expectedCumulative), borderColor: getCss('--warn'), backgroundColor: 'transparent', borderDash: [6, 4], tension: .35, pointRadius: 3, pointBackgroundColor: getCss('--warn'), fill: false, yAxisID: 'y1', order: 0 }
                 ]
             },
             options: {

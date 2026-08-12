@@ -84,6 +84,13 @@
         font-size: clamp(.85rem, 1vw, 1.05rem); padding: clamp(8px, 1vh, 12px) clamp(12px, 1.2vw, 16px);
         border-radius: 12px; text-decoration: none;
     }
+    /* Logo del cliente (Honda/BMW/Tesla/etc.) en vez del número de horno — chip blanco para
+       que el logo se lea bien sin importar el color del horno ni el tema claro/oscuro. */
+    .furnace-tag.logo-tag {
+        background: #ffffff; display: flex; align-items: center; justify-content: center;
+        padding: clamp(6px, .8vh, 10px) clamp(10px, 1vw, 14px); box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+    .furnace-tag.logo-tag img { height: clamp(30px, 3.6vh, 46px); width: auto; max-width: 110px; object-fit: contain; display: block; }
     .brand-text { min-width: 0; }
     .brand-text h1 { font-size: clamp(1.4rem, 2.3vw, 2.5rem); margin: 0; font-weight: 900; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .brand-text .subtitle { color: var(--text-dim); font-size: clamp(.85rem, 1vw, 1.05rem); display: flex; align-items: center; gap: 10px; margin-top: 4px; font-weight: 600; }
@@ -215,7 +222,9 @@
 
     <header>
         <div class="brand">
-            <a class="furnace-tag" href="@FurnaceHref(Model.FurnaceId)" title="Ver @Model.FurnaceName completo">@(Model.FurnaceId == 6 ? "TM" : Model.FurnaceId.ToString())</a>
+            <a class="furnace-tag logo-tag" href="@FurnaceHref(Model.FurnaceId)" title="Ver @Model.FurnaceName completo">
+                <img src="~/images/logos/@(GetClientLogo(Model.ProductDesc).LogoFile)" alt="@(GetClientLogo(Model.ProductDesc).AltText)" />
+            </a>
             <div class="brand-text">
                 <h1 id="lineTitle">@Model.ProductDesc</h1>
                 <div class="subtitle">
@@ -383,11 +392,6 @@
         return snapshot.hourlyTrend.map(h => (running += h.production));
     }
 
-    function idealHourlyRate() {
-        const hours = snapshot.shiftDurationHours || 8;
-        return hours > 0 ? snapshot.plannedShift / hours : 0;
-    }
-
     function renderTrend() {
         const canvas = document.getElementById('trendChart');
         if (!canvas) return;
@@ -395,7 +399,7 @@
             charts.trend.data.labels = snapshot.hourlyTrend.map(h => h.hour);
             charts.trend.data.datasets[0].data = snapshot.hourlyTrend.map(h => h.production);
             charts.trend.data.datasets[1].data = cumulativeSeries();
-            charts.trend.data.datasets[2].data = snapshot.hourlyTrend.map(() => idealHourlyRate());
+            charts.trend.data.datasets[2].data = snapshot.hourlyTrend.map(h => h.expectedCumulative);
             charts.trend.update('none');
             return;
         }
@@ -418,10 +422,12 @@
                         yAxisID: 'y1', order: 1
                     },
                     {
-                        type: 'line', label: 'Meta de producción / hora',
-                        data: snapshot.hourlyTrend.map(() => idealHourlyRate()),
-                        borderColor: getCss('--text-faint'), borderDash: [7, 5], borderWidth: 2,
-                        pointRadius: 0, fill: false, yAxisID: 'y', order: 3
+                        type: 'line', label: 'Acumulado esperado a esta hora',
+                        data: snapshot.hourlyTrend.map(h => h.expectedCumulative),
+                        borderColor: getCss('--warn'), backgroundColor: 'transparent',
+                        borderDash: [6, 4], tension: .35, pointRadius: 4, pointBackgroundColor: getCss('--warn'),
+                        pointBorderColor: getCss('--card'), pointBorderWidth: 2, borderWidth: 2.5,
+                        fill: false, yAxisID: 'y1', order: 0
                     }
                 ]
             },
@@ -587,4 +593,45 @@
     };
 
     string FurnaceHref(int id) => id == 6 ? "/TubeMills" : $"/Furnace{id}";
+
+    // ---------------------------------------------------------------------------
+    // Logo del cliente según palabras clave en el nombre de la línea (Product_Desc).
+    // Se revisa en ESTE orden — el primero que haga match gana. Coincidencia por
+    // "palabra completa" (no substring suelto) para que, por ejemplo, "WS" no matchee
+    // dentro de otra palabra por accidente.
+    //
+    // Los archivos van en /wwwroot/images/logos/ con estos nombres exactos — súbelos ahí,
+    // no hay que tocar código para agregarlos:
+    //   honda.png · chrysler.png · gm.png · lucid.png · default-car.png ·
+    //   bmw.png · tesla.png · toyota.png · rivian.png
+    // ---------------------------------------------------------------------------
+    static readonly (string Token, string LogoFile, string AltText)[] ClientLogoRules = new[]
+    {
+        ("PCM", "honda.png", "Honda"),
+        ("WS", "chrysler.png", "Chrysler"),
+        ("D2UX", "gm.png", "General Motors"),
+        ("Lucid", "lucid.png", "Lucid"),
+        ("Clam Shell", "default-car.png", "Cliente"),
+        ("BMW", "bmw.png", "BMW"),
+        ("Tesla", "tesla.png", "Tesla"),
+        ("Toyota", "toyota.png", "Toyota"),
+        ("GM", "gm.png", "General Motors"),
+        ("Honda", "honda.png", "Honda"),
+        ("RIVIAN", "rivian.png", "Rivian"),
+        ("BEV3", "gm.png", "General Motors"),
+    };
+
+    (string LogoFile, string AltText) GetClientLogo(string productDesc)
+    {
+        var desc = productDesc ?? "";
+        foreach (var rule in ClientLogoRules)
+        {
+            var pattern = @"\b" + System.Text.RegularExpressions.Regex.Escape(rule.Token) + @"\b";
+            if (System.Text.RegularExpressions.Regex.IsMatch(desc, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                return (rule.LogoFile, rule.AltText);
+            }
+        }
+        return ("default-car.png", "Cliente");
+    }
 }

@@ -99,6 +99,7 @@ public class FurnaceDetailService : IFurnaceDetailService
 
         snapshot.Lines = snapshot.Lines.OrderBy(l => l.ProductOrder).ToList();
         snapshot.HourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList();
+        ShiftTimeHelper.ApplyExpectedCumulative(snapshot.HourlyTrend, shiftDesc, snapshot.ShiftDurationHours, snapshot.TotalPlanned);
 
         return snapshot;
     }

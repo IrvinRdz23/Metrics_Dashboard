@@ -96,6 +96,10 @@ public class LineDetailService : ILineDetailService
             ? Math.Sqrt(samples.Sum(v => Math.Pow(v - actualMean!.Value, 2)) / (samples.Count - 1))
             : null;
 
+        var plannedShift = mainRow?.PlannedForOee ?? 0;
+        var shiftDurationHours = ShiftTimeHelper.GetDurationHours(shiftDesc);
+        ShiftTimeHelper.ApplyExpectedCumulative(hourlyTrend, shiftDesc, shiftDurationHours, plannedShift);
+
         return new LineDetailSnapshot
         {
             ProductListId = lineId,
@@ -103,11 +107,11 @@ public class LineDetailService : ILineDetailService
             FurnaceId = furnaceId,
             FurnaceName = furnaceName,
             ShiftDesc = shiftDesc,
-            ShiftDurationHours = ShiftTimeHelper.GetDurationHours(shiftDesc),
+            ShiftDurationHours = shiftDurationHours,
             CycleTimeSecs = mainRow?.CycleTimeSecs ?? 0,
             Total = mainRow?.Total ?? 0,
             AccumulatedRate = mainRow?.AccumRate ?? 0,
-            PlannedShift = mainRow?.PlannedForOee ?? 0,
+            PlannedShift = plannedShift,
             OeeShift = mainRow?.OeeShift ?? 0,
             TotalSap = totalSap,
             ExcludedFromSap = SapRules.IsExcluded(desc),
