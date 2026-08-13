@@ -90,7 +90,7 @@ public class FurnaceDetailService : IFurnaceDetailService
             }
         }
 
-        var hourlyTotals = new SortedDictionary<string, int>();
+        var hourlyTotals = new Dictionary<string, int>();
         foreach (var r in rows.Where(r => r.ReportGroup == 2 && groupIds.Contains(r.GroupId) && !string.IsNullOrWhiteSpace(r.Hour) && r.Hour != "-"))
         {
             hourlyTotals.TryGetValue(r.Hour, out var acc);
@@ -98,7 +98,8 @@ public class FurnaceDetailService : IFurnaceDetailService
         }
 
         snapshot.Lines = snapshot.Lines.OrderBy(l => l.ProductOrder).ToList();
-        snapshot.HourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList();
+        snapshot.HourlyTrend = ShiftTimeHelper.SortByShiftElapsed(
+            hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList(), shiftDesc);
         ShiftTimeHelper.ApplyExpectedCumulative(snapshot.HourlyTrend, shiftDesc, snapshot.ShiftDurationHours, snapshot.TotalPlanned);
 
         return snapshot;

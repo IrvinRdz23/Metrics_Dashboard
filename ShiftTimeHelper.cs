@@ -30,17 +30,34 @@ public static class ShiftTimeHelper
     }
 
     /// <summary>
+    /// Ordena los puntos de la gráfica de tendencia por MINUTOS TRANSCURRIDOS DESDE EL INICIO
+    /// DEL TURNO, no alfabéticamente por el texto de la hora. Sin esto, una hora como "00:00"
+    /// (el último bucket de un turno que cruza medianoche, ej. Turno 2/3) ordena ANTES que
+    /// "06:00" solo por comparación de texto, aunque en realidad sea la última hora del turno.
+    /// </summary>
+    public static List<HourlyPoint> SortByShiftElapsed(List<HourlyPoint> points, string? shiftDesc)
+    {
+        var m = ShiftTimeRegex.Match(shiftDesc ?? string.Empty);
+        if (!m.Success) return points.OrderBy(p => p.Hour, StringComparer.Ordinal).ToList();
+
+        var shiftStart = new TimeSpan(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), 0);
+        return points.OrderBy(p => ElapsedSinceShiftStart(p.Hour, shiftStart)).ToList();
+    }
+
+    /// <summary>
     /// Rellena HourlyPoint.ExpectedCumulative en cada punto: el acumulado que "deberíamos
     /// llevar" a esa hora si el ritmo fuera parejo durante todo el turno (Plan × fracción de
     /// turno transcurrida). Es la línea amarilla que compite contra el acumulado real (verde)
     /// en las gráficas de tendencia — de dónde sale el inicio del turno también lo dice el
     /// propio Shift_Desc, nada hardcodeado.
     ///
-    /// IMPORTANTE: para la hora que está EN CURSO ahora mismo (solo aplica si isLiveToday=true,
-    /// es decir, estamos viendo el turno de HOY en vivo), se usa la hora real de "ahora" en vez
-    /// de asumir que la hora ya se completó — si no, se sobreestima contra el Accumulated_Rate
-    /// real que reporta el SP para ese mismo instante. Para horas ya completadas, o para
-    /// cualquier turno histórico (isLiveToday=false), sí se asume la hora completa.
+    /// Dos casos especiales:
+    /// - Hora EN CURSO ahora mismo (solo isLiveToday=true): se usa la hora real de "ahora",
+    ///   no el fin de esa hora, para no sobreestimar contra el Accumulated_Rate real del SP.
+    /// - Hora que se SALE del horario real del turno (ej. el turno termina 15:20 pero el
+    ///   bucket de hora es "15:00-16:00"): se deja en null (hueco en la gráfica) en vez de
+    ///   saltar de golpe al 100% del plan — ese salto es matemáticamente "correcto" pero se
+    ///   ve como un pico confuso, así que mejor no se dibuja ese último punto.
     /// </summary>
     public static void ApplyExpectedCumulative(List<HourlyPoint> hourlyTrend, string? shiftDesc, double shiftDurationHours, int totalPlanned, bool isLiveToday = true)
     {
@@ -58,20 +75,40 @@ public static class ShiftTimeHelper
             if (!TimeSpan.TryParse(point.Hour, out var bucketEnd)) continue;
             if (bucketEnd == TimeSpan.Zero) bucketEnd = TimeSpan.FromHours(24); // "00:00" = fin del día
 
+            var bucketStart = bucketEnd - TimeSpan.FromHours(1);
             var effectiveTime = bucketEnd;
 
-            if (isLiveToday)
+            if (isLiveToday && now >= bucketStart && now < bucketEnd)
             {
-                var bucketStart = bucketEnd - TimeSpan.FromHours(1);
-                var nowIsWithinBucket = now >= bucketStart && now < bucketEnd;
-                if (nowIsWithinBucket) effectiveTime = now; // la hora sigue corriendo -> usa "ahora", no el fin de hora
+                effectiveTime = now; // la hora sigue corriendo -> usa "ahora", no el fin de hora
             }
 
-            var elapsed = effectiveTime - shiftStart;
-            if (elapsed < TimeSpan.Zero) elapsed += TimeSpan.FromHours(24); // turno cruza medianoche
+            var elapsedMinutes = ElapsedSinceShiftStart(effectiveTime, shiftStart).TotalMinutes;
 
-            var fraction = Math.Min(1.0, elapsed.TotalMinutes / totalMinutes);
+            // Este bucket ya se sale del horario real del turno (ej. turno termina 15:20 pero
+            // el bucket es 15:00-16:00) -> mejor sin dato aquí que un salto brusco al 100%.
+            if (elapsedMinutes > totalMinutes + 1)
+            {
+                point.ExpectedCumulative = null;
+                continue;
+            }
+
+            var fraction = Math.Min(1.0, elapsedMinutes / totalMinutes);
             point.ExpectedCumulative = (int)Math.Round(totalPlanned * fraction);
         }
+    }
+
+    private static TimeSpan ElapsedSinceShiftStart(string hourLabel, TimeSpan shiftStart)
+    {
+        if (!TimeSpan.TryParse(hourLabel, out var bucketEnd)) return TimeSpan.MaxValue;
+        if (bucketEnd == TimeSpan.Zero) bucketEnd = TimeSpan.FromHours(24);
+        return ElapsedSinceShiftStart(bucketEnd, shiftStart);
+    }
+
+    private static TimeSpan ElapsedSinceShiftStart(TimeSpan time, TimeSpan shiftStart)
+    {
+        var elapsed = time - shiftStart;
+        if (elapsed < TimeSpan.Zero) elapsed += TimeSpan.FromHours(24); // turno cruza medianoche
+        return elapsed;
     }
 }

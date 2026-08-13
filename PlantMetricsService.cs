@@ -114,7 +114,7 @@ public class PlantMetricsService : IPlantMetricsService
             }
         }
 
-        var hourlyTotals = new SortedDictionary<string, int>();
+        var hourlyTotals = new Dictionary<string, int>();
         foreach (var r in rows.Where(r => r.ReportGroup == 2 && groupToFurnace.ContainsKey(r.GroupId) && !string.IsNullOrWhiteSpace(r.Hour) && r.Hour != "-"))
         {
             hourlyTotals.TryGetValue(r.Hour, out var acc);
@@ -181,6 +181,7 @@ public class PlantMetricsService : IPlantMetricsService
         furnaces.Add(tubeMills);
 
         var hourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList();
+        hourlyTrend = ShiftTimeHelper.SortByShiftElapsed(hourlyTrend, shiftDesc);
         var plantTotalPlanned = furnaces.Where(f => f.FurnaceId <= 5).Sum(f => f.TotalPlanned);
         ShiftTimeHelper.ApplyExpectedCumulative(hourlyTrend, shiftDesc, ShiftTimeHelper.GetDurationHours(shiftDesc), plantTotalPlanned, isLiveToday);
 

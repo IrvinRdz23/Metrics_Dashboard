@@ -71,8 +71,8 @@ public class LineDetailService : ILineDetailService
             .Where(r => r.ReportGroup == 2 && r.GroupId == groupId && r.Desc == desc && !string.IsNullOrWhiteSpace(r.Hour) && r.Hour != "-")
             .GroupBy(r => r.Hour)
             .Select(g => new HourlyPoint { Hour = g.Key, Production = g.Sum(x => x.Total) })
-            .OrderBy(h => h.Hour)
             .ToList();
+        hourlyTrend = ShiftTimeHelper.SortByShiftElapsed(hourlyTrend, shiftDesc);
 
         // ---------- Tiempo de ciclo real aproximado por hora ----------
         // segundos disponibles (3600 - descansos que caen en esa hora) / piezas de esa hora.

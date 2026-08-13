@@ -111,8 +111,10 @@ public class HourlyPoint
 
     /// <summary>Acumulado que "deberíamos llevar" a esta hora si el ritmo fuera perfectamente
     /// parejo a lo largo del turno (Plan × fracción de turno transcurrida a esta hora). Se
-    /// calcula en ShiftTimeHelper.ApplyExpectedCumulative — nunca hardcodeado.</summary>
-    public int ExpectedCumulative { get; set; }
+    /// calcula en ShiftTimeHelper.ApplyExpectedCumulative — nunca hardcodeado. Null cuando esa
+    /// hora ya se sale del horario real del turno (ver por qué en ApplyExpectedCumulative) —
+    /// así la línea amarilla simplemente no dibuja ahí, en vez de saltar de golpe al 100%.</summary>
+    public int? ExpectedCumulative { get; set; }
 }
 
 /// <summary>
