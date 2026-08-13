@@ -62,13 +62,13 @@ public class MetricsBroadcastService : BackgroundService
             // dashboards distintos (general + hornos + líneas) estén conectados.
             var (rows, shiftDesc) = await rawDataService.FetchCurrentShiftRowsAsync(ct);
 
-            var general = plantService.BuildFromRows(rows, shiftDesc);
+            var general = await plantService.BuildFromRowsAsync(rows, shiftDesc, ct: ct);
             await _hubContext.Clients.Group(MetricsHub.GeneralGroup)
                 .SendAsync("SnapshotUpdated", general, cancellationToken: ct);
 
             foreach (var furnaceId in FurnaceCatalog.Map.Keys)
             {
-                var detail = furnaceService.BuildFromRows(rows, shiftDesc, furnaceId);
+                var detail = await furnaceService.BuildFromRowsAsync(rows, shiftDesc, furnaceId, ct);
                 await _hubContext.Clients.Group(MetricsHub.FurnaceGroup(furnaceId))
                     .SendAsync("FurnaceSnapshotUpdated", detail, cancellationToken: ct);
             }
@@ -77,7 +77,7 @@ public class MetricsBroadcastService : BackgroundService
             var lineIds = rows.BuildProductListIdLookup().Values.Distinct();
             foreach (var lineId in lineIds)
             {
-                var lineDetail = lineService.BuildFromRows(rows, shiftDesc, lineId);
+                var lineDetail = await lineService.BuildFromRowsAsync(rows, shiftDesc, lineId, ct);
                 await _hubContext.Clients.Group(MetricsHub.LineGroup(lineId))
                     .SendAsync("LineSnapshotUpdated", lineDetail, cancellationToken: ct);
             }

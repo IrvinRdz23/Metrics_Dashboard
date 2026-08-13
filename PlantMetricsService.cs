@@ -10,7 +10,7 @@ public interface IPlantMetricsService
     Task<PlantDashboardSnapshot> GetHistoricalSnapshotAsync(DateTime date, int shiftId, CancellationToken ct = default);
 
     /// <summary>Construye el snapshot general a partir de filas ya obtenidas (sin volver a golpear el SP).</summary>
-    PlantDashboardSnapshot BuildFromRows(List<RawMetricRow> rows, string shiftDesc, bool isLiveToday = true);
+    Task<PlantDashboardSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -20,15 +20,22 @@ public interface IPlantMetricsService
 /// esas propiedades en PlantDashboardSnapshot). Ya no ejecuta el SP directamente: usa
 /// IMetricsRawDataService, que se comparte con IFurnaceDetailService para que el SP se
 /// llame una sola vez por ciclo.
+///
+/// Desde que se agregó Heijunka: qué línea "cuenta" para OEE/producción/plan ya NO depende
+/// solo de Planned_Shift_for_OEE != 0 — se le pregunta a IHeijunkaService (Heijunka_Plan_List)
+/// si esa línea tenía plan ESTE día/turno específico. Si Heijunka no tiene datos para la
+/// semana vigente, se cae automáticamente al criterio viejo (ver ProductLineMetric.CountsForStats).
 /// </summary>
 public class PlantMetricsService : IPlantMetricsService
 {
     private readonly IMetricsRawDataService _rawDataService;
+    private readonly IHeijunkaService _heijunkaService;
     private readonly ILogger<PlantMetricsService> _logger;
 
-    public PlantMetricsService(IMetricsRawDataService rawDataService, ILogger<PlantMetricsService> logger)
+    public PlantMetricsService(IMetricsRawDataService rawDataService, IHeijunkaService heijunkaService, ILogger<PlantMetricsService> logger)
     {
         _rawDataService = rawDataService;
+        _heijunkaService = heijunkaService;
         _logger = logger;
     }
 
@@ -37,7 +44,7 @@ public class PlantMetricsService : IPlantMetricsService
         try
         {
             var (rows, shiftDesc) = await _rawDataService.FetchCurrentShiftRowsAsync(ct);
-            return BuildFromRows(rows, shiftDesc);
+            return await BuildFromRowsAsync(rows, shiftDesc, ct: ct);
         }
         catch (Exception ex)
         {
@@ -51,7 +58,7 @@ public class PlantMetricsService : IPlantMetricsService
         try
         {
             var (rows, shiftDesc) = await _rawDataService.FetchHistoricalRowsAsync(date, shiftId, ct);
-            var snapshot = BuildFromRows(rows, shiftDesc, isLiveToday: false);
+            var snapshot = await BuildFromRowsAsync(rows, shiftDesc, isLiveToday: false, forDate: date, ct: ct);
             snapshot.IsHistorical = true;
             snapshot.HistoricalDate = date.Date;
             snapshot.HistoricalShiftId = shiftId;
@@ -68,7 +75,7 @@ public class PlantMetricsService : IPlantMetricsService
         }
     }
 
-    public PlantDashboardSnapshot BuildFromRows(List<RawMetricRow> rows, string shiftDesc, bool isLiveToday = true)
+    public async Task<PlantDashboardSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default)
     {
         var furnaces = Enumerable.Range(1, 5)
             .Select(id => new FurnaceMetric { FurnaceId = id, FurnaceName = $"Furnace {id}" })
@@ -126,31 +133,6 @@ public class PlantMetricsService : IPlantMetricsService
             f.Lines = f.Lines.OrderBy(l => l.ProductOrder).ToList();
         }
 
-        // ---------- Carrusel de la barra superior: Core Builders / End of Line / Tube Mills ----------
-        // Core Builders y End of Line se dividen con la MISMA regla que ya usamos para el
-        // % de SAP (CB / Clam Shell / CM1 = Core Builders, el resto = End of Line), pero
-        // aquí sobre Furnace 1-5. Tube Mills es aparte, sin distinción, aunque nunca
-        // aparece como card en el grid del dashboard general.
-        var furnaceCountedRows = rows.Where(r => r.ReportGroup == 1 && r.PlannedForOee != 0 && groupToFurnace.ContainsKey(r.GroupId)).ToList();
-        var coreBuilderRows = furnaceCountedRows.Where(r => SapRules.IsExcluded(r.Desc)).ToList();
-        var endOfLineRows = furnaceCountedRows.Where(r => !SapRules.IsExcluded(r.Desc)).ToList();
-        var tubeMillsRows = rows.Where(r => r.ReportGroup == 1 && r.PlannedForOee != 0 && r.GroupId == 7).ToList();
-
-        static KpiGroup BuildKpiGroup(string label, List<RawMetricRow> countedRows) => new()
-        {
-            Label = label,
-            TotalProduction = countedRows.Sum(r => r.Total),
-            TotalPlanned = countedRows.Sum(r => r.PlannedForOee),
-            Oee = countedRows.Count == 0 ? 0 : countedRows.Average(r => r.OeeShift)
-        };
-
-        var topKpiGroups = new List<KpiGroup>
-        {
-            BuildKpiGroup("Core Builders", coreBuilderRows),
-            BuildKpiGroup("End of Line", endOfLineRows),
-            BuildKpiGroup("Tube Mills", tubeMillsRows)
-        };
-
         // ---------- Tube Mills como Furnace #6 (para el 6to recuadro del grid, que alterna con
         // la tendencia cada 15s, y para el modal si le dan clic) — nunca cuenta en TotalProduction/
         // TotalPlanned/PlantOee (ver esas propiedades en el modelo, ya filtran FurnaceId<=5). ----------
@@ -179,6 +161,47 @@ public class PlantMetricsService : IPlantMetricsService
         }
         tubeMills.Lines = tubeMills.Lines.OrderBy(l => l.ProductOrder).ToList();
         furnaces.Add(tubeMills);
+
+        // ---------- HEIJUNKA: se resuelve UNA vez para todas las líneas (Furnace 1-5 + Tube
+        // Mills) con un solo batch, y se le pega el resultado a cada ProductLineMetric. Si
+        // Heijunka no tiene datos para la semana vigente, todas quedan en null y cada línea
+        // cae sola al criterio viejo (ver ProductLineMetric.CountsForStats). ----------
+        var effectiveDate = forDate ?? DateTime.Today;
+        var shiftId = rows.FirstOrDefault(r => r.ReportGroup == 1)?.ShiftId ?? 0;
+        var allLines = furnaces.SelectMany(f => f.Lines).ToList();
+        var heijunkaResults = await _heijunkaService.IsPlannedBatchAsync(
+            allLines.Select(l => l.ProductListId).Where(id => id > 0), effectiveDate, shiftId, ct);
+
+        foreach (var line in allLines)
+        {
+            line.HeijunkaPlanned = heijunkaResults.TryGetValue(line.ProductListId, out var planned) ? planned : null;
+        }
+
+        // ---------- Carrusel de la barra superior: Core Builders / End of Line / Tube Mills ----------
+        // Core Builders y End of Line se dividen con la MISMA regla que ya usamos para el
+        // % de SAP (CB / Clam Shell / CM1 = Core Builders, el resto = End of Line), pero
+        // aquí sobre Furnace 1-5. Tube Mills es aparte, sin distinción, aunque nunca
+        // aparece como card en el grid del dashboard general. Usa las líneas YA resueltas con
+        // Heijunka (CountsForStats) en vez de filtrar el raw row por separado.
+        var furnace1to5Lines = furnaces.Where(f => f.FurnaceId <= 5).SelectMany(f => f.Lines).Where(l => l.CountsForStats).ToList();
+        var coreBuilderLines = furnace1to5Lines.Where(l => SapRules.IsExcluded(l.ProductDesc)).ToList();
+        var endOfLineLines = furnace1to5Lines.Where(l => !SapRules.IsExcluded(l.ProductDesc)).ToList();
+        var tubeMillsLines = tubeMills.Lines.Where(l => l.CountsForStats).ToList();
+
+        static KpiGroup BuildKpiGroup(string label, List<ProductLineMetric> countedLines) => new()
+        {
+            Label = label,
+            TotalProduction = countedLines.Sum(l => l.Total),
+            TotalPlanned = countedLines.Sum(l => l.PlannedShift),
+            Oee = countedLines.Count == 0 ? 0 : countedLines.Average(l => l.OeeShift)
+        };
+
+        var topKpiGroups = new List<KpiGroup>
+        {
+            BuildKpiGroup("Core Builders", coreBuilderLines),
+            BuildKpiGroup("End of Line", endOfLineLines),
+            BuildKpiGroup("Tube Mills", tubeMillsLines)
+        };
 
         var hourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList();
         hourlyTrend = ShiftTimeHelper.SortByShiftElapsed(hourlyTrend, shiftDesc);

@@ -8,7 +8,7 @@ public interface IFurnaceDetailService
     Task<FurnaceDetailSnapshot> GetSnapshotAsync(int furnaceId, CancellationToken ct = default);
 
     /// <summary>Construye el snapshot de un horno a partir de filas ya obtenidas (sin volver a golpear el SP).</summary>
-    FurnaceDetailSnapshot BuildFromRows(List<RawMetricRow> rows, string shiftDesc, int furnaceId);
+    Task<FurnaceDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int furnaceId, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -16,15 +16,21 @@ public interface IFurnaceDetailService
 /// resueltos por FurnaceCatalog. A diferencia del dashboard general, aquí SÍ se incluyen
 /// todas las líneas (no solo un top 5) y SÍ se contempla Product_Group_ID=7 (Tube Mills)
 /// cuando furnaceId=6.
+///
+/// Igual que PlantMetricsService: qué línea "cuenta" ya no es solo Planned_Shift_for_OEE != 0,
+/// sino lo que diga Heijunka para ese día/turno (con respaldo al criterio viejo si Heijunka
+/// no tiene datos esa semana). Ver ProductLineMetric.CountsForStats.
 /// </summary>
 public class FurnaceDetailService : IFurnaceDetailService
 {
     private readonly IMetricsRawDataService _rawDataService;
+    private readonly IHeijunkaService _heijunkaService;
     private readonly ILogger<FurnaceDetailService> _logger;
 
-    public FurnaceDetailService(IMetricsRawDataService rawDataService, ILogger<FurnaceDetailService> logger)
+    public FurnaceDetailService(IMetricsRawDataService rawDataService, IHeijunkaService heijunkaService, ILogger<FurnaceDetailService> logger)
     {
         _rawDataService = rawDataService;
+        _heijunkaService = heijunkaService;
         _logger = logger;
     }
 
@@ -33,7 +39,7 @@ public class FurnaceDetailService : IFurnaceDetailService
         try
         {
             var (rows, shiftDesc) = await _rawDataService.FetchCurrentShiftRowsAsync(ct);
-            return BuildFromRows(rows, shiftDesc, furnaceId);
+            return await BuildFromRowsAsync(rows, shiftDesc, furnaceId, ct);
         }
         catch (Exception ex)
         {
@@ -42,7 +48,7 @@ public class FurnaceDetailService : IFurnaceDetailService
         }
     }
 
-    public FurnaceDetailSnapshot BuildFromRows(List<RawMetricRow> rows, string shiftDesc, int furnaceId)
+    public async Task<FurnaceDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int furnaceId, CancellationToken ct = default)
     {
         if (!FurnaceCatalog.Map.TryGetValue(furnaceId, out var info))
         {
@@ -98,6 +104,17 @@ public class FurnaceDetailService : IFurnaceDetailService
         }
 
         snapshot.Lines = snapshot.Lines.OrderBy(l => l.ProductOrder).ToList();
+
+        // ---------- HEIJUNKA: siempre en vivo (no hay vista histórica de horno todavía) ----------
+        var today = DateTime.Today;
+        var shiftId = rows.FirstOrDefault(r => r.ReportGroup == 1)?.ShiftId ?? 0;
+        var heijunkaResults = await _heijunkaService.IsPlannedBatchAsync(
+            snapshot.Lines.Select(l => l.ProductListId).Where(id => id > 0), today, shiftId, ct);
+        foreach (var line in snapshot.Lines)
+        {
+            line.HeijunkaPlanned = heijunkaResults.TryGetValue(line.ProductListId, out var planned) ? planned : null;
+        }
+
         snapshot.HourlyTrend = ShiftTimeHelper.SortByShiftElapsed(
             hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList(), shiftDesc);
         ShiftTimeHelper.ApplyExpectedCumulative(snapshot.HourlyTrend, shiftDesc, snapshot.ShiftDurationHours, snapshot.TotalPlanned);

@@ -37,6 +37,27 @@ public class ProductLineMetric
     /// con "-" en vez de un número/porcentaje. Ver SapRules.IsExcluded.
     /// </summary>
     public bool ExcludedFromSap { get; set; }
+
+    /// <summary>
+    /// true = Heijunka dice que esta línea SÍ tenía plan este día/turno.
+    /// false = Heijunka dice que NO tenía plan.
+    /// null = no hay datos de Heijunka para esta semana (o la línea no se pudo mapear) —
+    /// en ese caso se usa el criterio viejo como respaldo (ver CountsForStats).
+    /// </summary>
+    public bool? HeijunkaPlanned { get; set; }
+
+    /// <summary>
+    /// ¿Esta línea cuenta para OEE/producción/plan? Heijunka manda si hay datos esta semana;
+    /// si no los hay, se cae al criterio de siempre (Planned_Shift_for_OEE != 0).
+    /// </summary>
+    public bool CountsForStats => HeijunkaPlanned ?? (PlannedShift > 0);
+
+    /// <summary>
+    /// Heijunka dice que esta línea NO tenía plan este turno, pero sí produjo algo —
+    /// "producción no planeada". No cuenta para nada, pero se muestra en rojo en el detalle
+    /// para que se entienda qué pasó.
+    /// </summary>
+    public bool IsUnplannedProduction => HeijunkaPlanned == false && Total > 0;
 }
 
 /// <summary>
@@ -73,8 +94,14 @@ public class FurnaceMetric
     /// para nada (ver CountedLines).</summary>
     public List<ProductLineMetric> Lines { get; set; } = new();
 
-    /// <summary>Solo las líneas con plan > 0 — las únicas que cuentan para producción/plan/OEE.</summary>
-    private List<ProductLineMetric> CountedLines => Lines.Where(l => l.PlannedShift > 0).ToList();
+    /// <summary>Solo las líneas que SÍ cuentan (ver ProductLineMetric.CountsForStats — Heijunka
+    /// si hay datos esta semana, si no el criterio viejo de Planned_Shift_for_OEE != 0).</summary>
+    private List<ProductLineMetric> CountedLines => Lines.Where(l => l.CountsForStats).ToList();
+
+    /// <summary>Líneas con producción NO planeada según Heijunka (Total > 0 pero Heijunka
+    /// dice que no tenían plan este turno) — no cuentan para nada, se muestran en rojo
+    /// solo en el detalle.</summary>
+    public List<ProductLineMetric> UnplannedLines => Lines.Where(l => l.IsUnplannedProduction).ToList();
 
     public int TotalProduction => CountedLines.Sum(l => l.Total);
     public int TotalPlanned => CountedLines.Sum(l => l.PlannedShift);
@@ -172,7 +199,7 @@ public class PlantDashboardSnapshot
     {
         get
         {
-            var allLines = Furnaces.Where(f => f.FurnaceId <= 5).SelectMany(f => f.Lines).ToList();
+            var allLines = Furnaces.Where(f => f.FurnaceId <= 5).SelectMany(f => f.Lines).Where(l => l.CountsForStats).ToList();
             return allLines.Count == 0 ? 0 : allLines.Average(l => l.OeeShift);
         }
     }

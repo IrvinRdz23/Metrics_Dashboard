@@ -215,6 +215,8 @@
     }
     .no-plan-hero .big { font-size: clamp(2rem, 4vw, 4rem); font-weight: 900; letter-spacing: .5px; }
     .no-plan-hero .small { font-size: clamp(1rem, 1.3vw, 1.4rem); font-weight: 700; opacity: .85; }
+
+    .no-plan-hero.unplanned-hero { background: rgba(255,107,120,0.1); border-color: var(--bad); color: var(--bad); }
 </style>
 </head>
 <body>
@@ -280,6 +282,14 @@
         const grid = document.getElementById('bodyGrid');
 
         if (!snapshot.hasPlan) {
+            if (snapshot.total > 0) {
+                grid.innerHTML = `
+                    <div class="no-plan-hero unplanned-hero">
+                        <div class="big">⚠ PRODUCCIÓN NO PLANEADA</div>
+                        <div class="small">Heijunka indica que esta línea no tenía plan este turno, pero produjo ${snapshot.total.toLocaleString()} pieza(s) — no cuenta para el OEE.</div>
+                    </div>`;
+                return;
+            }
             grid.innerHTML = `
                 <div class="no-plan-hero">
                     <div class="big">SIN PRODUCCIÓN EN EL TURNO ACTUAL</div>

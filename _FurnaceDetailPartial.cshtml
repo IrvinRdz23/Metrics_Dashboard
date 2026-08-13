@@ -148,6 +148,14 @@
     .line-bar-fill span { font-size: clamp(.85rem, 1vw, 1.1rem); font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
     .line-bar-detail { font-size: clamp(.78rem, .9vw, .98rem); color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-weight: 700; white-space: nowrap; min-width: 96px; }
 
+    /* ---------- LÍNEA CON PRODUCCIÓN NO PLANEADA (Heijunka dice que no iba, pero produjo) ---------- */
+    .line-row.unplanned-line-row { border-color: var(--bad); background: rgba(255,107,120,0.06); }
+    .unplanned-badge {
+        flex: 1; height: clamp(26px, 3vh, 36px); border-radius: 8px; display: flex; align-items: center; padding-left: 14px;
+        background: rgba(255,107,120,0.14); border: 1px dashed var(--bad); color: var(--bad);
+        font-size: clamp(.8rem, .95vw, 1rem); font-weight: 800; letter-spacing: .3px;
+    }
+
     /* ---------- SECCIÓN DE LÍNEAS SIN PRODUCCIÓN (compacta, debajo de la lista) ---------- */
     .no-prod-section { flex: 0 0 auto; margin-top: clamp(10px, 1.2vh, 14px); padding-top: clamp(10px, 1.2vh, 14px); border-top: 2px dashed var(--border); }
     .no-prod-title {
@@ -320,18 +328,21 @@
         renderTrend();
     }
 
-    // Líneas ACTIVAS (con producción > 0) van a la lista principal con barra.
+    // Líneas ACTIVAS (con producción > 0 y SÍ cuentan) van a la lista principal con barra.
+    // Líneas con producción NO PLANEADA (Heijunka dice que no iban, pero produjeron algo)
+    // van también en la lista, pero con badge rojo en vez de barra de OEE — no cuentan para nada.
     // Líneas SIN producción (incluidas las que ni siquiera tienen plan) van a la
     // sección compacta de abajo, en morado — nunca cuentan para las estadísticas.
     function renderLinesList(isLiveUpdate) {
-        const active = snapshot.lines.filter(l => l.total > 0).sort((a, b) => a.productOrder - b.productOrder);
-        const inactive = snapshot.lines.filter(l => l.total === 0).sort((a, b) => a.productOrder - b.productOrder);
+        const active = snapshot.lines.filter(l => l.total > 0 && !l.isUnplannedProduction).sort((a, b) => a.productOrder - b.productOrder);
+        const unplanned = snapshot.lines.filter(l => l.isUnplannedProduction).sort((a, b) => a.productOrder - b.productOrder);
+        const inactive = snapshot.lines.filter(l => l.total === 0 && !l.isUnplannedProduction).sort((a, b) => a.productOrder - b.productOrder);
 
         const container = document.getElementById('linesList');
         const prevTotalByDesc = {};
         container.querySelectorAll('.line-row').forEach(el => prevTotalByDesc[el.dataset.desc] = el.dataset.total);
 
-        container.innerHTML = active.map(l => {
+        const activeRows = active.map(l => {
             const changed = isLiveUpdate && prevTotalByDesc[l.productDesc] !== undefined && prevTotalByDesc[l.productDesc] !== String(l.total);
             return `
                 <div class="line-row ${changed ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
@@ -348,6 +359,21 @@
                     <div class="line-plan">Plan ${l.plannedShift.toLocaleString()}</div>
                 </div>`;
         }).join('');
+
+        const unplannedRows = unplanned.map(l => {
+            const changed = isLiveUpdate && prevTotalByDesc[l.productDesc] !== undefined && prevTotalByDesc[l.productDesc] !== String(l.total);
+            return `
+                <div class="line-row unplanned-line-row ${changed ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
+                    <div class="line-name" title="${l.productDesc}">${l.productListId > 0 ? `<a href="/Line/${l.productListId}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>` : l.productDesc}</div>
+                    <div class="line-bar-area">
+                        <div class="unplanned-badge">⚠ PRODUCCIÓN NO PLANEADA</div>
+                        <span class="line-bar-detail">${l.total.toLocaleString()} piezas</span>
+                    </div>
+                    <div class="line-plan">&nbsp;</div>
+                </div>`;
+        }).join('');
+
+        container.innerHTML = activeRows + unplannedRows;
 
         if (isLiveUpdate) {
             setTimeout(() => container.querySelectorAll('.line-row.flash').forEach(el => el.classList.remove('flash')), 900);

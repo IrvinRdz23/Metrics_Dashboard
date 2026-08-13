@@ -105,9 +105,17 @@ public class LineDetailSnapshot
     public int TotalSap { get; set; }
     public bool ExcludedFromSap { get; set; }
 
-    /// <summary>Si no hay plan para este turno (Planned_Shift_for_OEE = 0), la línea existe
-    /// pero no tiene nada que reportar — la vista debe mostrar el estado "sin producción".</summary>
-    public bool HasPlan => PlannedShift > 0;
+    /// <summary>true/false = lo que dice Heijunka para esta línea este día/turno; null = no hay
+    /// datos de Heijunka esta semana (se usa el criterio viejo como respaldo).</summary>
+    public bool? HeijunkaPlanned { get; set; }
+
+    /// <summary>Si no hay plan para este turno, la línea existe pero no tiene nada que
+    /// reportar — la vista debe mostrar el estado "sin producción". Heijunka manda si hay
+    /// datos esta semana; si no, se cae al criterio viejo (Planned_Shift_for_OEE != 0).</summary>
+    public bool HasPlan => HeijunkaPlanned ?? (PlannedShift > 0);
+
+    /// <summary>Heijunka dice que esta línea NO tenía plan este turno, pero sí produjo algo.</summary>
+    public bool IsUnplannedProduction => HeijunkaPlanned == false && Total > 0;
 
     public List<HourlyPoint> HourlyTrend { get; set; } = new();
 
@@ -134,8 +142,12 @@ public class FurnaceDetailSnapshot
     public List<ProductLineMetric> Lines { get; set; } = new();
     public List<HourlyPoint> HourlyTrend { get; set; } = new();
 
-    /// <summary>Solo las líneas con plan > 0 — las únicas que cuentan para producción/plan/OEE.</summary>
-    private List<ProductLineMetric> CountedLines => Lines.Where(l => l.PlannedShift > 0).ToList();
+    /// <summary>Solo las líneas que SÍ cuentan (ver ProductLineMetric.CountsForStats).</summary>
+    private List<ProductLineMetric> CountedLines => Lines.Where(l => l.CountsForStats).ToList();
+
+    /// <summary>Líneas con producción NO planeada según Heijunka — no cuentan para nada,
+    /// se muestran en rojo aparte en el detalle.</summary>
+    public List<ProductLineMetric> UnplannedLines => Lines.Where(l => l.IsUnplannedProduction).ToList();
 
     public int TotalProduction => CountedLines.Sum(l => l.Total);
     public int TotalPlanned => CountedLines.Sum(l => l.PlannedShift);

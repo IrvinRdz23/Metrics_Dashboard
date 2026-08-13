@@ -633,6 +633,28 @@
         display: inline-block;
         }
 
+        tr.unplanned-row td {
+        color: var(--bad);
+        }
+
+        .unplanned-tag {
+        background: rgba(255,107,120,0.14);
+        border: 1px solid var(--bad);
+        color: var(--bad);
+        padding: 4px 11px;
+        border-radius: 6px;
+        font-size: .74rem;
+        font-weight: 700;
+        letter-spacing: .3px;
+        display: inline-block;
+        }
+
+        .chip-unplanned {
+        background: rgba(255,107,120,0.14);
+        border-color: var(--bad);
+        color: var(--bad);
+        }
+
         .sap-excluded {
         color: var(--text-faint);
         font-weight: 600;
@@ -1275,7 +1297,8 @@
         <span class="chip">Plan: ${f.totalPlanned.toLocaleString()}</span>
         <span class="chip">OEE: ${pct(f.oee)}</span>
         <span class="chip">SAP: ${pct(f.sapPercent)}</span>
-        <span class="chip">${f.lines.length} líneas</span>
+        <span class="chip">${f.lines.filter(l => l.countsForStats).length} líneas</span>
+        ${f.lines.some(l => l.isUnplannedProduction) ? `<span class="chip chip-unplanned">⚠ ${f.lines.filter(l => l.isUnplannedProduction).length} no planeada(s)</span>` : ''}
         `;
         const rows = [...f.lines].sort((a, b) => a.productOrder - b.productOrder).map(l => {
         const sapCell = l.excludedFromSap
@@ -1284,6 +1307,17 @@
         const nameCell = l.productListId > 0
         ? `<a href="/Line/${l.productListId}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>`
         : l.productDesc;
+        if (l.isUnplannedProduction) {
+        return `
+        <tr class="unplanned-row">
+        <td>${nameCell}</td>
+        <td><span class="unplanned-tag">⚠ PRODUCCIÓN NO PLANEADA</span></td>
+        <td class="num">${l.total.toLocaleString()}</td>
+        <td class="num">-</td>
+        <td class="num">-</td>
+        <td class="num">${sapCell}</td>
+        </tr>`;
+        }
         if (l.total === 0) {
         return `
         <tr class="no-prod-row">

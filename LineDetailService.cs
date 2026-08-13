@@ -8,25 +8,28 @@ public interface ILineDetailService
     Task<LineDetailSnapshot> GetSnapshotAsync(int lineId, CancellationToken ct = default);
 
     /// <summary>Construye el snapshot de una línea a partir de filas ya obtenidas (sin volver a golpear el SP).</summary>
-    LineDetailSnapshot BuildFromRows(List<RawMetricRow> rows, string shiftDesc, int lineId);
+    Task<LineDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int lineId, CancellationToken ct = default);
 }
 
 /// <summary>
 /// Un solo servicio para las 53 líneas de la planta (sin contar Tube Mills, aunque también
 /// funcionaría igual si algún día se necesitan sus líneas). Identifica la línea por su
 /// Product_List_ID real — no hace falta tocar el SP, se resuelve con el mismo raw data que
-/// ya trae MetricsBroadcastService en cada ciclo.
+/// ya trae MetricsBroadcastService en cada ciclo. Igual que el resto: HasPlan ahora respeta
+/// Heijunka si hay datos esa semana (ver ProductLineMetric.CountsForStats para la misma idea).
 /// </summary>
 public class LineDetailService : ILineDetailService
 {
     private readonly IMetricsRawDataService _rawDataService;
     private readonly IBreakScheduleService _breakSchedule;
+    private readonly IHeijunkaService _heijunkaService;
     private readonly ILogger<LineDetailService> _logger;
 
-    public LineDetailService(IMetricsRawDataService rawDataService, IBreakScheduleService breakSchedule, ILogger<LineDetailService> logger)
+    public LineDetailService(IMetricsRawDataService rawDataService, IBreakScheduleService breakSchedule, IHeijunkaService heijunkaService, ILogger<LineDetailService> logger)
     {
         _rawDataService = rawDataService;
         _breakSchedule = breakSchedule;
+        _heijunkaService = heijunkaService;
         _logger = logger;
     }
 
@@ -35,7 +38,7 @@ public class LineDetailService : ILineDetailService
         try
         {
             var (rows, shiftDesc) = await _rawDataService.FetchCurrentShiftRowsAsync(ct);
-            return BuildFromRows(rows, shiftDesc, lineId);
+            return await BuildFromRowsAsync(rows, shiftDesc, lineId, ct);
         }
         catch (Exception ex)
         {
@@ -44,7 +47,7 @@ public class LineDetailService : ILineDetailService
         }
     }
 
-    public LineDetailSnapshot BuildFromRows(List<RawMetricRow> rows, string shiftDesc, int lineId)
+    public async Task<LineDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int lineId, CancellationToken ct = default)
     {
         var idLookup = rows.BuildProductListIdLookup();
 
@@ -100,6 +103,9 @@ public class LineDetailService : ILineDetailService
         var shiftDurationHours = ShiftTimeHelper.GetDurationHours(shiftDesc);
         ShiftTimeHelper.ApplyExpectedCumulative(hourlyTrend, shiftDesc, shiftDurationHours, plannedShift);
 
+        var heijunkaResult = await _heijunkaService.IsPlannedBatchAsync(new[] { lineId }, DateTime.Today, shiftId, ct);
+        var heijunkaPlanned = heijunkaResult.TryGetValue(lineId, out var planned) ? planned : null;
+
         return new LineDetailSnapshot
         {
             ProductListId = lineId,
@@ -115,6 +121,7 @@ public class LineDetailService : ILineDetailService
             OeeShift = mainRow?.OeeShift ?? 0,
             TotalSap = totalSap,
             ExcludedFromSap = SapRules.IsExcluded(desc),
+            HeijunkaPlanned = heijunkaPlanned,
             HourlyTrend = hourlyTrend,
             CycleTimeTrend = cycleTimeTrend,
             ActualCycleTimeMean = actualMean,

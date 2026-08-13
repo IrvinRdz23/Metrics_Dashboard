@@ -13,6 +13,7 @@ builder.Services.AddScoped<IFurnaceDetailService, FurnaceDetailService>();
 builder.Services.AddScoped<ILineDetailService, LineDetailService>();
 builder.Services.AddScoped<IOeeHistoryService, OeeHistoryService>();
 builder.Services.AddSingleton<IBreakScheduleService, BreakScheduleService>();
+builder.Services.AddSingleton<IHeijunkaService, HeijunkaService>();
 
 builder.Services.AddHostedService<MetricsBroadcastService>();
 
