@@ -849,9 +849,10 @@
         }
         function pct(v) { return (v * 100).toFixed(0) + '%'; }
 
-        // Solo las líneas CON plan cuentan para el mini-chart de cada card (las líneas sin
-        // plan solo se muestran en el detalle/modal, no aquí — ver countedLines()).
-        function countedLines(f) { return f.lines.filter(l => l.plannedShift > 0); }
+        // Solo las líneas que SÍ cuentan (Heijunka si hay datos, si no plan > 0 como antes)
+        // entran al mini-chart de cada card — las que no tienen plan, y las que tienen
+        // producción NO planeada según Heijunka, solo se muestran en el detalle/modal.
+        function countedLines(f) { return f.lines.filter(l => l.countsForStats); }
 
         // Carrusel tipo pantalla de aeropuerto: pagina las líneas de 5 en 5, ordenadas por Product_Order.
         function furnaceLinesPage(f) {
