@@ -1,11 +1,57 @@
-Ok. Ya se ve muchisimo major. Unicamente lo que no me sigue gustando de la grafica de tendencia/acumulado es que para primer turno me sale desde las 7:00 am (hora de cierre de 6 a 7 supongo, lo cual esta perfecto por que se va acumulando ahi todo) y se ven agregando las horas conforme vamos pasando de hora, eso esta perfecto, pero el problema es que siempre se me muestra las 16:00, no importa en que hora este, siempre es la ultima columna y simepre vacia obviamente hasta que llegan las 13:01. Eso no me molestaba, sin embargo ahora que pusimos el acumulado esperado a esa hora, la grafica en el punto de las 16:00 me sale hasta arriba en ese punto por que ahi dice que espera a esa hora lo del final de turno, lo cual es correcto, pero hace que la grafica se haga confusa, por que de repente crece exponencialmente. Me explico?
-Y para el Segundo turno, me marca en vez de al final, al principio, en las 00:00 la grafica hasta arriba, por que pues, es lo que espera a esa hora para el 2do turno. No se si me explico el problema, hay que solucionarlo.
+Ok, mira, encontre la table pivote. Vamos con esta linea donde el Product Order es 20. El Product_Group_ID es 1 por que es de horno 1., pero Tambien te paso lo que significan los Product_Group_ID:
+
+SELECT *
+  FROM [M2S_Report_Services].[dbo].[Product_Group_List]
+
+Product_Group_ID	Product_Group_Desc
+1	Furnace 1
+2	Furnace 2
+3	Furnace 3
+4	Furnace 4
+5	Furnace 5
+6	Furnace 1 Clam Shells
+7	Tube Mills
+8	Condenser
+9	Battery Cooling Plate
+10	Heater Core
+11	Residential
+12	EGR
+13	HVAC
+14	Stamping
+
+Mi Sp para el dia de hoy me da esto:
+
+Report_Group	Product_Group_ID	Product_Group_Desc	Week_Group	Product_List_ID	Product_Order	Product_Desc	Cycle_Time_Secs	Cut_Min	Planned_Shift	Mahle_Matl_Nbr	Cust_Matl_Nbr	Event_Date_Short	Event_Date_Short_Name	Event_Date_Short_Month_Name	Shift_Desc	Shift_ID	Accumulated_Rate	Hour_by_Hour	Total	Total_SAP	Planned_Shift_for_OEE	OEE_Shift	Heijunka_Enabled	Beginning_Inventory	OPS	WIP	CB	Using_CB_As_OPS	Capacity_5d_Percent	Heijunka_Percent_OEE	Capacity_5d	Heijunka	Change_Over	Cumulative_Heijunka_Planned_Shift
+1	1	Furnace 1	0	NULL	20	PTC PCM Evaporator	36.11	0.00	830	-	-	2026/08/13	Thursday	August	Shift 1 06:00-15:20	1	408	-	281	0	830	0.688725490196078	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	830	830	1	0
 
 
-Ahora, se viene lo bueno, lo que va a cambiar muchisimo todas las pantallas. Una agregacion de logica. Ahi te va.
-Ahorita mismo, si no vemos produccion en la linea, lo dejamos en 0 y no contamos para el OEE, si empieza produccion empezamos a contarlo y agregamos lo esperado del turno y lo que se espera a esa hora para es Alinea, no importa sim el turno empezaba digamos a las 6 y empezo producir a las 10, seguimos poniendo el OEE de esa hora conforme a lo que ha producido y espera a esa hora, eso esta perfecto.
-Pero ahora, le vamos a meter una variable importante. Esta tabla:
 
+Entonces, encontre esta tabla:
+
+SELECT TOP (1000) [Product_List_ID]
+      ,[Product_List_Group_ID]
+      ,[Plant_List_ID]
+      ,[Server_List_ID]
+      ,[Cell_ID]
+      ,[Product_Order]
+      ,[Product_Desc]
+      ,[Product_Desc_2]
+      ,[Comments]
+      ,[Product_Group_ID]
+      ,[Part_Number_Conditional]
+      ,[Counter_Conditional]
+      ,[Is_Test_Report]
+      ,[Is_SAP_Reporting]
+      ,[Is_DT_Reporting]
+      ,[MachineID]
+  FROM [M2S_Report_Services].[dbo].[Product_List]
+  where Product_Order = 20 and Product_Group_ID =1
+
+Product_List_ID	Product_List_Group_ID	Plant_List_ID	Server_List_ID	Cell_ID	Product_Order	Product_Desc	Product_Desc_2	Comments	Product_Group_ID	Part_Number_Conditional	Counter_Conditional	Is_Test_Report	Is_SAP_Reporting	Is_DT_Reporting	MachineID
+24	8	1	15	3	20	PTC PCM Evaporator	PCM Evaporator	NULL	1	1	0	0	1	0	NULL
+
+
+Ya con eso tengo el Product_List_Group_ID:
 
 SELECT TOP (1000) [Heijunka_Plan_List_ID]
       ,[Start_Date]
@@ -57,74 +103,11 @@ SELECT TOP (1000) [Heijunka_Plan_List_ID]
       ,[Sunday_Shift_1_Change_Over]
       ,[Sunday_Shift_2_Change_Over]
   FROM [M2S_Report_Services].[dbo].[Heijunka_Plan_List]
+  Where Product_List_Group_ID = 8
+  order by Start_Date desc
 
-
-Asi se ve para la fecha de esta semana:
-
-4709	2026/08/10	1	1	0	0	0.05	1588	1	0.85	0.85	0	0	0	0	0	0	0	0	0	0	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4710	2026/08/10	2	1	1780	1512	0	0	0	0.85	0.85	0	0	0	0	0	0	0	0	0	0	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4711	2026/08/10	3	1	0	0	0.025	1525	1	0.85	0.85	1	1	0	1	1	0	1	1	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4712	2026/08/10	4	1	1513	1488	0	0	0	0.85	0.85	1	1	0	1	1	0	1	1	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4713	2026/08/10	5	1	0	0	0.032	755	1	0.85	0.85	0	0	0	1	0	0	1	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4714	2026/08/10	6	1	869	732	0	0	0	0.85	0.85	0	0	0	1	0	0	1	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4715	2026/08/10	7	1	0	0	0.05	9214	1	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+Heijunka_Plan_List_ID	Start_Date	Product_List_Group_ID	Heijunka_Enabled	Beginning_Inventory	OPS	WIP	CB	Using_CB_As_OPS	Capacity_5d_Percent	Heijunka_Percent_OEE	Monday_Shift_1	Monday_Shift_2	Monday_Shift_3	Tuesday_Shift_1	Tuesday_Shift_2	Tuesday_Shift_3	Wednesday_Shift_1	Wednesday_Shift_2	Wednesday_Shift_3	Thursday_Shift_1	Thursday_Shift_2	Thursday_Shift_3	Friday_Shift_1	Friday_Shift_2	Friday_Shift_3	Saturday_Shift_1	Saturday_Shift_2	Sunday_Shift_1	Sunday_Shift_2	Monday_Shift_1_Change_Over	Monday_Shift_2_Change_Over	Monday_Shift_3_Change_Over	Tuesday_Shift_1_Change_Over	Tuesday_Shift_2_Change_Over	Tuesday_Shift_3_Change_Over	Wednesday_Shift_1_Change_Over	Wednesday_Shift_2_Change_Over	Wednesday_Shift_3_Change_Over	Thursday_Shift_1_Change_Over	Thursday_Shift_2_Change_Over	Thursday_Shift_3_Change_Over	Friday_Shift_1_Change_Over	Friday_Shift_2_Change_Over	Friday_Shift_3_Change_Over	Saturday_Shift_1_Change_Over	Saturday_Shift_2_Change_Over	Sunday_Shift_1_Change_Over	Sunday_Shift_2_Change_Over
 4716	2026/08/10	8	1	1485	8775	0	0	0	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4717	2026/08/10	9	1	0	0	0	0	1	0.85	0.85	0	0	0	0	0	0	1	0	0	1	1	0	1	1	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4718	2026/08/10	10	1	0	0	0.05	0	1	0.85	0.85	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4719	2026/08/10	11	1	0	0	0.01	0	0	0.85	0.85	0	0	0	0	0	0	1	0	0	1	0	0	1	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4720	2026/08/10	12	1	35	2200	0.01	0	0	0.85	0.85	0	0	0	0	0	0	1	0	0	1	0	0	1	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4721	2026/08/10	13	1	0	0	0.08	1669	1	0.85	0.85	1	1	0	1	1	1	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0
-4722	2026/08/10	14	1	1215	1545	0	0	0	0.85	0.85	1	1	0	1	1	1	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0
-4723	2026/08/10	15	1	0	0	0.025	1661	1	0.85	0.85	0	0	0	1	1	1	1	1	1	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	1	0	0	0	1	0	0	0	0	0	0
-4724	2026/08/10	16	1	860	1620	0	0	0	0.85	0.85	0	0	0	1	1	1	1	1	1	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0
-4725	2026/08/10	17	1	0	0	0.012	4663	1	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4726	2026/08/10	18	1	0	0	0.012	4663	1	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4727	2026/08/10	19	1	6138	4608	0	0	0	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4728	2026/08/10	20	1	0	0	0.025	0	1	0.85	0.85	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4729	2026/08/10	21	1	1728	0	0	0	0	0.85	0.85	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4730	2026/08/10	22	1	0	0	0.5	0	1	0.85	0.5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4731	2026/08/10	23	1	256	0	0	0	0	0.85	0.5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4732	2026/08/10	24	1	6138	4608	0	0	0	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4733	2026/08/10	25	1	0	0	0.025	3542	1	0.85	0.85	0	0	0	1	1	1	1	1	1	1	1	1	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4734	2026/08/10	26	1	0	0	0	990	1	0.85	0.85	1	0	0	1	0	0	1	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4735	2026/08/10	27	1	0	0	0	0	0	0.85	0.85	1	0	0	1	0	0	1	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4736	2026/08/10	28	1	476	966	0	0	0	0.85	0.85	1	0	0	1	0	0	1	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4737	2026/08/10	29	1	0	0	0.025	2614	1	0.85	0.85	1	1	0	1	1	0	1	1	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4738	2026/08/10	30	1	1477	2550	0	0	0	0.85	0.85	1	1	0	1	1	0	1	1	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4739	2026/08/10	31	1	0	0	1	0	1	0.85	0.5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4740	2026/08/10	32	1	0	0	0	0	0	0.85	0.5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4741	2026/08/10	33	1	0	0	0.025	2686	1	0.85	0.85	1	1	1	0	0	0	0	0	1	1	1	1	1	1	0	1	1	1	1	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4742	2026/08/10	34	1	3200	2620	0	0	0	0.85	0.85	1	1	1	0	0	0	0	0	1	1	1	1	1	1	0	1	1	1	1	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4743	2026/08/10	35	1	0	0	0	1392	1	0.85	0.85	0	1	1	0	0	1	0	1	1	0	1	0	1	1	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	0	0	0
-4744	2026/08/10	36	1	0	0	0.05	3976	1	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	1	1	0	0	0	0	0	1	0	0	0
-4745	2026/08/10	37	1	0	0	0	0	0	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4746	2026/08/10	38	1	2824	6508	0	0	0	0.85	0.85	0	1	1	0	1	1	0	1	1	0	0	0	1	1	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4747	2026/08/10	39	1	0	0	0.018	7321	1	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4748	2026/08/10	40	1	6479	7192	0	0	0	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4749	2026/08/10	41	1	0	0	0	0	0	0.85	0.85	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4750	2026/08/10	42	1	0	0	0	0	0	0.85	0.85	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4751	2026/08/10	43	1	0	1100	0.1	0	0	0.85	0.85	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	0	0
-4752	2026/08/10	44	1	0	0	0	0	0	0.85	0.85	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4753	2026/08/10	45	1	41636	257985	0	0	0	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4754	2026/08/10	46	1	41636	257985	0	0	0	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4755	2026/08/10	47	1	41636	257985	0	0	0	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4756	2026/08/10	48	1	41636	257985	0	0	0	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4757	2026/08/10	49	1	41636	257985	0	0	0	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4758	2026/08/10	50	1	74649	136677	0.04	0	0	0.85	0.85	0	0	0	0	0	0	1	0	0	1	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4759	2026/08/10	51	1	0	43944	0.1	0	0	0.85	0.85	1	0	0	1	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4760	2026/08/10	52	1	46596	729353	0.04	0	0	0.85	0.85	1	1	1	0	0	0	0	0	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4761	2026/08/10	53	1	47678	185972	0.1	0	0	0.85	0.85	1	1	0	1	1	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4762	2026/08/10	54	1	0	0	0.08	1669	1	0.85	0.85	0	0	0	0	1	0	1	1	0	1	1	1	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4763	2026/08/10	55	1	2081	1545	0	0	0	0.85	0.85	0	0	0	0	1	0	1	1	0	1	1	1	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4764	2026/08/10	56	1	66531	90948	0.05	0	0	0.85	0.85	0	0	0	0	0	0	1	0	0	1	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4765	2026/08/10	58	1	0	0	0.1	0	0	0.85	0.85	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4766	2026/08/10	57	1	32336	91461	0.1	0	0	0.85	0.85	0	0	0	0	0	1	1	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4767	2026/08/10	59	1	1728	3456	0	0	0	0.85	0.85	0	0	0	1	1	1	1	1	1	1	1	1	1	1	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4768	2026/08/10	61	1	256	0	0	0	0	0.85	0.5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-4769	2026/08/10	60	1	0	0	0.5	0	1	0.85	0.5	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
 
-La Start_Date es la fecha de inicio de la semana (siempre en lunes). Con esta tabla es donde se prenden y apagan la produccion de las maquinas por turno. Lo importante de esto, es que va afectar directamente a TODOS nuestros datos, incluso a los historicos. Por que? Por que por ejemplo, una linea marcaba en esta tabla que NO tenia produccion, sin embargo, empezo a producir (a veces de que solo 5 piezas o algo) y eso se lo estamos contando para el OEE, pero si aqui decia que esa maquina en ese dia en ese turno NO tenia produccion, no se lo temenos que contar, ni para bien ni para mal. En cambio, si una maquina decia que SI tenia produccion para ese dia en ese turno, y no ha empezado a producir nada de nada, se lo tenemos que contar como 0 y que si baje el OEE (cosa que no hacemos ahorita) Entonces tenemos que poner esos cambios de logica. Y Ahora, para mostrar esos datos, si se tenia planeado que NO se tenia produccion y si produjo, no le contamos esas piezas para nada, pero en el detalle del horno en la vista general y solo en el detalle ponemos con badge o letras rojitas los datos de produccion, para que se entienda que es produccion no planeada. Y en hornos que Si esta planeada la produccion pero no han producido nada a ese momento, que se vea la barra en 0%. 
-Esto afecta a todo, al general, al historico, a las vistas de hornos y de celdas/lineas. 
-
-Ahora, si actualmente no hay datos para la semana actual en la tabla Heijunka_Plan_List, que se siga viendo como lo hace actualmente como lo tenemos. Pero una vez que haya datos para la semana actual, ahi si ya que se apliquen esas reglas. Me explique? Se que es grande el cambio, espero que se pueda hacer.
-Gracias!
+Esa es la primera que me da, y es por que el Start Date es el de esta semana. 
+Crees que con eso tienes? O necesitas algo mas para estos cambios? Si necesitas algo mas, sin problema eh. Lo busco.
