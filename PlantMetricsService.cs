@@ -93,9 +93,30 @@ public class PlantMetricsService : IPlantMetricsService
         // Se incluyen TODAS las líneas (incluso con Planned_Shift_for_OEE = 0) para poder
         // mostrarlas en el detalle; FurnaceMetric ya se encarga de no contarlas en las
         // estadísticas (ver CountedLines en el modelo).
+        //
+        // OJO: el SP a veces regresa la MISMA línea 2 veces (probablemente por su join interno
+        // a Heijunka_Plan_List, que ahora que esa tabla tiene datos reales para la semana
+        // puede estar generando un fan-out). Si ya vimos esta línea (mismo horno + mismo
+        // nombre), NO se agrega una segunda entrada — se actualiza la que ya existe con los
+        // datos más "reales" (el mayor Total/Plan de las dos filas), para nunca duplicar.
         foreach (var r in rows.Where(r => r.ReportGroup == 1 && groupToFurnace.ContainsKey(r.GroupId)))
         {
             var furnaceId = groupToFurnace[r.GroupId];
+            var key = (furnaceId, r.Desc);
+
+            if (linesIndex.TryGetValue(key, out var existing))
+            {
+                if (r.Total > existing.Total || r.PlannedForOee > existing.PlannedShift)
+                {
+                    existing.Total = r.Total;
+                    existing.AccumulatedRate = r.AccumRate;
+                    existing.PlannedShift = r.PlannedForOee;
+                    existing.OeeShift = r.OeeShift;
+                    existing.CycleTimeSecs = r.CycleTimeSecs;
+                }
+                continue;
+            }
+
             var line = new ProductLineMetric
             {
                 ProductDesc = r.Desc,
@@ -109,7 +130,7 @@ public class PlantMetricsService : IPlantMetricsService
                 ExcludedFromSap = SapRules.IsExcluded(r.Desc),
             };
             furnaces.First(f => f.FurnaceId == furnaceId).Lines.Add(line);
-            linesIndex[(furnaceId, r.Desc)] = line;
+            linesIndex[key] = line;
         }
 
         foreach (var r in rows.Where(r => r.ReportGroup == 3 && r.TotalSap > 0 && groupToFurnace.ContainsKey(r.GroupId)))
@@ -140,6 +161,19 @@ public class PlantMetricsService : IPlantMetricsService
         var tubeMillsLinesIndex = new Dictionary<string, ProductLineMetric>();
         foreach (var r in rows.Where(r => r.ReportGroup == 1 && r.GroupId == 7))
         {
+            if (tubeMillsLinesIndex.TryGetValue(r.Desc, out var existingTm))
+            {
+                if (r.Total > existingTm.Total || r.PlannedForOee > existingTm.PlannedShift)
+                {
+                    existingTm.Total = r.Total;
+                    existingTm.AccumulatedRate = r.AccumRate;
+                    existingTm.PlannedShift = r.PlannedForOee;
+                    existingTm.OeeShift = r.OeeShift;
+                    existingTm.CycleTimeSecs = r.CycleTimeSecs;
+                }
+                continue;
+            }
+
             var line = new ProductLineMetric
             {
                 ProductDesc = r.Desc,
