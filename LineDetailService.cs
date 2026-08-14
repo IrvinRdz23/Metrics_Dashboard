@@ -64,7 +64,14 @@ public class LineDetailService : ILineDetailService
         var furnaceId = furnaceEntry.Key;
         var furnaceName = furnaceEntry.Value.Name ?? string.Empty;
 
-        var mainRow = rows.FirstOrDefault(r => r.ReportGroup == 1 && r.GroupId == groupId && r.Desc == desc);
+        // OJO: mismo caso que en los otros servicios — si el SP regresa esta línea 2 veces,
+        // nos quedamos con la fila que trae los datos reales (mayor Total/Plan), no con la
+        // primera que aparezca (podría ser la "vacía" del duplicado).
+        var mainRow = rows
+            .Where(r => r.ReportGroup == 1 && r.GroupId == groupId && r.Desc == desc)
+            .OrderByDescending(r => r.Total)
+            .ThenByDescending(r => r.PlannedForOee)
+            .FirstOrDefault();
 
         var totalSap = rows
             .Where(r => r.ReportGroup == 3 && r.GroupId == groupId && r.Desc == desc)
