@@ -70,6 +70,21 @@ public static class ShiftTimeHelper
         var totalMinutes = shiftDurationHours * 60.0;
         var now = DateTime.Now.TimeOfDay;
 
+        if (isLiveToday)
+        {
+            // El SP arma de antemano las casillas de TODAS las horas del turno, aunque
+            // todavía no hayan pasado (ej. a las 8am ya viene la casilla de "10:00" vacía).
+            // Esas horas que NI SIQUIERA HAN EMPEZADO se quitan por completo del turno en
+            // vivo — ni barra vacía ni línea de esperado ahí, hasta que de verdad lleguen.
+            hourlyTrend.RemoveAll(p =>
+            {
+                if (!TimeSpan.TryParse(p.Hour, out var end)) return false;
+                if (end == TimeSpan.Zero) end = TimeSpan.FromHours(24);
+                var start = end - TimeSpan.FromHours(1);
+                return now < start;
+            });
+        }
+
         foreach (var point in hourlyTrend)
         {
             if (!TimeSpan.TryParse(point.Hour, out var bucketEnd)) continue;
