@@ -70,8 +70,25 @@ public class FurnaceDetailService : IFurnaceDetailService
         // Se incluyen TODAS las líneas (incluso con Planned_Shift_for_OEE = 0) para poder
         // mostrarlas en el detalle; FurnaceDetailSnapshot ya se encarga de no contarlas en
         // las estadísticas (ver CountedLines en el modelo).
+        //
+        // OJO: el SP a veces regresa la MISMA línea 2 veces (probablemente por su join interno
+        // a Heijunka_Plan_List) — si ya la vimos, no se agrega una segunda entrada, se
+        // actualiza la existente con los datos más "reales" de las dos filas.
         foreach (var r in rows.Where(r => r.ReportGroup == 1 && groupIds.Contains(r.GroupId)))
         {
+            if (linesIndex.TryGetValue(r.Desc, out var existing))
+            {
+                if (r.Total > existing.Total || r.PlannedForOee > existing.PlannedShift)
+                {
+                    existing.Total = r.Total;
+                    existing.AccumulatedRate = r.AccumRate;
+                    existing.PlannedShift = r.PlannedForOee;
+                    existing.OeeShift = r.OeeShift;
+                    existing.CycleTimeSecs = r.CycleTimeSecs;
+                }
+                continue;
+            }
+
             var line = new ProductLineMetric
             {
                 ProductDesc = r.Desc,
