@@ -1,113 +1,15 @@
-Ok, mira, encontre la table pivote. Vamos con esta linea donde el Product Order es 20. El Product_Group_ID es 1 por que es de horno 1., pero Tambien te paso lo que significan los Product_Group_ID:
+Ok, necesito unos cambios en la pantalla general del dashboard. Son cambios esteticos, pero medio importantes, si?
 
-SELECT *
-  FROM [M2S_Report_Services].[dbo].[Product_Group_List]
+1. Para el Horno 1, necesito separar las lineas de las clamshells, ahi mismo en la card, que el carrusel muestre 1 pantalla de solo lineas tipo 1 (horno 1) y luego las clamshells (tipo 6). Y Que la produccion, plan turno y SAP que se ve arriba de las barras en la card, se cambie junto con el carrusel.
 
-Product_Group_ID	Product_Group_Desc
-1	Furnace 1
-2	Furnace 2
-3	Furnace 3
-4	Furnace 4
-5	Furnace 5
-6	Furnace 1 Clam Shells
-7	Tube Mills
-8	Condenser
-9	Battery Cooling Plate
-10	Heater Core
-11	Residential
-12	EGR
-13	HVAC
-14	Stamping
+2. Junto con la anterior, va a haber un cambio en todas las cards. Ahorita en la card se combina la producccion de Core Builders y Back End, pues ahora necesitamos separar las cantidades de esas 2. Que se vean las 2 en la cards (separados por un separador tipo |). Recuerda, solo back end (end of line) tiene SAP %, Core Builder no, ni tampoco Clam Shells, ni Tube Mills.
 
-Mi Sp para el dia de hoy me da esto:
+3. En la parte de arriba donde cambiamos los valores de Core Builders, End Of Line (Back End), Tube Mills, ahora Tambien tenemos que separar para Clam Shells y quitarlas de Core Builders, para que tengan su propio OEE, produccion y plan de turno.
 
-Report_Group	Product_Group_ID	Product_Group_Desc	Week_Group	Product_List_ID	Product_Order	Product_Desc	Cycle_Time_Secs	Cut_Min	Planned_Shift	Mahle_Matl_Nbr	Cust_Matl_Nbr	Event_Date_Short	Event_Date_Short_Name	Event_Date_Short_Month_Name	Shift_Desc	Shift_ID	Accumulated_Rate	Hour_by_Hour	Total	Total_SAP	Planned_Shift_for_OEE	OEE_Shift	Heijunka_Enabled	Beginning_Inventory	OPS	WIP	CB	Using_CB_As_OPS	Capacity_5d_Percent	Heijunka_Percent_OEE	Capacity_5d	Heijunka	Change_Over	Cumulative_Heijunka_Planned_Shift
-1	1	Furnace 1	0	NULL	20	PTC PCM Evaporator	36.11	0.00	830	-	-	2026/08/13	Thursday	August	Shift 1 06:00-15:20	1	408	-	281	0	830	0.688725490196078	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	830	830	1	0
+4. Tambien para la pantalla general, me gustaria poner un tipo interruptor chico Abajo de los iconos de cambiar de tema, pantalla grande e historico, que diga "Automatico / Manual", que sirva que si esta en automatico (default) los carruseles se muevan solos como ahorita, pero en manual yo pueda mover con flechas los carrusules, tanto de las cards, como de los datos principals de la barra de arriba.
 
+5. Ahorita mismo en pantalla chica, me sales las barras de cada horno maximo 5, lo cual esta perfecto, pero solo se ven los nombres de 3 si estan las 5, el nombre de la 1ra, 3ra y 5ta. No Podemos darle mas espacio a las barras para que se vean las 5 en pantalla chica? Por que ahorita solo se ve en pantalla grande.
 
+6. EN el mismo tema, en la pantalla de por horno, se ve la grafica de tendenciapor hora, muy chica, se ve aplastada, solo se ve bien en pantalla grande /completa. Necesito quitarle espacio a los datos de abajp y del OEE de turno para que se aprecie perfecto, que sea la que mas tiene espacio. Y en esa pantalla, Tambien necesito que los datos de la parte de arriba de produccion, plan de turno y falta plan, junto con el OEE, este separado por Core Builder y Back End (con sap %) y para horno 1 Tambien poner clam shells, y para Tube Mills solo tube mills sin sap %.
 
-Entonces, encontre esta tabla:
-
-SELECT TOP (1000) [Product_List_ID]
-      ,[Product_List_Group_ID]
-      ,[Plant_List_ID]
-      ,[Server_List_ID]
-      ,[Cell_ID]
-      ,[Product_Order]
-      ,[Product_Desc]
-      ,[Product_Desc_2]
-      ,[Comments]
-      ,[Product_Group_ID]
-      ,[Part_Number_Conditional]
-      ,[Counter_Conditional]
-      ,[Is_Test_Report]
-      ,[Is_SAP_Reporting]
-      ,[Is_DT_Reporting]
-      ,[MachineID]
-  FROM [M2S_Report_Services].[dbo].[Product_List]
-  where Product_Order = 20 and Product_Group_ID =1
-
-Product_List_ID	Product_List_Group_ID	Plant_List_ID	Server_List_ID	Cell_ID	Product_Order	Product_Desc	Product_Desc_2	Comments	Product_Group_ID	Part_Number_Conditional	Counter_Conditional	Is_Test_Report	Is_SAP_Reporting	Is_DT_Reporting	MachineID
-24	8	1	15	3	20	PTC PCM Evaporator	PCM Evaporator	NULL	1	1	0	0	1	0	NULL
-
-
-Ya con eso tengo el Product_List_Group_ID:
-
-SELECT TOP (1000) [Heijunka_Plan_List_ID]
-      ,[Start_Date]
-      ,[Product_List_Group_ID]
-      ,[Heijunka_Enabled]
-      ,[Beginning_Inventory]
-      ,[OPS]
-      ,[WIP]
-      ,[CB]
-      ,[Using_CB_As_OPS]
-      ,[Capacity_5d_Percent]
-      ,[Heijunka_Percent_OEE]
-      ,[Monday_Shift_1]
-      ,[Monday_Shift_2]
-      ,[Monday_Shift_3]
-      ,[Tuesday_Shift_1]
-      ,[Tuesday_Shift_2]
-      ,[Tuesday_Shift_3]
-      ,[Wednesday_Shift_1]
-      ,[Wednesday_Shift_2]
-      ,[Wednesday_Shift_3]
-      ,[Thursday_Shift_1]
-      ,[Thursday_Shift_2]
-      ,[Thursday_Shift_3]
-      ,[Friday_Shift_1]
-      ,[Friday_Shift_2]
-      ,[Friday_Shift_3]
-      ,[Saturday_Shift_1]
-      ,[Saturday_Shift_2]
-      ,[Sunday_Shift_1]
-      ,[Sunday_Shift_2]
-      ,[Monday_Shift_1_Change_Over]
-      ,[Monday_Shift_2_Change_Over]
-      ,[Monday_Shift_3_Change_Over]
-      ,[Tuesday_Shift_1_Change_Over]
-      ,[Tuesday_Shift_2_Change_Over]
-      ,[Tuesday_Shift_3_Change_Over]
-      ,[Wednesday_Shift_1_Change_Over]
-      ,[Wednesday_Shift_2_Change_Over]
-      ,[Wednesday_Shift_3_Change_Over]
-      ,[Thursday_Shift_1_Change_Over]
-      ,[Thursday_Shift_2_Change_Over]
-      ,[Thursday_Shift_3_Change_Over]
-      ,[Friday_Shift_1_Change_Over]
-      ,[Friday_Shift_2_Change_Over]
-      ,[Friday_Shift_3_Change_Over]
-      ,[Saturday_Shift_1_Change_Over]
-      ,[Saturday_Shift_2_Change_Over]
-      ,[Sunday_Shift_1_Change_Over]
-      ,[Sunday_Shift_2_Change_Over]
-  FROM [M2S_Report_Services].[dbo].[Heijunka_Plan_List]
-  Where Product_List_Group_ID = 8
-  order by Start_Date desc
-
-Heijunka_Plan_List_ID	Start_Date	Product_List_Group_ID	Heijunka_Enabled	Beginning_Inventory	OPS	WIP	CB	Using_CB_As_OPS	Capacity_5d_Percent	Heijunka_Percent_OEE	Monday_Shift_1	Monday_Shift_2	Monday_Shift_3	Tuesday_Shift_1	Tuesday_Shift_2	Tuesday_Shift_3	Wednesday_Shift_1	Wednesday_Shift_2	Wednesday_Shift_3	Thursday_Shift_1	Thursday_Shift_2	Thursday_Shift_3	Friday_Shift_1	Friday_Shift_2	Friday_Shift_3	Saturday_Shift_1	Saturday_Shift_2	Sunday_Shift_1	Sunday_Shift_2	Monday_Shift_1_Change_Over	Monday_Shift_2_Change_Over	Monday_Shift_3_Change_Over	Tuesday_Shift_1_Change_Over	Tuesday_Shift_2_Change_Over	Tuesday_Shift_3_Change_Over	Wednesday_Shift_1_Change_Over	Wednesday_Shift_2_Change_Over	Wednesday_Shift_3_Change_Over	Thursday_Shift_1_Change_Over	Thursday_Shift_2_Change_Over	Thursday_Shift_3_Change_Over	Friday_Shift_1_Change_Over	Friday_Shift_2_Change_Over	Friday_Shift_3_Change_Over	Saturday_Shift_1_Change_Over	Saturday_Shift_2_Change_Over	Sunday_Shift_1_Change_Over	Sunday_Shift_2_Change_Over
-4716	2026/08/10	8	1	1485	8775	0	0	0	0.85	0.85	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
-
-Esa es la primera que me da, y es por que el Start Date es el de esta semana. 
-Crees que con eso tienes? O necesitas algo mas para estos cambios? Si necesitas algo mas, sin problema eh. Lo busco.
+Como la ves? Eso seria todo por el momento. Estamos a punto de lanzarlo a produccion, si se puede!
