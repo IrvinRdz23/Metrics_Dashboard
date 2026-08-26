@@ -11,8 +11,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="~/lib/signalr/signalr.min.js"></script>
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
     <style>
         :root[data-theme="dark"] {
         --bg: #0a0e15;
@@ -156,8 +156,8 @@
         }
 
         /* Badge del carrusel Core Builders / End of Line / Tube Mills, debajo de los
-           métricos. La franja de relleno avanza durante los 15s hasta el próximo cambio;
-           formal y visible, sin robarle protagonismo a los números de arriba. */
+        métricos. La franja de relleno avanza durante los 15s hasta el próximo cambio;
+        formal y visible, sin robarle protagonismo a los números de arriba. */
         .kpi-group-badge {
         position: relative;
         overflow: hidden;
@@ -186,8 +186,13 @@
         }
 
         @@keyframes badgeFill {
-        from { width: 0%; }
-        to { width: 100%; }
+        from {
+        width: 0%;
+        }
+
+        to {
+        width: 100%;
+        }
         }
 
         .kpi-group-badge .label-text {
@@ -750,7 +755,7 @@
             <div class="brand">
                 <img src="~/images/m2s.png" style="width: 60px;" />
                 <div class="brand-text">
-                    <h1><img src="~/images/MAHLE-Logo.png" style="width: 80px; margin:20px,0,0,0" /> · Planta 1</h1>
+                    <h1><img src="~/images/MahleOriginal.png" style="width: 80px; margin:20px,0,0,0" /> · Planta 1</h1>
                     <div class="subtitle">
                         <span id="dateLabel"></span>
                         <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
