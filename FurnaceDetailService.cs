@@ -19,7 +19,9 @@ public interface IFurnaceDetailService
 ///
 /// Igual que PlantMetricsService: qué línea "cuenta" ya no es solo Planned_Shift_for_OEE != 0,
 /// sino lo que diga Heijunka para ese día/turno (con respaldo al criterio viejo si Heijunka
-/// no tiene datos esa semana). Ver ProductLineMetric.CountsForStats.
+/// no tiene datos esa semana). Ver ProductLineMetric.CountsForStats. La separación Core
+/// Builder/Back End/Clam Shells/Tube Mills vive en el modelo (FurnaceDetailSnapshot) — aquí
+/// solo hace falta pegarle GroupId a cada línea para que esa clasificación funcione.
 /// </summary>
 public class FurnaceDetailService : IFurnaceDetailService
 {
@@ -92,6 +94,7 @@ public class FurnaceDetailService : IFurnaceDetailService
             var line = new ProductLineMetric
             {
                 ProductDesc = r.Desc,
+                GroupId = r.GroupId,
                 ProductListId = productListIdLookup.TryGetValue((r.GroupId, r.Desc), out var plid) ? plid : 0,
                 ProductOrder = r.ProductOrder,
                 CycleTimeSecs = r.CycleTimeSecs,

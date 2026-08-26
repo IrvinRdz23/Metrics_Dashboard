@@ -120,6 +120,7 @@ public class PlantMetricsService : IPlantMetricsService
             var line = new ProductLineMetric
             {
                 ProductDesc = r.Desc,
+                GroupId = r.GroupId,
                 ProductListId = productListIdLookup.TryGetValue((r.GroupId, r.Desc), out var plid) ? plid : 0,
                 ProductOrder = r.ProductOrder,
                 CycleTimeSecs = r.CycleTimeSecs,
@@ -177,6 +178,7 @@ public class PlantMetricsService : IPlantMetricsService
             var line = new ProductLineMetric
             {
                 ProductDesc = r.Desc,
+                GroupId = r.GroupId,
                 ProductListId = productListIdLookup.TryGetValue((r.GroupId, r.Desc), out var tmPlid) ? tmPlid : 0,
                 ProductOrder = r.ProductOrder,
                 CycleTimeSecs = r.CycleTimeSecs,
@@ -211,29 +213,35 @@ public class PlantMetricsService : IPlantMetricsService
             line.HeijunkaPlanned = heijunkaResults.TryGetValue(line.ProductListId, out var planned) ? planned : null;
         }
 
-        // ---------- Carrusel de la barra superior: Core Builders / End of Line / Tube Mills ----------
-        // Core Builders y End of Line se dividen con la MISMA regla que ya usamos para el
-        // % de SAP (CB / Clam Shell / CM1 = Core Builders, el resto = End of Line), pero
-        // aquí sobre Furnace 1-5. Tube Mills es aparte, sin distinción, aunque nunca
-        // aparece como card en el grid del dashboard general. Usa las líneas YA resueltas con
-        // Heijunka (CountsForStats) en vez de filtrar el raw row por separado.
+        // ---------- Carrusel de la barra superior: Core Builders / Back End / Clam Shells / Tube Mills ----------
+        // Ahora se clasifica por LineSegment (Product_Group_ID primero: 6=Clam Shells,
+        // 7=Tube Mills; el resto por el texto del nombre, igual que SapRules) en vez de solo
+        // el texto — así Clam Shells sale SIEMPRE aparte de Core Builders, aunque su nombre
+        // también contuviera "CB". El OEE de cada grupo solo promedia líneas con producción
+        // > 0 (mismo criterio que en FurnaceMetric.Oee).
         var furnace1to5Lines = furnaces.Where(f => f.FurnaceId <= 5).SelectMany(f => f.Lines).Where(l => l.CountsForStats).ToList();
-        var coreBuilderLines = furnace1to5Lines.Where(l => SapRules.IsExcluded(l.ProductDesc)).ToList();
-        var endOfLineLines = furnace1to5Lines.Where(l => !SapRules.IsExcluded(l.ProductDesc)).ToList();
+        var coreBuilderLines = furnace1to5Lines.Where(l => l.Segment == LineSegment.CoreBuilder).ToList();
+        var backEndLines = furnace1to5Lines.Where(l => l.Segment == LineSegment.BackEnd).ToList();
+        var clamShellLines = furnace1to5Lines.Where(l => l.Segment == LineSegment.ClamShell).ToList();
         var tubeMillsLines = tubeMills.Lines.Where(l => l.CountsForStats).ToList();
 
-        static KpiGroup BuildKpiGroup(string label, List<ProductLineMetric> countedLines) => new()
+        static KpiGroup BuildKpiGroup(string label, List<ProductLineMetric> countedLines)
         {
-            Label = label,
-            TotalProduction = countedLines.Sum(l => l.Total),
-            TotalPlanned = countedLines.Sum(l => l.PlannedShift),
-            Oee = countedLines.Count == 0 ? 0 : countedLines.Average(l => l.OeeShift)
-        };
+            var withProduction = countedLines.Where(l => l.Total > 0).ToList();
+            return new KpiGroup
+            {
+                Label = label,
+                TotalProduction = countedLines.Sum(l => l.Total),
+                TotalPlanned = countedLines.Sum(l => l.PlannedShift),
+                Oee = withProduction.Count == 0 ? 0 : withProduction.Average(l => l.OeeShift)
+            };
+        }
 
         var topKpiGroups = new List<KpiGroup>
         {
             BuildKpiGroup("Core Builders", coreBuilderLines),
-            BuildKpiGroup("Back End", endOfLineLines),
+            BuildKpiGroup("Back End", backEndLines),
+            BuildKpiGroup("Clam Shells", clamShellLines),
             BuildKpiGroup("Tube Mills", tubeMillsLines)
         };
 
@@ -264,6 +272,7 @@ public class PlantMetricsService : IPlantMetricsService
         {
             new() { Label = "Core Builders" },
             new() { Label = "Back End" },
+            new() { Label = "Clam Shells" },
             new() { Label = "Tube Mills" }
         }
     };

@@ -9,11 +9,6 @@ namespace Metrics_Dashboard.Models;
 /// Se calcula una sola vez por ciclo en IMetricsRawDataService y de ahí se derivan TODOS los
 /// snapshots (el general y los 6 de detalle), para no golpear el SP más de una vez por poll.
 /// </summary>
-/// <summary>
-/// Helper compartido para resolver el Product_List_ID real de cada línea — en Report_Group=1
-/// siempre viene NULL, pero en Report_Group 2 y 3 sí viene. Se usa para poder generar el
-/// link /Line/{id} de cada línea sin tener que tocar el SP.
-/// </summary>
 public static class RawRowsExtensions
 {
     public static Dictionary<(int GroupId, string Desc), int> BuildProductListIdLookup(this List<RawMetricRow> rows)
@@ -67,15 +62,6 @@ public static class FurnaceCatalog
 }
 
 /// <summary>
-/// Snapshot completo de UN horno (o Tube Mills), con TODAS sus líneas del turno actual
-/// (no solo un top 5) — es lo que alimenta cada dashboard individual.
-/// </summary>
-/// <summary>
-/// Snapshot de UNA sola línea/celda (ej. "PTC Clam Shell 1"), para su TV individual
-/// montada arriba de esa línea en piso. Se identifica por Product_List_ID — el ID real
-/// de tu base, tomado de las filas de Report_Group 2/3 (en la 1 siempre viene NULL).
-/// </summary>
-/// <summary>
 /// Tiempo de ciclo REAL aproximado de una hora: segundos disponibles para producir en esa
 /// hora (3600 menos el traslape con descansos) ÷ piezas producidas. Null si no hubo
 /// producción esa hora (no se puede estimar).
@@ -87,6 +73,11 @@ public class CycleTimePoint
     public double? ActualCycleTimeSecs { get; set; }
 }
 
+/// <summary>
+/// Snapshot de UNA sola línea/celda (ej. "PTC Clam Shell 1"), para su TV individual
+/// montada arriba de esa línea en piso. Se identifica por Product_List_ID — el ID real
+/// de tu base, tomado de las filas de Report_Group 2/3 (en la 1 siempre viene NULL).
+/// </summary>
 public class LineDetailSnapshot
 {
     public int ProductListId { get; set; }
@@ -129,6 +120,10 @@ public class LineDetailSnapshot
     public double? ActualCycleTimeStdDev { get; set; }
 }
 
+/// <summary>
+/// Snapshot completo de UN horno (o Tube Mills), con TODAS sus líneas del turno actual
+/// (no solo un top 5) — es lo que alimenta cada dashboard individual.
+/// </summary>
 public class FurnaceDetailSnapshot
 {
     public int FurnaceId { get; set; }
@@ -145,6 +140,10 @@ public class FurnaceDetailSnapshot
     /// <summary>Solo las líneas que SÍ cuentan (ver ProductLineMetric.CountsForStats).</summary>
     private List<ProductLineMetric> CountedLines => Lines.Where(l => l.CountsForStats).ToList();
 
+    /// <summary>De las que cuentan, solo las que YA tienen al menos 1 pieza — únicas que
+    /// entran al OEE ponderado (ver Oee).</summary>
+    private List<ProductLineMetric> CountedLinesWithProduction => CountedLines.Where(l => l.Total > 0).ToList();
+
     /// <summary>Líneas con producción NO planeada según Heijunka — no cuentan para nada,
     /// se muestran en rojo aparte en el detalle.</summary>
     public List<ProductLineMetric> UnplannedLines => Lines.Where(l => l.IsUnplannedProduction).ToList();
@@ -154,7 +153,10 @@ public class FurnaceDetailSnapshot
     public int TotalSap => CountedLines.Sum(l => l.TotalSap);
     public int RemainingToPlan => Math.Max(0, TotalPlanned - TotalProduction);
 
-    public double Oee => CountedLines.Count == 0 ? 0 : CountedLines.Average(l => l.OeeShift);
+    /// <summary>OEE ponderado del horno — SOLO promedia líneas que ya tienen producción.
+    /// Una línea planeada en 0 piezas no cuenta todavía; en cuanto hace 1 pieza, sí.</summary>
+    public double Oee => CountedLinesWithProduction.Count == 0 ? 0 : CountedLinesWithProduction.Average(l => l.OeeShift);
+
     public double SapPercent
     {
         get
@@ -169,13 +171,54 @@ public class FurnaceDetailSnapshot
     public int LinesWithProduction => Lines.Count(l => l.Total > 0);
     public int LinesWithoutProduction => Lines.Count(l => l.Total == 0);
 
-    public ProductLineMetric? BestLine => CountedLines
-        .Where(l => l.Total > 0)
+    public ProductLineMetric? BestLine => CountedLinesWithProduction
         .OrderByDescending(l => l.OeeShift)
         .FirstOrDefault();
 
-    public ProductLineMetric? WorstLine => CountedLines
-        .Where(l => l.Total > 0)
+    public ProductLineMetric? WorstLine => CountedLinesWithProduction
         .OrderBy(l => l.OeeShift)
         .FirstOrDefault();
+
+    // ---------- Separación por segmento (item 6): Core Builder / Back End (+SAP) / Clam
+    // Shells (solo Furnace 1) / Tube Mills (solo su propia página, sin SAP). ----------
+    private List<ProductLineMetric> CoreBuilderLines => CountedLines.Where(l => l.Segment == LineSegment.CoreBuilder).ToList();
+    private List<ProductLineMetric> BackEndLines => CountedLines.Where(l => l.Segment == LineSegment.BackEnd).ToList();
+    private List<ProductLineMetric> ClamShellLines => CountedLines.Where(l => l.Segment == LineSegment.ClamShell).ToList();
+    private List<ProductLineMetric> TubeMillsLines => CountedLines.Where(l => l.Segment == LineSegment.TubeMills).ToList();
+
+    private static double AvgOee(List<ProductLineMetric> lines)
+    {
+        var withProd = lines.Where(l => l.Total > 0).ToList();
+        return withProd.Count == 0 ? 0 : withProd.Average(l => l.OeeShift);
+    }
+
+    public int CoreBuilderProduction => CoreBuilderLines.Sum(l => l.Total);
+    public int CoreBuilderPlanned => CoreBuilderLines.Sum(l => l.PlannedShift);
+    public int CoreBuilderRemaining => Math.Max(0, CoreBuilderPlanned - CoreBuilderProduction);
+    public double CoreBuilderOee => AvgOee(CoreBuilderLines);
+
+    public int BackEndProduction => BackEndLines.Sum(l => l.Total);
+    public int BackEndPlanned => BackEndLines.Sum(l => l.PlannedShift);
+    public int BackEndRemaining => Math.Max(0, BackEndPlanned - BackEndProduction);
+    public double BackEndOee => AvgOee(BackEndLines);
+    public double BackEndSapPercent
+    {
+        get
+        {
+            var eligible = BackEndLines.Where(l => !l.ExcludedFromSap).ToList();
+            var prod = eligible.Sum(l => l.Total);
+            var sap = eligible.Sum(l => l.TotalSap);
+            return prod <= 0 ? 0 : (double)sap / prod;
+        }
+    }
+
+    public int ClamShellProduction => ClamShellLines.Sum(l => l.Total);
+    public int ClamShellPlanned => ClamShellLines.Sum(l => l.PlannedShift);
+    public int ClamShellRemaining => Math.Max(0, ClamShellPlanned - ClamShellProduction);
+    public double ClamShellOee => AvgOee(ClamShellLines);
+
+    public int TubeMillsProduction => TubeMillsLines.Sum(l => l.Total);
+    public int TubeMillsPlanned => TubeMillsLines.Sum(l => l.PlannedShift);
+    public int TubeMillsRemaining => Math.Max(0, TubeMillsPlanned - TubeMillsProduction);
+    public double TubeMillsOee => AvgOee(TubeMillsLines);
 }

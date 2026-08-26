@@ -36,6 +36,8 @@
         --shadow: 0 10px 26px -12px rgba(0,0,0,0.55);
         --flash: rgba(85,172,255,0.38);
         --pill-text: #061018;
+        --seg-cb: #f2b84b;
+        --seg-be: #55acff;
         }
 
         :root[data-theme="light"] {
@@ -60,691 +62,194 @@
         --shadow: 0 12px 28px -14px rgba(20,30,60,0.22);
         --flash: rgba(25,87,194,0.16);
         --pill-text: #ffffff;
+        --seg-cb: #96650a;
+        --seg-be: #1957c2;
         }
 
-        * {
-        box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        overflow: hidden;
-        background: var(--bg);
-        color: var(--text);
+        margin: 0; padding: 0; height: 100%; overflow: hidden;
+        background: var(--bg); color: var(--text);
         font-family: 'Inter', 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
         -webkit-font-smoothing: antialiased;
         }
 
-        .app {
-        height: 100vh;
-        width: 100vw;
-        display: grid;
-        grid-template-rows: auto 1fr;
-        gap: clamp(10px, 1vh, 16px);
-        padding: clamp(12px, 1.2vh, 20px);
-        }
+        .app { height: 100vh; width: 100vw; display: grid; grid-template-rows: auto 1fr; gap: clamp(10px, 1vh, 16px); padding: clamp(12px, 1.2vh, 20px); }
 
-        /* ---------- HEADER ---------- */
         header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: clamp(12px, 1.4vh, 20px) clamp(20px, 1.8vw, 32px);
-        box-shadow: var(--shadow);
+        display: flex; align-items: center; justify-content: space-between;
+        background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+        padding: clamp(12px, 1.4vh, 20px) clamp(20px, 1.8vw, 32px); box-shadow: var(--shadow);
         }
 
-        .app.presentation .controls-collapsible {
-        display: none;
-        }
+        .app.presentation .controls-collapsible { display: none; }
 
-        .brand {
-        display: flex;
-        align-items: center;
-        gap: clamp(14px, 1.4vw, 22px);
-        }
-
-        .brand-text h1 {
-        font-size: clamp(1.35rem, 1.7vw, 1.85rem);
-        margin: 0;
-        font-weight: 800;
-        letter-spacing: .2px;
-        }
-
-        .brand-text .subtitle {
-        color: var(--text-dim);
-        font-size: clamp(.85rem, .95vw, 1.05rem);
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-top: 4px;
-        font-weight: 600;
-        }
+        .brand { display: flex; align-items: center; gap: clamp(14px, 1.4vw, 22px); }
+        .brand-text h1 { font-size: clamp(1.35rem, 1.7vw, 1.85rem); margin: 0; font-weight: 800; letter-spacing: .2px; }
+        .brand-text .subtitle { color: var(--text-dim); font-size: clamp(.85rem, .95vw, 1.05rem); display: flex; align-items: center; gap: 10px; margin-top: 4px; font-weight: 600; }
 
         .shift-badge {
-        background: var(--accent-soft);
-        color: var(--accent);
-        border: 1px solid var(--border);
-        padding: 3px 12px;
-        border-radius: 999px;
-        font-size: clamp(.72rem, .82vw, .88rem);
-        font-weight: 700;
-        letter-spacing: .3px;
+        background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border);
+        padding: 3px 12px; border-radius: 999px; font-size: clamp(.72rem, .82vw, .88rem); font-weight: 700; letter-spacing: .3px;
         }
 
-        .plant-kpi {
-        display: flex;
-        align-items: center;
-        gap: clamp(18px, 2.2vw, 34px);
-        }
+        .plant-kpi { display: flex; align-items: center; gap: clamp(18px, 2.2vw, 34px); }
+        .kpi-cluster { display: flex; flex-direction: column; align-items: center; gap: clamp(8px, 1vh, 12px); }
+        .kpi-cluster-row { display: flex; align-items: center; gap: clamp(18px, 2.2vw, 34px); }
 
-        .kpi-cluster {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: clamp(8px, 1vh, 12px);
-        }
-
-        .kpi-cluster-row {
-        display: flex;
-        align-items: center;
-        gap: clamp(18px, 2.2vw, 34px);
-        }
-
-        /* Badge del carrusel Core Builders / End of Line / Tube Mills, debajo de los
-        métricos. La franja de relleno avanza durante los 15s hasta el próximo cambio;
-        formal y visible, sin robarle protagonismo a los números de arriba. */
         .kpi-group-badge {
-        position: relative;
-        overflow: hidden;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: clamp(6px, .8vh, 9px) clamp(20px, 2vw, 30px);
-        border-radius: 999px;
-        border: 1.5px solid var(--accent);
-        background: var(--card);
-        min-width: clamp(160px, 14vw, 220px);
+        position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        padding: clamp(6px, .8vh, 9px) clamp(14px, 1.4vw, 22px); border-radius: 999px; border: 1.5px solid var(--accent);
+        background: var(--card); min-width: clamp(160px, 14vw, 220px);
         }
 
-        .kpi-group-badge .fill {
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 0%;
-        background: var(--accent-soft);
-        z-index: 0;
-        }
+        .kpi-group-badge .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: var(--accent-soft); z-index: 0; }
+        .kpi-group-badge .fill.animating { animation: badgeFill 15s linear forwards; }
 
-        .kpi-group-badge .fill.animating {
-        animation: badgeFill 15s linear forwards;
-        }
-
-        @@keyframes badgeFill {
-        from {
-        width: 0%;
-        }
-
-        to {
-        width: 100%;
-        }
-        }
+        @@keyframes badgeFill { from { width: 0%; } to { width: 100%; } }
 
         .kpi-group-badge .label-text {
-        position: relative;
-        z-index: 1;
-        color: var(--accent);
-        font-size: clamp(.76rem, .88vw, .92rem);
-        font-weight: 800;
-        letter-spacing: .6px;
-        text-transform: uppercase;
-        white-space: nowrap;
+        position: relative; z-index: 1; color: var(--accent); font-size: clamp(.76rem, .88vw, .92rem);
+        font-weight: 800; letter-spacing: .6px; text-transform: uppercase; white-space: nowrap;
         }
 
-        .kpi-block {
-        text-align: center;
-        min-width: 70px;
-        }
+        .kpi-block { text-align: center; min-width: 70px; }
+        .kpi-block .value { font-size: clamp(2.5rem, 3.6vw, 4.1rem); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; transition: color .3s ease; }
+        .kpi-block .label { font-size: clamp(.68rem, .78vw, .82rem); text-transform: uppercase; letter-spacing: .7px; color: var(--text-faint); margin-top: 6px; font-weight: 700; }
+        .kpi-divider { width: 1px; height: clamp(40px, 4.5vh, 60px); background: var(--border); }
 
-        .kpi-block .value {
-        font-size: clamp(2.5rem, 3.6vw, 4.1rem);
-        font-weight: 800;
-        line-height: 1;
-        font-variant-numeric: tabular-nums;
-        font-family: 'JetBrains Mono', monospace;
-        transition: color .3s ease;
-        }
-
-        .kpi-block .label {
-        font-size: clamp(.68rem, .78vw, .82rem);
-        text-transform: uppercase;
-        letter-spacing: .7px;
-        color: var(--text-faint);
-        margin-top: 6px;
-        font-weight: 700;
-        }
-
-        .kpi-divider {
-        width: 1px;
-        height: clamp(40px, 4.5vh, 60px);
-        background: var(--border);
-        }
-
-        .header-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        }
+        .header-actions-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+        .header-actions { display: flex; align-items: center; gap: 10px; }
 
         .btn {
-        background: var(--card);
-        border: 1px solid var(--border);
-        color: var(--text);
-        border-radius: 10px;
-        padding: 10px 16px;
-        font-size: clamp(.82rem, .95vw, 1rem);
-        font-weight: 700;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        transition: background .15s, border-color .15s;
+        background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 10px;
+        padding: 10px 16px; font-size: clamp(.82rem, .95vw, 1rem); font-weight: 700; cursor: pointer;
+        display: flex; align-items: center; gap: 7px; transition: background .15s, border-color .15s;
         }
+        .btn:hover { background: var(--card-hover); border-color: var(--accent); }
 
-        .btn:hover {
-        background: var(--card-hover);
-        border-color: var(--accent);
-        }
+        .mode-switch { display: flex; align-items: center; gap: 8px; font-size: .72rem; font-weight: 800; color: var(--text-faint); text-transform: uppercase; letter-spacing: .4px; }
+        .mode-label.active { color: var(--accent); }
+        .mode-toggle { position: relative; width: 36px; height: 19px; display: inline-block; flex-shrink: 0; }
+        .mode-toggle input { opacity: 0; width: 0; height: 0; }
+        .mode-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 999px; transition: background .2s; }
+        .mode-slider::before { content: ''; position: absolute; height: 13px; width: 13px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+        .mode-toggle input:checked + .mode-slider { background: var(--accent); }
+        .mode-toggle input:checked + .mode-slider::before { transform: translateX(17px); }
 
-        /* ---------- GRID DE HORNOS (proporcional siempre, también en presentación) ---------- */
-        .grid-main {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        grid-template-rows: repeat(2, 1fr);
-        gap: clamp(10px, 1vw, 16px);
-        min-height: 0;
-        }
+        .carousel-arrow { display: none; background: transparent; border: none; color: var(--text-faint); cursor: pointer; font-size: .8rem; padding: 2px 4px; line-height: 1; flex-shrink: 0; }
+        .carousel-arrow:hover { color: var(--accent); }
+        .app.manual-mode .carousel-arrow { display: inline-flex; align-items: center; justify-content: center; }
+        .kpi-arrow { position: relative; z-index: 1; color: var(--accent); }
+
+        .grid-main { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: clamp(10px, 1vw, 16px); min-height: 0; }
 
         .card {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        padding: clamp(16px, 1.6vw, 24px) clamp(18px, 1.8vw, 26px);
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        cursor: pointer;
-        box-shadow: var(--shadow);
-        transition: transform .12s ease, border-color .12s ease, background .12s ease;
-        position: relative;
-        overflow: hidden;
+        background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+        padding: clamp(16px, 1.6vw, 24px) clamp(18px, 1.8vw, 26px); display: flex; flex-direction: column; min-height: 0;
+        cursor: pointer; box-shadow: var(--shadow); transition: transform .12s ease, border-color .12s ease, background .12s ease;
+        position: relative; overflow: hidden;
         }
+        .card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--furnace-color, var(--accent)); }
+        .card:hover { transform: translateY(-2px); border-color: var(--furnace-color, var(--accent)); }
+        .card.selected { border-color: var(--furnace-color, var(--accent)); background: var(--card-hover); box-shadow: 0 0 0 2px var(--furnace-color, var(--accent)); }
+        .card.dimmed { opacity: .32; }
+        .card.flash { animation: flashUpdate 900ms ease; }
 
-        .card::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 4px;
-        background: var(--furnace-color, var(--accent));
-        }
+        @@keyframes flashUpdate { 0% { box-shadow: 0 0 0 3px var(--flash); } 100% { box-shadow: var(--shadow); } }
 
-        .card:hover {
-        transform: translateY(-2px);
-        border-color: var(--furnace-color, var(--accent));
-        }
-
-        .card.selected {
-        border-color: var(--furnace-color, var(--accent));
-        background: var(--card-hover);
-        box-shadow: 0 0 0 2px var(--furnace-color, var(--accent));
-        }
-
-        .card.dimmed {
-        opacity: .32;
-        }
-
-        .card.flash {
-        animation: flashUpdate 900ms ease;
-        }
-
-        @@keyframes flashUpdate {
-        0% {
-        box-shadow: 0 0 0 3px var(--flash);
-        }
-
-        100% {
-        box-shadow: var(--shadow);
-        }
-        }
-
-        .furnace-card .card-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        }
-
-        .furnace-card h2 {
-        font-size: clamp(1.15rem, 1.4vw, 1.55rem);
-        margin: 0;
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-width: 0;
-        }
-
+        .furnace-card .card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .furnace-card h2 { font-size: clamp(1.15rem, 1.4vw, 1.55rem); margin: 0; font-weight: 800; display: flex; align-items: center; gap: 10px; min-width: 0; }
         .furnace-card h2 .fnum {
-        width: clamp(26px, 2vw, 32px);
-        height: clamp(26px, 2vw, 32px);
-        border-radius: 8px;
-        background: var(--furnace-color, var(--accent));
-        color: #06101f;
-        font-size: clamp(.82rem, .95vw, 1rem);
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
+        width: clamp(26px, 2vw, 32px); height: clamp(26px, 2vw, 32px); border-radius: 8px; background: var(--furnace-color, var(--accent));
+        color: #06101f; font-size: clamp(.82rem, .95vw, 1rem); font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
-
-        .furnace-card h2 .fname {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        }
+        .furnace-card h2 .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         .detail-link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        width: clamp(26px, 2vw, 32px);
-        height: clamp(26px, 2vw, 32px);
-        border-radius: 8px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        color: var(--text-faint);
-        text-decoration: none;
+        display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+        width: clamp(26px, 2vw, 32px); height: clamp(26px, 2vw, 32px); border-radius: 8px;
+        background: var(--bg); border: 1px solid var(--border); color: var(--text-faint); text-decoration: none;
         transition: background .15s, color .15s, border-color .15s;
         }
+        .detail-link svg { width: 60%; height: 60%; }
+        .detail-link:hover { background: var(--furnace-color, var(--accent)); color: #06101f; border-color: transparent; }
 
-        .detail-link svg {
-        width: 60%;
-        height: 60%;
-        }
+        .oee-block { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+        .furnace-card .oee-pill { font-size: clamp(1.1rem, 1.4vw, 1.55rem); font-weight: 800; padding: 5px 16px; border-radius: 999px; color: var(--pill-text); font-family: 'JetBrains Mono', monospace; text-shadow: 0 1px 2px rgba(0,0,0,.2); }
+        .oee-caption { font-size: clamp(.62rem, .72vw, .78rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .4px; font-weight: 700; }
 
-        .detail-link:hover {
-        background: var(--furnace-color, var(--accent));
-        color: #06101f;
-        border-color: transparent;
-        }
+        .furnace-card .numbers { display: flex; gap: clamp(12px, 1.6vw, 24px); margin-top: clamp(10px, 1.2vh, 16px); }
+        .furnace-card .numbers .n .v { font-size: clamp(1.15rem, 1.5vw, 1.85rem); font-weight: 800; font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .furnace-card .numbers .n .v .sep { color: var(--text-faint); margin: 0 4px; font-weight: 500; }
+        .furnace-card .numbers .n .v .seg-cb { color: var(--seg-cb); }
+        .furnace-card .numbers .n .v .seg-be { color: var(--seg-be); }
+        .furnace-card .numbers .n .l { font-size: clamp(.6rem, .68vw, .74rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .4px; font-weight: 700; margin-top: 3px; white-space: nowrap; }
 
-        .oee-block {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 3px;
-        flex-shrink: 0;
-        }
+        .furnace-card .chart-wrap { flex: 1; min-height: 0; margin-top: clamp(8px, 1vh, 14px); position: relative; }
 
-        .furnace-card .oee-pill {
-        font-size: clamp(1.1rem, 1.4vw, 1.55rem);
-        font-weight: 800;
-        padding: 5px 16px;
-        border-radius: 999px;
-        color: var(--pill-text);
-        font-family: 'JetBrains Mono', monospace;
-        text-shadow: 0 1px 2px rgba(0,0,0,.2);
-        }
-
-        .oee-caption {
-        font-size: clamp(.62rem, .72vw, .78rem);
-        color: var(--text-faint);
-        text-transform: uppercase;
-        letter-spacing: .4px;
-        font-weight: 700;
-        }
-
-        .furnace-card .numbers {
-        display: flex;
-        gap: clamp(16px, 2vw, 30px);
-        margin-top: clamp(10px, 1.2vh, 16px);
-        }
-
-        .furnace-card .numbers .n .v {
-        font-size: clamp(1.5rem, 2vw, 2.3rem);
-        font-weight: 800;
-        font-family: 'JetBrains Mono', monospace;
-        font-variant-numeric: tabular-nums;
-        }
-
-        .furnace-card .numbers .n .l {
-        font-size: clamp(.62rem, .72vw, .78rem);
-        color: var(--text-faint);
-        text-transform: uppercase;
-        letter-spacing: .5px;
-        font-weight: 700;
-        margin-top: 3px;
-        }
-
-        .furnace-card .chart-wrap {
-        flex: 1;
-        min-height: 0;
-        margin-top: clamp(8px, 1vh, 14px);
-        position: relative;
-        }
-
-        .furnace-card .worst-line {
-        margin-top: clamp(8px, 1vh, 12px);
-        font-size: clamp(.78rem, .9vw, .95rem);
-        color: var(--text-dim);
-        font-weight: 600;
-        display: flex;
-        justify-content: space-between;
-        border-top: 1px solid var(--border-soft);
-        padding-top: 10px;
-        }
-
-        .furnace-card .worst-line b {
-        color: var(--bad);
-        font-family: 'JetBrains Mono', monospace;
-        }
+        .furnace-card .worst-line { margin-top: clamp(8px, 1vh, 12px); font-size: clamp(.78rem, .9vw, .95rem); color: var(--text-dim); font-weight: 600; display: flex; justify-content: space-between; border-top: 1px solid var(--border-soft); padding-top: 10px; }
+        .furnace-card .worst-line b { color: var(--bad); font-family: 'JetBrains Mono', monospace; }
 
         .no-plan-box {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        background: var(--no-plan-bg);
-        border: 2px dashed var(--no-plan-border);
-        border-radius: 12px;
-        color: var(--no-plan-text);
-        font-size: clamp(1rem, 1.2vw, 1.3rem);
-        font-weight: 800;
-        letter-spacing: .3px;
-        padding: 10px;
-        margin-top: 8px;
-        line-height: 1.4;
+        flex: 1; display: flex; align-items: center; justify-content: center; text-align: center;
+        background: var(--no-plan-bg); border: 2px dashed var(--no-plan-border); border-radius: 12px; color: var(--no-plan-text);
+        font-size: clamp(1rem, 1.2vw, 1.3rem); font-weight: 800; letter-spacing: .3px; padding: 10px; margin-top: 8px; line-height: 1.4;
         }
 
-        .trend-card {
-        display: flex;
-        flex-direction: column;
-        }
+        .trend-card { display: flex; flex-direction: column; }
+        .trend-card h2 { font-size: clamp(1.15rem, 1.4vw, 1.55rem); margin: 0 0 10px 0; font-weight: 800; display: flex; align-items: center; justify-content: space-between; }
+        .trend-card h2 .hint { font-size: clamp(.68rem, .8vw, .85rem); font-weight: 600; color: var(--text-faint); }
+        .trend-card .chart-wrap { flex: 1; min-height: 0; }
 
-        .trend-card h2 {
-        font-size: clamp(1.15rem, 1.4vw, 1.55rem);
-        margin: 0 0 10px 0;
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        }
+        .drilldown-overlay { position: fixed; inset: 0; background: rgba(4,7,14,.6); display: none; align-items: center; justify-content: center; z-index: 50; }
+        .drilldown-overlay.open { display: flex; }
+        .drilldown-panel { width: min(1040px, 92vw); max-height: 84vh; overflow: auto; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 26px 28px; box-shadow: var(--shadow); }
+        .drilldown-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+        .drilldown-panel h3 { margin: 0 0 8px 0; font-size: 1.35rem; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+        .drilldown-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+        .chip { background: var(--accent-soft); border: 1px solid var(--border); color: var(--text); padding: 6px 13px; border-radius: 999px; font-size: .8rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
 
-        .trend-card h2 .hint {
-        font-size: clamp(.68rem, .8vw, .85rem);
-        font-weight: 600;
-        color: var(--text-faint);
-        }
+        table.lines-table { width: 100%; border-collapse: collapse; font-size: .92rem; margin-top: 8px; }
+        table.lines-table th, table.lines-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border-soft); }
+        table.lines-table th { color: var(--text-faint); font-weight: 800; font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; }
+        table.lines-table tbody tr:hover { background: var(--card-hover); }
+        table.lines-table td.num { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
 
-        .trend-card .chart-wrap {
-        flex: 1;
-        min-height: 0;
-        }
+        .bar-cell { display: flex; align-items: center; gap: 8px; }
+        .bar-track { flex: 1; height: 8px; border-radius: 4px; background: var(--grid-line); overflow: hidden; position: relative; }
+        .bar-fill { height: 100%; border-radius: 4px; }
+        .target-marker { position: absolute; top: -2px; bottom: -2px; width: 0; border-left: 2px dashed rgba(255,255,255,.55); z-index: 2; }
+        .close-btn { flex-shrink: 0; }
 
-        /* ---------- PANEL DE DRILL-DOWN (cross-filter) ---------- */
-        .drilldown-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(4,7,14,.6);
-        display: none;
-        align-items: center;
-        justify-content: center;
-        z-index: 50;
-        }
+        tr.no-prod-row td { color: var(--no-plan-text); }
+        .no-prod-tag { background: var(--no-plan-bg); border: 1px solid var(--no-plan-border); color: var(--no-plan-text); padding: 4px 11px; border-radius: 6px; font-size: .74rem; font-weight: 700; letter-spacing: .3px; display: inline-block; }
+        tr.unplanned-row td { color: var(--bad); }
+        .unplanned-tag { background: rgba(255,107,120,0.14); border: 1px solid var(--bad); color: var(--bad); padding: 4px 11px; border-radius: 6px; font-size: .74rem; font-weight: 700; letter-spacing: .3px; display: inline-block; }
+        .chip-unplanned { background: rgba(255,107,120,0.14); border-color: var(--bad); color: var(--bad); }
+        .sap-excluded { color: var(--text-faint); font-weight: 600; }
 
-        .drilldown-overlay.open {
-        display: flex;
-        }
+        .line-link { color: inherit; text-decoration: none; border-bottom: 1px dashed var(--border); }
+        .line-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
 
-        .drilldown-panel {
-        width: min(1040px, 92vw);
-        max-height: 84vh;
-        overflow: auto;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 26px 28px;
-        box-shadow: var(--shadow);
-        }
+        .page-ring-wrap { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; height: 18px; }
+        .page-ring-svg { width: 18px; height: 18px; transform: rotate(-90deg); flex-shrink: 0; }
+        .ring-bg { fill: none; stroke: var(--border); stroke-width: 2.5; }
+        .ring-fill { fill: none; stroke: var(--furnace-color, var(--accent)); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 44; stroke-dashoffset: 44; }
+        .ring-fill.animating { animation: ringFill 15s linear forwards; }
 
-        .drilldown-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 16px;
-        }
+        @@keyframes ringFill { to { stroke-dashoffset: 0; } }
 
-        .drilldown-panel h3 {
-        margin: 0 0 8px 0;
-        font-size: 1.35rem;
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        }
+        .page-ring-label { font-size: .72rem; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; font-weight: 700; }
 
-        .drilldown-chips {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        }
+        .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 rgba(61,219,152,.6); animation: pulse 1.8s infinite; }
 
-        .chip {
-        background: var(--accent-soft);
-        border: 1px solid var(--border);
-        color: var(--text);
-        padding: 6px 13px;
-        border-radius: 999px;
-        font-size: .8rem;
-        font-weight: 700;
-        font-family: 'JetBrains Mono', monospace;
-        }
+        @@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(61,219,152,.55); } 70% { box-shadow: 0 0 0 9px rgba(61,219,152,0); } 100% { box-shadow: 0 0 0 0 rgba(61,219,152,0); } }
 
-        table.lines-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: .92rem;
-        margin-top: 8px;
-        }
-
-        table.lines-table th, table.lines-table td {
-        text-align: left;
-        padding: 10px 12px;
-        border-bottom: 1px solid var(--border-soft);
-        }
-
-        table.lines-table th {
-        color: var(--text-faint);
-        font-weight: 800;
-        font-size: .72rem;
-        text-transform: uppercase;
-        letter-spacing: .5px;
-        }
-
-        table.lines-table tbody tr:hover {
-        background: var(--card-hover);
-        }
-
-        table.lines-table td.num {
-        font-family: 'JetBrains Mono', monospace;
-        font-variant-numeric: tabular-nums;
-        }
-
-        .bar-cell {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        }
-
-        .bar-track {
-        flex: 1;
-        height: 8px;
-        border-radius: 4px;
-        background: var(--grid-line);
-        overflow: hidden;
-        position: relative;
-        }
-
-        .bar-fill {
-        height: 100%;
-        border-radius: 4px;
-        }
-
-        .target-marker {
-        position: absolute;
-        top: -2px;
-        bottom: -2px;
-        width: 0;
-        border-left: 2px dashed rgba(255,255,255,.55);
-        z-index: 2;
-        }
-
-        .close-btn {
-        flex-shrink: 0;
-        }
-
-        tr.no-prod-row td {
-        color: var(--no-plan-text);
-        }
-
-        .no-prod-tag {
-        background: var(--no-plan-bg);
-        border: 1px solid var(--no-plan-border);
-        color: var(--no-plan-text);
-        padding: 4px 11px;
-        border-radius: 6px;
-        font-size: .74rem;
-        font-weight: 700;
-        letter-spacing: .3px;
-        display: inline-block;
-        }
-
-        tr.unplanned-row td {
-        color: var(--bad);
-        }
-
-        .unplanned-tag {
-        background: rgba(255,107,120,0.14);
-        border: 1px solid var(--bad);
-        color: var(--bad);
-        padding: 4px 11px;
-        border-radius: 6px;
-        font-size: .74rem;
-        font-weight: 700;
-        letter-spacing: .3px;
-        display: inline-block;
-        }
-
-        .chip-unplanned {
-        background: rgba(255,107,120,0.14);
-        border-color: var(--bad);
-        color: var(--bad);
-        }
-
-        .sap-excluded {
-        color: var(--text-faint);
-        font-weight: 600;
-        }
-
-        .line-link {
-        color: inherit;
-        text-decoration: none;
-        border-bottom: 1px dashed var(--border);
-        }
-
-        .line-link:hover {
-        color: var(--accent);
-        border-bottom-color: var(--accent);
-        }
-
-        .page-ring-wrap {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        margin-top: 8px;
-        height: 18px;
-        }
-
-        .page-ring-svg {
-        width: 18px;
-        height: 18px;
-        transform: rotate(-90deg);
-        flex-shrink: 0;
-        }
-
-        .ring-bg {
-        fill: none;
-        stroke: var(--border);
-        stroke-width: 2.5;
-        }
-
-        .ring-fill {
-        fill: none;
-        stroke: var(--furnace-color, var(--accent));
-        stroke-width: 2.5;
-        stroke-linecap: round;
-        stroke-dasharray: 44;
-        stroke-dashoffset: 44;
-        }
-
-        .ring-fill.animating {
-        animation: ringFill 15s linear forwards;
-        }
-
-        @@keyframes ringFill {
-        to {
-        stroke-dashoffset: 0;
-        }
-        }
-
-        .page-ring-label {
-        font-size: .72rem;
-        color: var(--text-faint);
-        font-family: 'JetBrains Mono', monospace;
-        font-weight: 700;
-        }
-
-        .live-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: var(--good);
-        box-shadow: 0 0 0 0 rgba(61,219,152,.6);
-        animation: pulse 1.8s infinite;
-        }
-
-        @@keyframes pulse {
-        0% {
-        box-shadow: 0 0 0 0 rgba(61,219,152,.55);
-        }
-
-        70% {
-        box-shadow: 0 0 0 9px rgba(61,219,152,0);
-        }
-
-        100% {
-        box-shadow: 0 0 0 0 rgba(61,219,152,0);
-        }
+        @@media (max-width: 900px) {
+        .furnace-card .numbers .n .v { font-size: 1rem; }
+        .furnace-card .numbers { gap: 10px; }
         }
     </style>
 </head>
@@ -782,8 +287,10 @@
                         </div>
                     </div>
                     <div class="kpi-group-badge" id="kpiGroupBadge">
+                        <button class="carousel-arrow kpi-arrow" id="kpiArrowPrev" title="Grupo anterior">◀</button>
                         <div class="fill" id="kpiGroupFill"></div>
                         <span class="label-text" id="kpiGroupName">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].Label : "")</span>
+                        <button class="carousel-arrow kpi-arrow" id="kpiArrowNext" title="Siguiente grupo">▶</button>
                     </div>
                 </div>
                 <div class="kpi-divider"></div>
@@ -796,10 +303,20 @@
                 </div>
             </div>
 
-            <div class="header-actions controls-collapsible">
-                <a class="btn" href="/Dashboard/Historical" title="Ver histórico">📅</a>
-                <button class="btn" id="toggleTheme">🌗</button>
-                <button class="btn" id="togglePresentation">🖥️</button>
+            <div class="header-actions-wrap controls-collapsible">
+                <div class="header-actions">
+                    <a class="btn" href="/Dashboard/Historical" title="Ver histórico">📅</a>
+                    <button class="btn" id="toggleTheme">🌗</button>
+                    <button class="btn" id="togglePresentation">🖥️</button>
+                </div>
+                <div class="mode-switch">
+                    <span class="mode-label" id="modeLabelAuto">Automático</span>
+                    <label class="mode-toggle">
+                        <input type="checkbox" id="modeCheckbox" />
+                        <span class="mode-slider"></span>
+                    </label>
+                    <span class="mode-label" id="modeLabelManual">Manual</span>
+                </div>
             </div>
         </header>
 
@@ -825,20 +342,17 @@
     </div>
 
     <script>
-        // ---------------------------------------------------------------
-        // Estado inicial servido por el servidor (primer render, sin esperar SignalR)
-        // ---------------------------------------------------------------
         let snapshot = @Html.Raw(Json.Serialize(Model));
         let selectedFurnaceId = null;
         const charts = {};
-        const furnacePage = {}; // furnaceId -> índice de página actual (carrusel de 5 en 5, cada 15s)
+        const furnacePage = {};
         const PAGE_SIZE = 5;
         const PAGE_ROTATE_MS = 15000;
         const KPI_ROTATE_MS = 15000;
         let kpiGroupIndex = 0;
         const FURNACE_COLORS = ['#4da3ff', '#35d68f', '#f2b84b', '#c084fc', '#ff8a5c', '#64748b'];
+        const isSmallScreen = window.innerWidth < 900;
 
-        // Semáforo de OEE: >=85% verde, 70-85% amarillo, <70% rojo. Aplica a plantas, hornos y líneas.
         function oeeColor(oee) {
         if (oee >= 0.85) return getCss('--good');
         if (oee >= 0.70) return getCss('--warn');
@@ -854,60 +368,90 @@
         }
         function pct(v) { return (v * 100).toFixed(0) + '%'; }
 
-        // Solo las líneas que SÍ cuentan (Heijunka si hay datos, si no plan > 0 como antes)
-        // entran al mini-chart de cada card — las que no tienen plan, y las que tienen
-        // producción NO planeada según Heijunka, solo se muestran en el detalle/modal.
         function countedLines(f) { return f.lines.filter(l => l.countsForStats); }
 
-        // Carrusel tipo pantalla de aeropuerto: pagina las líneas de 5 en 5, ordenadas por Product_Order.
-        function furnaceLinesPage(f) {
-        const sorted = [...countedLines(f)].sort((a, b) => a.productOrder - b.productOrder);
-        const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-        const idx = (furnacePage[f.furnaceId] || 0) % totalPages;
-        return { page: sorted.slice(idx * PAGE_SIZE, idx * PAGE_SIZE + PAGE_SIZE), totalPages, idx };
+        function furnaceCarouselPages(f) {
+        const lines = countedLines(f);
+        const clamShell = lines.filter(l => l.groupId === 6).sort((a, b) => a.productOrder - b.productOrder);
+        const regular = lines.filter(l => l.groupId !== 6).sort((a, b) => a.productOrder - b.productOrder);
+        const pages = [];
+        const pushPages = (arr, type) => {
+        const total = Math.max(1, Math.ceil(arr.length / PAGE_SIZE));
+        for (let i = 0; i < total && arr.length > 0; i++) {
+        pages.push({ type, lines: arr.slice(i * PAGE_SIZE, i * PAGE_SIZE + PAGE_SIZE) });
+        }
+        };
+        pushPages(regular, 'regular');
+        pushPages(clamShell, 'clamshell');
+        if (pages.length === 0) pages.push({ type: 'regular', lines: [] });
+        return pages;
         }
 
-        // Helper genérico de anillo de progreso (lo usan tanto las cards de horno como el
-        // indicador de categoría del header): se llena en 15s y al completar coincide con el cambio.
+        function furnaceLinesPage(f) {
+        const pages = furnaceCarouselPages(f);
+        const idx = (furnacePage[f.furnaceId] || 0) % pages.length;
+        return { page: pages[idx].lines, pageType: pages[idx].type, totalPages: pages.length, idx };
+        }
+
+        function cardNumbersHtml(f, pageType) {
+        if (f.furnaceId === 6) {
+        return `
+        <div class="n"><div class="v">${f.totalProduction.toLocaleString()}</div><div class="l">Producción</div></div>
+        <div class="n"><div class="v">${f.totalPlanned.toLocaleString()}</div><div class="l">Plan Turno</div></div>
+        <div class="n"><div class="v">—</div><div class="l">SAP % (N/A)</div></div>
+        `;
+        }
+        if (pageType === 'clamshell') {
+        return `
+        <div class="n"><div class="v">${f.clamShellProduction.toLocaleString()}</div><div class="l">Producción Clam Shells</div></div>
+        <div class="n"><div class="v">${f.clamShellPlanned.toLocaleString()}</div><div class="l">Plan Clam Shells</div></div>
+        <div class="n"><div class="v">—</div><div class="l">SAP % (N/A)</div></div>
+        `;
+        }
+        return `
+        <div class="n"><div class="v"><span class="seg-cb">${f.coreBuilderProduction.toLocaleString()}</span><span class="sep">|</span><span class="seg-be">${f.backEndProduction.toLocaleString()}</span></div><div class="l">Producción (CB | BE)</div></div>
+        <div class="n"><div class="v"><span class="seg-cb">${f.coreBuilderPlanned.toLocaleString()}</span><span class="sep">|</span><span class="seg-be">${f.backEndPlanned.toLocaleString()}</span></div><div class="l">Plan Turno (CB | BE)</div></div>
+        <div class="n"><div class="v">${pct(f.backEndSapPercent)}</div><div class="l">SAP % (BE)</div></div>
+        `;
+        }
+
         function restartRing(ring) {
         ring.classList.remove('animating');
-        void ring.getBoundingClientRect(); // fuerza reflow para poder reiniciar la animación
+        void ring.getBoundingClientRect();
         ring.classList.add('animating');
         }
 
-        function ensureRing(containerId, ringIdPrefix) {
+        function ensureRing(containerId, ringIdPrefix, furnaceId) {
         const container = document.getElementById(containerId);
         let ring = document.getElementById(ringIdPrefix + '-fill');
         if (!ring) {
         container.innerHTML = `
+        <button class="carousel-arrow" title="Página anterior" onclick="event.stopPropagation(); stepFurnacePage(${furnaceId}, -1)">◀</button>
         <svg class="page-ring-svg" viewBox="0 0 16 16">
         <circle class="ring-bg" cx="8" cy="8" r="7"></circle>
         <circle class="ring-fill" id="${ringIdPrefix}-fill" cx="8" cy="8" r="7"></circle>
         </svg>
         <span class="page-ring-label" id="${ringIdPrefix}-label"></span>
+        <button class="carousel-arrow" title="Página siguiente" onclick="event.stopPropagation(); stepFurnacePage(${furnaceId}, 1)">▶</button>
         `;
         ring = document.getElementById(ringIdPrefix + '-fill');
         }
         return ring;
         }
 
-        // Anillo de progreso de las cards de horno: se llena en 15s y al completar la vuelta coincide con el cambio de página.
         function renderPageRing(f) {
         const container = document.getElementById('pagering-' + f.furnaceId);
         if (!container) return;
         const { totalPages, idx } = furnaceLinesPage(f);
         if (totalPages <= 1) { container.innerHTML = ''; return; }
 
-        const ring = ensureRing('pagering-' + f.furnaceId, 'ring-' + f.furnaceId);
+        const ring = ensureRing('pagering-' + f.furnaceId, 'ring-' + f.furnaceId, f.furnaceId);
         document.getElementById('ring-' + f.furnaceId + '-label').textContent = `${idx + 1}/${totalPages}`;
         restartRing(ring);
         }
 
         document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
 
-        // ---------------------------------------------------------------
-        // RENDER
-        // ---------------------------------------------------------------
         function render(isLiveUpdate) {
         renderKpiGroup(isLiveUpdate);
 
@@ -928,12 +472,6 @@
         applySelection();
         }
 
-        // ---------------------------------------------------------------
-        // CARRUSEL DE LA BARRA SUPERIOR: Core Builders / End of Line / Tube Mills,
-        // rota cada 15s con una badge que se va rellenando (independiente del refresh
-        // de datos, igual que el carrusel de líneas por horno — el índice no se
-        // reinicia con cada snapshot, solo cuando de verdad toca cambiar de grupo).
-        // ---------------------------------------------------------------
         function renderKpiGroup(isLiveUpdate) {
         const groups = snapshot.topKpiGroups || [];
         if (groups.length === 0) return;
@@ -951,17 +489,27 @@
         if (!isLiveUpdate) {
         const fill = document.getElementById('kpiGroupFill');
         fill.classList.remove('animating');
-        void fill.getBoundingClientRect(); // fuerza reflow para reiniciar la animación
-        fill.classList.add('animating');
+        void fill.getBoundingClientRect();
+        if (carouselMode === 'auto') fill.classList.add('animating');
         }
         }
 
-        setInterval(() => {
+        function advanceKpiGroup() {
         const groups = snapshot.topKpiGroups || [];
         if (groups.length === 0) return;
         kpiGroupIndex = (kpiGroupIndex + 1) % groups.length;
         renderKpiGroup(false);
-        }, KPI_ROTATE_MS);
+        }
+
+        function stepKpiGroup(delta) {
+        const groups = snapshot.topKpiGroups || [];
+        if (groups.length === 0) return;
+        kpiGroupIndex = (kpiGroupIndex + delta + groups.length) % groups.length;
+        renderKpiGroup(false);
+        }
+
+        document.getElementById('kpiArrowPrev').onclick = () => stepKpiGroup(-1);
+        document.getElementById('kpiArrowNext').onclick = () => stepKpiGroup(1);
 
         function buildFurnaceCard(f) {
         const div = document.createElement('div');
@@ -971,6 +519,8 @@
         div.onclick = () => selectFurnace(f.furnaceId);
 
         const hasProduction = countedLines(f).length > 0;
+        const { pageType } = furnaceLinesPage(f);
+        div.dataset.lastProd = f.totalProduction;
 
         div.innerHTML = `
         <div class="card-top">
@@ -986,11 +536,7 @@
         <span class="oee-caption">OEE de Turno</span>
         </div>
         </div>
-        <div class="numbers">
-        <div class="n"><div class="v" id="prod-${f.furnaceId}">${f.totalProduction.toLocaleString()}</div><div class="l">Producción</div></div>
-        <div class="n"><div class="v" id="plan-${f.furnaceId}">${f.totalPlanned.toLocaleString()}</div><div class="l">Plan Turno</div></div>
-        <div class="n"><div class="v" id="sap-${f.furnaceId}">${pct(f.sapPercent)}</div><div class="l">SAP %</div></div>
-        </div>
+        <div class="numbers" id="numbers-${f.furnaceId}">${cardNumbersHtml(f, pageType)}</div>
         <div class="chart-wrap" id="chartwrap-${f.furnaceId}">
         ${hasProduction ? `<canvas id="chart-${f.furnaceId}"></canvas>` : `<div class="no-plan-box">SIN PRODUCCIÓN<br>EN EL TURNO ACTUAL</div>`}
         </div>
@@ -1007,9 +553,6 @@
         return div;
         }
 
-        // Plugin ligero (sin librerías extra) que dibuja, sobre cada barra:
-        // - el % de OEE "dentro" de la barra (con contorno para leerse en cualquier color/tema)
-        // - Producción/Esperado a esta hora pegado a la derecha de la barra
         const barLabelsPlugin = {
         id: 'lineBarLabels',
         afterDatasetsDraw(chart) {
@@ -1044,10 +587,8 @@
         }
         };
 
-        const OEE_TARGET = 85; // objetivo de turno, mismo umbral que ya usa el semáforo (oeeColor)
+        const OEE_TARGET = 85;
 
-        // Línea punteada del objetivo de OEE (85%), reutilizable en cualquier gráfica de
-        // barras horizontal cuyo eje X sea porcentaje de OEE.
         const targetLinePlugin = {
         id: 'targetLine',
         afterDatasetsDraw(chart) {
@@ -1087,11 +628,14 @@
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 500 },
-        layout: { padding: { right: 78 } },
+        layout: { padding: { right: isSmallScreen ? 52 : 78 } },
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toFixed(0) + '% OEE de turno (objetivo 85%)' } } },
         scales: {
         x: { min: 0, suggestedMax: 100, ticks: { display: false }, grid: { color: getCss('--grid-line') } },
-        y: { ticks: { color: getCss('--text-dim'), font: { size: 15, weight: '600' } }, grid: { display: false } }
+        y: {
+        ticks: { autoSkip: false, color: getCss('--text-dim'), font: { size: isSmallScreen ? 11 : 15, weight: '600' } },
+        grid: { display: false }
+        }
         }
         }
         };
@@ -1113,14 +657,16 @@
         if (!card || !pill) return;
 
         const hasProduction = countedLines(f).length > 0;
-        const prodChanged = document.getElementById('prod-' + f.furnaceId).textContent !== f.totalProduction.toLocaleString();
+        const prodChanged = card.dataset.lastProd !== String(f.totalProduction);
+        card.dataset.lastProd = f.totalProduction;
 
         pill.textContent = hasProduction ? pct(f.oee) : '—';
         pill.style.background = hasProduction ? oeeColor(f.oee) : 'var(--neutral)';
         pill.classList.toggle('neutral', !hasProduction);
-        document.getElementById('prod-' + f.furnaceId).textContent = f.totalProduction.toLocaleString();
-        document.getElementById('plan-' + f.furnaceId).textContent = f.totalPlanned.toLocaleString();
-        document.getElementById('sap-' + f.furnaceId).textContent = pct(f.sapPercent);
+
+        const { pageType } = furnaceLinesPage(f);
+        const numbersEl = document.getElementById('numbers-' + f.furnaceId);
+        if (numbersEl) numbersEl.innerHTML = cardNumbersHtml(f, pageType);
         renderWorstLine(f);
 
         const wrap = document.getElementById('chartwrap-' + f.furnaceId);
@@ -1129,15 +675,13 @@
         if (hasProduction && !hasCanvas) {
         wrap.innerHTML = `<canvas id="chart-${f.furnaceId}"></canvas>`;
         charts['f' + f.furnaceId] = new Chart(document.getElementById('chart-' + f.furnaceId), lineBarConfig(f));
-        renderPageRing(f); // primera vez que aparece la gráfica -> arranca el anillo
+        renderPageRing(f);
         } else if (!hasProduction && hasCanvas) {
         charts['f' + f.furnaceId]?.destroy();
         delete charts['f' + f.furnaceId];
         wrap.innerHTML = `<div class="no-plan-box">SIN PRODUCCIÓN<br>EN EL TURNO ACTUAL</div>`;
         document.getElementById('pagering-' + f.furnaceId).innerHTML = '';
         } else if (hasProduction && hasCanvas) {
-        // Solo se actualizan los datos de la barra; el anillo NO se reinicia aquí,
-        // así el conteo de 15s sigue su curso normal aunque llegue un refresh de datos.
         const chart = charts['f' + f.furnaceId];
         const cfg = lineBarConfig(f);
         chart.data = cfg.data;
@@ -1155,12 +699,28 @@
         if (selectedFurnaceId === f.furnaceId) renderDrilldown(f);
         }
 
-        // ---------------------------------------------------------------
-        // 6TO RECUADRO: alterna cada 15s entre la Tendencia de Planta y Tube Mills
-        // (mismo look que una card de horno, reutilizando buildFurnaceCard/updateFurnaceCard
-        // con FurnaceId=6) — así seguimos teniendo exactamente 6 recuadros en el grid.
-        // ---------------------------------------------------------------
-        let sixthSlotShowing = 'trend'; // 'trend' | 'tubemills'
+        function refreshFurnaceCardDisplay(f) {
+        const chart = charts['f' + f.furnaceId];
+        if (chart) {
+        chart.data = lineBarConfig(f).data;
+        chart.update('none');
+        }
+        const { pageType } = furnaceLinesPage(f);
+        const numbersEl = document.getElementById('numbers-' + f.furnaceId);
+        if (numbersEl) numbersEl.innerHTML = cardNumbersHtml(f, pageType);
+        renderPageRing(f);
+        }
+
+        function stepFurnacePage(furnaceId, delta) {
+        const f = snapshot.furnaces.find(x => x.furnaceId === furnaceId);
+        if (!f) return;
+        const { totalPages } = furnaceLinesPage(f);
+        if (totalPages <= 1) return;
+        furnacePage[furnaceId] = ((furnacePage[furnaceId] || 0) + delta + totalPages) % totalPages;
+        refreshFurnaceCardDisplay(f);
+        }
+
+        let sixthSlotShowing = 'trend';
         const SIXTH_SLOT_ROTATE_MS = 15000;
 
         function buildSixthSlot() {
@@ -1263,9 +823,6 @@
         chart.update('none');
         }
 
-        // ---------------------------------------------------------------
-        // CROSS-FILTER: clic en un horno -> dimear los demás + abrir drill-down con TODAS sus líneas
-        // ---------------------------------------------------------------
         function selectFurnace(id) {
         selectedFurnaceId = (selectedFurnaceId === id) ? null : id;
         applySelection();
@@ -1358,9 +915,6 @@
         if (e.target.id === 'drilldownOverlay') selectFurnace(selectedFurnaceId);
         };
 
-        // ---------------------------------------------------------------
-        // TEMA / PRESENTACIÓN / SELECTOR DE FECHA
-        // ---------------------------------------------------------------
         document.getElementById('toggleTheme').onclick = () => {
         const html = document.documentElement;
         const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -1384,28 +938,42 @@
         setTimeout(() => Object.values(charts).forEach(c => c && c.resize()), 260);
         };
 
-        // ---------------------------------------------------------------
-        // CARRUSEL: cada 15s avanza a la siguiente página de líneas por horno
-        // (como los monitores de vuelos en un aeropuerto), sin esperar al refresh de datos.
-        // ---------------------------------------------------------------
-        setInterval(() => {
+        let carouselMode = localStorage.getItem('pm-carousel-mode') || 'auto';
+        let cardIntervalId = null, kpiIntervalId = null;
+
+        function advanceAllCardPages() {
         snapshot.furnaces.forEach(f => {
         const { totalPages } = furnaceLinesPage(f);
         if (totalPages <= 1) return;
         furnacePage[f.furnaceId] = ((furnacePage[f.furnaceId] || 0) + 1) % totalPages;
-        const chart = charts['f' + f.furnaceId];
-        if (chart) {
-        chart.data = lineBarConfig(f).data;
-        // el anillo se reinicia justo aquí, en el mismo instante del cambio de página
-        chart.update('none');
-        }
-        renderPageRing(f);
+        refreshFurnaceCardDisplay(f);
         });
-        }, PAGE_ROTATE_MS);
+        }
 
-        // ---------------------------------------------------------------
-        // SIGNALR: conexión + recepción de actualizaciones en vivo
-        // ---------------------------------------------------------------
+        function applyModeUI() {
+        document.getElementById('modeCheckbox').checked = carouselMode === 'manual';
+        document.getElementById('modeLabelAuto').classList.toggle('active', carouselMode === 'auto');
+        document.getElementById('modeLabelManual').classList.toggle('active', carouselMode === 'manual');
+        document.getElementById('app').classList.toggle('manual-mode', carouselMode === 'manual');
+        }
+
+        function restartAutoCarousels() {
+        if (cardIntervalId) clearInterval(cardIntervalId);
+        if (kpiIntervalId) clearInterval(kpiIntervalId);
+        cardIntervalId = null;
+        kpiIntervalId = null;
+        if (carouselMode !== 'auto') return;
+        cardIntervalId = setInterval(advanceAllCardPages, PAGE_ROTATE_MS);
+        kpiIntervalId = setInterval(advanceKpiGroup, KPI_ROTATE_MS);
+        }
+
+        document.getElementById('modeCheckbox').addEventListener('change', (e) => {
+        carouselMode = e.target.checked ? 'manual' : 'auto';
+        localStorage.setItem('pm-carousel-mode', carouselMode);
+        applyModeUI();
+        restartAutoCarousels();
+        });
+
         const connection = new signalR.HubConnectionBuilder()
         .withUrl('/hubs/metrics')
         .withAutomaticReconnect()
@@ -1419,6 +987,8 @@
         connection.start().catch(err => console.error('SignalR error:', err));
 
         render(false);
+        applyModeUI();
+        restartAutoCarousels();
     </script>
 </body>
 </html>
