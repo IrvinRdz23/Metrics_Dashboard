@@ -233,7 +233,7 @@ public class PlantMetricsService : IPlantMetricsService
         var topKpiGroups = new List<KpiGroup>
         {
             BuildKpiGroup("Core Builders", coreBuilderLines),
-            BuildKpiGroup("End of Line", endOfLineLines),
+            BuildKpiGroup("Back End", endOfLineLines),
             BuildKpiGroup("Tube Mills", tubeMillsLines)
         };
 
@@ -263,7 +263,7 @@ public class PlantMetricsService : IPlantMetricsService
         TopKpiGroups = new List<KpiGroup>
         {
             new() { Label = "Core Builders" },
-            new() { Label = "End of Line" },
+            new() { Label = "Back End" },
             new() { Label = "Tube Mills" }
         }
     };
