@@ -12,4 +12,6 @@ Ok, necesito unos cambios en la pantalla general del dashboard. Son cambios este
 
 6. EN el mismo tema, en la pantalla de por horno, se ve la grafica de tendenciapor hora, muy chica, se ve aplastada, solo se ve bien en pantalla grande /completa. Necesito quitarle espacio a los datos de abajp y del OEE de turno para que se aprecie perfecto, que sea la que mas tiene espacio. Y en esa pantalla, Tambien necesito que los datos de la parte de arriba de produccion, plan de turno y falta plan, junto con el OEE, este separado por Core Builder y Back End (con sap %) y para horno 1 Tambien poner clam shells, y para Tube Mills solo tube mills sin sap %.
 
+7. Por ultimo, para los OEE en general (pantalla general todos los OEE y en Horno OEEs), si un turno SI esta programado, pero no ha tenido 1 sola pieza de produccion, es decir, esta en 0 piezas, no cuentes ese procentaje para el OEE ponderado, perooo, si el turno SI esta programado y ya hizo 1 pieza, ya lo empiezas a contar, gracias!
+
 Como la ves? Eso seria todo por el momento. Estamos a punto de lanzarlo a produccion, si se puede!
