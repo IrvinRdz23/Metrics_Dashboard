@@ -1,17 +1,9 @@
-Ok, necesito unos cambios en la pantalla general del dashboard. Son cambios esteticos, pero medio importantes, si?
+Hola!
+OK, esto ya practicamente quedo perfecto!
+Ya solo necesitamos 3 cosas de cambios.
 
-1. Para el Horno 1, necesito separar las lineas de las clamshells, ahi mismo en la card, que el carrusel muestre 1 pantalla de solo lineas tipo 1 (horno 1) y luego las clamshells (tipo 6). Y Que la produccion, plan turno y SAP que se ve arriba de las barras en la card, se cambie junto con el carrusel.
+1. En los dashboard principal, en las graficas de barras de los hornos. Si llevan 0 piezas, no poner el 0%, por que se juntan las letras de 0% con las cantidades, que en este caso dice 0/N piezas, me explico?
 
-2. Junto con la anterior, va a haber un cambio en todas las cards. Ahorita en la card se combina la producccion de Core Builders y Back End, pues ahora necesitamos separar las cantidades de esas 2. Que se vean las 2 en la cards (separados por un separador tipo |). Recuerda, solo back end (end of line) tiene SAP %, Core Builder no, ni tampoco Clam Shells, ni Tube Mills.
+2. Hay que reformular la grafica del tiempo de ciclo en la pantalla de por linea/celda, por que hay cantidades que no tienen sentido, mas que nada la ultima barra, siempre es la mas alta, por que supongo que tomar toda la hora, cuando aun no acaba, sabes como? Salen cantidades que no tienen sentido. Hay que hacer algo para ver mas variables que puedan afectar a esa grafica de tiempo de ciclo, ah y hay que quitar lo de la desviacion estandar, no tiene sentido.
 
-3. En la parte de arriba donde cambiamos los valores de Core Builders, End Of Line (Back End), Tube Mills, ahora Tambien tenemos que separar para Clam Shells y quitarlas de Core Builders, para que tengan su propio OEE, produccion y plan de turno.
-
-4. Tambien para la pantalla general, me gustaria poner un tipo interruptor chico Abajo de los iconos de cambiar de tema, pantalla grande e historico, que diga "Automatico / Manual", que sirva que si esta en automatico (default) los carruseles se muevan solos como ahorita, pero en manual yo pueda mover con flechas los carrusules, tanto de las cards, como de los datos principals de la barra de arriba.
-
-5. Ahorita mismo en pantalla chica, me sales las barras de cada horno maximo 5, lo cual esta perfecto, pero solo se ven los nombres de 3 si estan las 5, el nombre de la 1ra, 3ra y 5ta. No Podemos darle mas espacio a las barras para que se vean las 5 en pantalla chica? Por que ahorita solo se ve en pantalla grande.
-
-6. EN el mismo tema, en la pantalla de por horno, se ve la grafica de tendenciapor hora, muy chica, se ve aplastada, solo se ve bien en pantalla grande /completa. Necesito quitarle espacio a los datos de abajp y del OEE de turno para que se aprecie perfecto, que sea la que mas tiene espacio. Y en esa pantalla, Tambien necesito que los datos de la parte de arriba de produccion, plan de turno y falta plan, junto con el OEE, este separado por Core Builder y Back End (con sap %) y para horno 1 Tambien poner clam shells, y para Tube Mills solo tube mills sin sap %.
-
-7. Por ultimo, para los OEE en general (pantalla general todos los OEE y en Horno OEEs), si un turno SI esta programado, pero no ha tenido 1 sola pieza de produccion, es decir, esta en 0 piezas, no cuentes ese procentaje para el OEE ponderado, perooo, si el turno SI esta programado y ya hizo 1 pieza, ya lo empiezas a contar, gracias!
-
-Como la ves? Eso seria todo por el momento. Estamos a punto de lanzarlo a produccion, si se puede!
+3. Me dicen que hay un problema con el dashboard, en turno 3, que se ha visto entre las 5:00 am y 6:00, me afirman que durante esas horas se ve todo sin produccion, no se si sea un problema o que pase, yo no he podido revisarlo, pero ve en el codigo si hay algun bug o algo que hace que pase eso, porfavor. Estaria bien checarlo, y me dices si encontraste algo o no. Gracias!
