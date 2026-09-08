@@ -89,37 +89,42 @@ public class LineDetailService : ILineDetailService
             ?? 0;
 
         // ---------- Tiempo de ciclo real aproximado por hora ----------
-        // ANTES: usaba IBreakScheduleService para restar descansos de la hora — pero ese
-        // cálculo estaba dando números que no cuadraban con la realidad (confirmado: 201s
-        // real contra 66.9s teórico, con solo 3 piezas de diferencia contra lo esperado —
-        // imposible). En vez de seguir dependiendo de ese servicio, ahora se usan los
-        // SEGUNDOS DE RELOJ REALMENTE TRANSCURRIDOS en esa hora — el mismo tipo de cálculo
-        // que ya usamos (y que ya confirmaste que quedó bien) para el acumulado esperado.
-        // Nada de estimaciones de descansos: si la hora ya se completó, son sus 3600
-        // segundos completos; si sigue en curso, son los minutos que de verdad han pasado
-        // desde que empezó esa hora hasta AHORA. Null si no hubo producción esa hora.
-        var now = DateTime.Now;
+        // TERCER INTENTO — los 2 anteriores (descansos, reloj de pared) daban números que no
+        // cuadraban, así que cambio de estrategia por completo: en vez de reconstruir el
+        // tiempo transcurrido yo mismo, uso el mismo Accumulated_Rate que ya calcula bien el
+        // SP (confirmado por ti — es "esperado a esta hora", que sí sale correcto) y le doy
+        // la vuelta a la fórmula: si Accumulated_Rate = segundos_transcurridos ÷ Ciclo_Teórico,
+        // entonces segundos_transcurridos = Accumulated_Rate × Ciclo_Teórico. Ese total de
+        // segundos del TURNO se reparte entre las horas: a cada hora ya completada le tocan
+        // sus 3600s completos, a la hora en curso le toca lo que sobre, a las futuras nada
+        // (por eso no tienen barra). Ya no depende de reloj de pared ni de descansos.
+        var shiftStart = ParseShiftStart(shiftDesc);
+        var theoreticalCT = mainRow?.CycleTimeSecs ?? 0;
+        var totalElapsedTheoreticalSeconds = shiftStart.HasValue && theoreticalCT > 0
+            ? (mainRow?.AccumRate ?? 0) * theoreticalCT
+            : 0;
+
         var cycleTimeTrend = hourlyTrend.Select(h =>
         {
-            if (!TimeSpan.TryParse(h.Hour, out var bucketEnd))
+            if (!shiftStart.HasValue || theoreticalCT <= 0 || !TimeSpan.TryParse(h.Hour, out var bucketEnd))
             {
                 return new CycleTimePoint { Hour = h.Hour, Production = h.Production, ActualCycleTimeSecs = null };
             }
             if (bucketEnd == TimeSpan.Zero) bucketEnd = TimeSpan.FromHours(24); // "00:00" = fin del día
-
             var bucketStart = bucketEnd - TimeSpan.FromHours(1);
-            var isInProgress = now.TimeOfDay >= bucketStart && now.TimeOfDay < bucketEnd;
-            var effectiveEnd = isInProgress ? now.TimeOfDay : bucketEnd;
 
-            var elapsedSeconds = Math.Max(0, (effectiveEnd - bucketStart).TotalSeconds);
-            double? actual = h.Production > 0 ? elapsedSeconds / h.Production : null;
+            var secondsBeforeThisHour = ElapsedSinceShiftStart(bucketStart, shiftStart.Value).TotalSeconds;
+            var elapsedThisHour = Math.Clamp(totalElapsedTheoreticalSeconds - secondsBeforeThisHour, 0, 3600);
+            var isInProgress = elapsedThisHour > 0 && elapsedThisHour < 3600;
+
+            double? actual = h.Production > 0 ? elapsedThisHour / h.Production : null;
 
             return new CycleTimePoint
             {
                 Hour = h.Hour,
                 Production = h.Production,
                 ActualCycleTimeSecs = actual,
-                AvailableSeconds = (int)Math.Round(elapsedSeconds),
+                AvailableSeconds = (int)Math.Round(elapsedThisHour),
                 IsInProgress = isInProgress
             };
         }).ToList();
@@ -157,6 +162,23 @@ public class LineDetailService : ILineDetailService
             CycleTimeTrend = cycleTimeTrend,
             ActualCycleTimeMean = actualMean
         };
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex ShiftTimeRegex =
+        new(@"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static TimeSpan? ParseShiftStart(string? shiftDesc)
+    {
+        var m = ShiftTimeRegex.Match(shiftDesc ?? string.Empty);
+        if (!m.Success) return null;
+        return new TimeSpan(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), 0);
+    }
+
+    private static TimeSpan ElapsedSinceShiftStart(TimeSpan time, TimeSpan shiftStart)
+    {
+        var elapsed = time - shiftStart;
+        if (elapsed < TimeSpan.Zero) elapsed += TimeSpan.FromHours(24); // turno cruza medianoche
+        return elapsed;
     }
 
     private static LineDetailSnapshot EmptySnapshot(int lineId) => new()
