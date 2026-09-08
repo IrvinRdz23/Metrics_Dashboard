@@ -237,6 +237,19 @@
         font-family: 'Inter', sans-serif;
         }
 
+        .historical-picker select option:disabled {
+        color: var(--text-faint);
+        }
+
+        .picker-note {
+        font-size: .68rem;
+        color: var(--warn);
+        font-weight: 700;
+        text-align: center;
+        display: none;
+        max-width: 220px;
+        }
+
         .kpi-block {
         text-align: center;
         min-width: 70px;
@@ -859,6 +872,7 @@
                         </select>
                         <button type="submit" class="btn">Ver</button>
                     </form>
+                    <div class="picker-note" id="pickerNote">Ese turno de hoy todavía no termina — elige otro.</div>
                 </div>
             </div>
 
@@ -1422,7 +1436,7 @@
         };
 
         // ---------------------------------------------------------------
-        // TEMA / PRESENTACIÓN / SELECTOR DE FECHA
+        // TEMA / PRESENTACIÓN
         // ---------------------------------------------------------------
         document.getElementById('toggleTheme').onclick = () => {
         const html = document.documentElement;
@@ -1469,6 +1483,42 @@
         // ---------------------------------------------------------------
         // PICKER DE FECHA/TURNO: precargado con lo que ya se está viendo (viene del
         // servidor en el propio snapshot), listo para que solo cambien y le den "Ver".
+        //
+        // NUEVO: como "hoy" ya puede ser una opción válida (para turnos que ya cerraron),
+        // el dropdown de turno se ajusta según la fecha elegida — si escogen HOY, se
+        // deshabilitan los turnos que todavía no han terminado (el actual y los que le
+        // siguen). CURRENT_SHIFT_ID y TODAY_STR vienen del servidor, calculados una sola
+        // vez al cargar la página (no se actualizan solos si el turno cambia mientras
+        // tienes la página abierta — para eso, hay que refrescar).
+        // ---------------------------------------------------------------
+        const CURRENT_SHIFT_ID = @(ViewData["CurrentShiftId"] != null ? ViewData["CurrentShiftId"].ToString() : "null");
+        const TODAY_STR = '@ViewData["Today"]';
+
+        function enforceShiftAvailability() {
+        const dateInput = document.getElementById('pickerDate');
+        const shiftSelect = document.getElementById('pickerShift');
+        const note = document.getElementById('pickerNote');
+        const isToday = dateInput.value === TODAY_STR;
+
+        let anyEnabled = false;
+        Array.from(shiftSelect.options).forEach(opt => {
+        const shiftNum = parseInt(opt.value, 10);
+        const blocked = isToday && (CURRENT_SHIFT_ID === null || shiftNum >= CURRENT_SHIFT_ID);
+        opt.disabled = blocked;
+        if (!blocked) anyEnabled = true;
+        });
+
+        if (isToday && parseInt(shiftSelect.value, 10) >= (CURRENT_SHIFT_ID ?? 99)) {
+        const fallback = Array.from(shiftSelect.options).find(o => !o.disabled);
+        if (fallback) shiftSelect.value = fallback.value;
+        }
+
+        note.style.display = (isToday && !anyEnabled) ? 'block' : 'none';
+        }
+
+        document.getElementById('pickerDate').addEventListener('change', enforceShiftAvailability);
+        enforceShiftAvailability();
+
         // Al enviar, se muestra el loader ANTES de que el navegador navegue a la nueva
         // URL, para que no se vea una pantalla en blanco mientras el SP responde.
         // ---------------------------------------------------------------
@@ -1476,6 +1526,7 @@
         document.getElementById('pickerDate').value = snapshot.historicalDate.substring(0, 10);
         }
         document.getElementById('pickerShift').value = String(snapshot.historicalShiftId || 1);
+        enforceShiftAvailability();
 
         document.getElementById('historicalPicker').addEventListener('submit', () => {
         const dateVal = document.getElementById('pickerDate').value;
