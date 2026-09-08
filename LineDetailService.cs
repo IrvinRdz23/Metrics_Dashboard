@@ -179,7 +179,22 @@ public class LineDetailService : ILineDetailService
     private static TimeSpan ElapsedSinceShiftStart(TimeSpan time, TimeSpan shiftStart)
     {
         var elapsed = time - shiftStart;
-        if (elapsed < TimeSpan.Zero) elapsed += TimeSpan.FromHours(24); // turno cruza medianoche
+        if (elapsed < TimeSpan.Zero)
+        {
+            // Dos casos MUY distintos dan negativo aquí, y hay que tratarlos distinto:
+            //   1) El turno cruza medianoche de verdad (ej. bucket "00:00" de un turno que
+            //      empezó 22:40 la noche anterior) -> la diferencia es GRANDE (varias horas),
+            //      y sí hay que sumarle 24h para que ordene después del inicio del turno.
+            //   2) El turno arranca a media hora, no en punto (ej. "Shift 2 15:15-23:25" — el
+            //      primer bloque se llama "16:00" y representa la ventana 15:00-16:00, pero
+            //      el turno arrancó a las 15:15, 15 min DESPUÉS de que "empieza" ese bloque)
+            //      -> la diferencia es CHICA (minutos), y sumarle 24h da un disparate. Aquí
+            //      lo correcto es simplemente 0: no hay nada que contar antes de que el turno
+            //      arrancara.
+            // Se distinguen por el tamaño: si faltan más de 12 horas para cuadrar, es el caso
+            // 1 (cruza medianoche); si es menos, es el caso 2 (arranque a media hora).
+            elapsed = elapsed < TimeSpan.FromHours(-12) ? elapsed + TimeSpan.FromHours(24) : TimeSpan.Zero;
+        }
         return elapsed;
     }
 
