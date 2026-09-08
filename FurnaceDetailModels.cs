@@ -71,6 +71,16 @@ public class CycleTimePoint
     public string Hour { get; set; } = string.Empty;
     public int Production { get; set; }
     public double? ActualCycleTimeSecs { get; set; }
+
+    /// <summary>Segundos disponibles usados para calcular ActualCycleTimeSecs (ya con
+    /// descansos descontados) — se muestra en el tooltip para que se entienda de dónde
+    /// sale el número. Si esta es la hora EN CURSO, ya viene prorrateada a los minutos
+    /// que realmente han pasado (ver IsInProgress).</summary>
+    public int AvailableSeconds { get; set; }
+
+    /// <summary>true si esta es la hora que está corriendo ahora mismo (todavía no se
+    /// completa) — el tooltip lo aclara para que no se lea como un dato "final".</summary>
+    public bool IsInProgress { get; set; }
 }
 
 /// <summary>
@@ -113,11 +123,10 @@ public class LineDetailSnapshot
     /// <summary>Tiempo de ciclo real aproximado por hora del turno actual (ver CycleTimePoint).</summary>
     public List<CycleTimePoint> CycleTimeTrend { get; set; } = new();
 
-    /// <summary>Media y desviación estándar del tiempo de ciclo real, calculadas SOLO con las
-    /// horas del turno actual que tuvieron producción. Null si hay menos de 2 muestras válidas
-    /// (no alcanza para una desviación estándar con sentido).</summary>
+    /// <summary>Media del tiempo de ciclo real del turno actual (solo horas con producción) —
+    /// se usa como línea de referencia en la gráfica. Ya no se calcula desviación estándar
+    /// (la banda ±1σ se quitó, no aportaba).</summary>
     public double? ActualCycleTimeMean { get; set; }
-    public double? ActualCycleTimeStdDev { get; set; }
 }
 
 /// <summary>

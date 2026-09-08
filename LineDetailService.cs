@@ -84,27 +84,54 @@ public class LineDetailService : ILineDetailService
             .ToList();
         hourlyTrend = ShiftTimeHelper.SortByShiftElapsed(hourlyTrend, shiftDesc);
 
-        // ---------- Tiempo de ciclo real aproximado por hora ----------
-        // segundos disponibles (3600 - descansos que caen en esa hora) / piezas de esa hora.
-        // Null si no hubo producción esa hora (no se puede estimar).
         var shiftId = mainRow?.ShiftId
             ?? rows.FirstOrDefault(r => r.GroupId == groupId && r.Desc == desc)?.ShiftId
             ?? 0;
 
+        // ---------- Tiempo de ciclo real aproximado por hora ----------
+        // segundos disponibles (3600 - descansos que caen en esa hora) / piezas de esa hora.
+        // Null si no hubo producción esa hora (no se puede estimar).
+        //
+        // OJO con la hora EN CURSO: si todavía no se completa, usar los segundos disponibles
+        // de la HORA COMPLETA contra una producción que solo lleva una fracción de esa hora
+        // infla el tiempo de ciclo real de forma artificial — por eso la última barra siempre
+        // salía disparada. Se prorratean los segundos disponibles a los minutos que
+        // REALMENTE han pasado de esa hora (con un piso del 5% para no dividir casi entre 0
+        // en el primer minuto).
+        var now = DateTime.Now;
         var cycleTimeTrend = hourlyTrend.Select(h =>
         {
             var availableSeconds = _breakSchedule.GetAvailableSeconds(shiftId, h.Hour);
+            var isInProgress = false;
+
+            if (TimeSpan.TryParse(h.Hour, out var bucketEnd))
+            {
+                if (bucketEnd == TimeSpan.Zero) bucketEnd = TimeSpan.FromHours(24);
+                var bucketStart = bucketEnd - TimeSpan.FromHours(1);
+                if (now.TimeOfDay >= bucketStart && now.TimeOfDay < bucketEnd)
+                {
+                    isInProgress = true;
+                    var elapsedFraction = (now.TimeOfDay - bucketStart).TotalMinutes / 60.0;
+                    availableSeconds = (int)Math.Round(availableSeconds * Math.Max(0.05, elapsedFraction));
+                }
+            }
+
             double? actual = h.Production > 0 ? (double)availableSeconds / h.Production : null;
-            return new CycleTimePoint { Hour = h.Hour, Production = h.Production, ActualCycleTimeSecs = actual };
+            return new CycleTimePoint
+            {
+                Hour = h.Hour,
+                Production = h.Production,
+                ActualCycleTimeSecs = actual,
+                AvailableSeconds = availableSeconds,
+                IsInProgress = isInProgress
+            };
         }).ToList();
 
-        // Media y desviación estándar (muestral, n-1) solo con las horas que sí tuvieron producción.
-        // Se requieren al menos 2 muestras para que la desviación estándar tenga sentido.
+        // Media del tiempo de ciclo real, solo con las horas del turno actual que tuvieron
+        // producción — se muestra como línea de referencia en la gráfica (ya no hay banda
+        // de desviación estándar, se quitó por no aportar).
         var samples = cycleTimeTrend.Where(p => p.ActualCycleTimeSecs.HasValue).Select(p => p.ActualCycleTimeSecs!.Value).ToList();
         double? actualMean = samples.Count > 0 ? samples.Average() : null;
-        double? actualStdDev = samples.Count > 1
-            ? Math.Sqrt(samples.Sum(v => Math.Pow(v - actualMean!.Value, 2)) / (samples.Count - 1))
-            : null;
 
         var plannedShift = mainRow?.PlannedForOee ?? 0;
         var shiftDurationHours = ShiftTimeHelper.GetDurationHours(shiftDesc);
@@ -131,8 +158,7 @@ public class LineDetailService : ILineDetailService
             HeijunkaPlanned = heijunkaPlanned,
             HourlyTrend = hourlyTrend,
             CycleTimeTrend = cycleTimeTrend,
-            ActualCycleTimeMean = actualMean,
-            ActualCycleTimeStdDev = actualStdDev
+            ActualCycleTimeMean = actualMean
         };
     }
 

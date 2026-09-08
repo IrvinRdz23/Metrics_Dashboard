@@ -569,6 +569,10 @@
         const barRight = Math.max(bar.x, bar.base);
         const y = bar.y;
 
+        // Con 0 piezas la barra prácticamente no tiene ancho, así que el "0%" y el
+        // "0/N piezas" quedan pegados y se encima el texto — mejor no dibujar el % ahí,
+        // el detalle de la derecha ya deja claro que va en 0.
+        if (line.total > 0) {
         const oeeLabel = Math.round(line.oeeShift * 100) + '%';
         ctx.font = '800 15px Inter, sans-serif';
         ctx.textBaseline = 'middle';
@@ -578,6 +582,7 @@
         ctx.strokeText(oeeLabel, barLeft + 8, y);
         ctx.fillStyle = '#ffffff';
         ctx.fillText(oeeLabel, barLeft + 8, y);
+        }
 
         ctx.font = '700 13px "JetBrains Mono", monospace';
         ctx.fillStyle = getCss('--text-dim');

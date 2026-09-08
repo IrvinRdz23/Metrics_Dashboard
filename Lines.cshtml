@@ -11,8 +11,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="~/lib/signalr/signalr.min.js"></script>
+<script src="~/lib/chartjs/chart.umd.js"></script>
 <style>
     :root[data-theme="dark"] {
         --bg: #0a0e15;
@@ -348,7 +348,7 @@
                     </div>
                     <div class="card trend-card">
                         <h2>Tiempo de Ciclo: Real vs. Teórico</h2>
-                        <div class="subtitle-note">Aproximado por hora (seg/pieza) · banda = rango normal del turno</div>
+                        <div class="subtitle-note">Aproximado por hora (seg/pieza) · línea punteada gris = tu promedio real del turno</div>
                         <div class="chart-wrap"><canvas id="cycleTimeChart"></canvas></div>
                     </div>
                 </div>`;
@@ -455,11 +455,12 @@
     }
 
     // ---------------------------------------------------------------
-    // TIEMPO DE CICLO: REAL (aprox. por hora) vs. TEÓRICO (Cycle_Time_Secs), con una
-    // banda de "rango normal" = media ± 1 desviación estándar del turno actual.
-    // El real es una aproximación (segundos disponibles / piezas de esa hora, ya
-    // restando descansos) — no es una medición por pieza, así que la banda es más una
-    // guía de qué tan estable ha ido la línea que una campana de Gauss de verdad.
+    // TIEMPO DE CICLO: REAL (aprox. por hora) vs. TEÓRICO (Cycle_Time_Secs) vs. TU PROMEDIO
+    // del turno (línea de referencia, ya sin la banda de ±1 desviación estándar — se quitó
+    // porque no aportaba). La hora EN CURSO ya viene prorrateada del lado del servidor (no
+    // asume que la hora completa ya pasó), y el tooltip ahora muestra los segundos
+    // disponibles usados y si esa hora sigue corriendo, para que se entienda de dónde sale
+    // cada número.
     // ---------------------------------------------------------------
     function renderCycleTimeChart() {
         const canvas = document.getElementById('cycleTimeChart');
@@ -470,13 +471,7 @@
         const actual = points.map(p => p.actualCycleTimeSecs);
         const theoretical = labels.map(() => snapshot.cycleTimeSecs);
         const mean = snapshot.actualCycleTimeMean;
-        const stdDev = snapshot.actualCycleTimeStdDev;
-        const hasBand = mean != null && stdDev != null;
-        // Estructura de 4 datasets SIEMPRE fija (aunque la banda esté vacía) para que la
-        // actualización en vivo no truene si la banda aparece a medio turno (cuando ya
-        // hay 2+ horas con datos y por fin se puede calcular la desviación estándar).
-        const upperBand = hasBand ? labels.map(() => mean + stdDev) : labels.map(() => null);
-        const lowerBand = hasBand ? labels.map(() => Math.max(0, mean - stdDev)) : labels.map(() => null);
+        const meanLine = mean != null ? labels.map(() => mean) : labels.map(() => null);
 
         const barColor = (v) => {
             if (v == null) return 'transparent';
@@ -488,25 +483,14 @@
         if (charts.cycleTime) {
             const ds = charts.cycleTime.data.datasets;
             charts.cycleTime.data.labels = labels;
-            ds[0].data = upperBand;
-            ds[1].data = lowerBand;
-            ds[2].data = actual; ds[2].backgroundColor = actual.map(barColor);
-            ds[3].data = theoretical;
+            ds[0].data = actual; ds[0].backgroundColor = actual.map(barColor);
+            ds[1].data = theoretical;
+            ds[2].data = meanLine;
             charts.cycleTime.update('none');
             return;
         }
 
         const datasets = [
-            {
-                type: 'line', label: 'Rango normal (±1σ)', data: upperBand,
-                borderColor: 'transparent', backgroundColor: hexToRgba(getCss('--accent'), .12),
-                pointRadius: 0, fill: '+1', order: 3, spanGaps: false
-            },
-            {
-                type: 'line', label: '', data: lowerBand,
-                borderColor: 'transparent', backgroundColor: 'transparent',
-                pointRadius: 0, fill: false, order: 3, spanGaps: false
-            },
             {
                 type: 'bar', label: 'Tiempo de ciclo real (seg)',
                 data: actual, backgroundColor: actual.map(barColor),
@@ -516,6 +500,11 @@
                 type: 'line', label: 'Tiempo de ciclo teórico (seg)', data: theoretical,
                 borderColor: getCss('--text-dim'), borderDash: [7, 5], borderWidth: 2.5,
                 pointRadius: 0, fill: false, order: 0
+            },
+            {
+                type: 'line', label: 'Tu promedio de hoy (seg)', data: meanLine,
+                borderColor: getCss('--accent'), borderDash: [2, 3], borderWidth: 2,
+                pointRadius: 0, fill: false, order: 0, spanGaps: true
             }
         ];
 
@@ -525,15 +514,23 @@
                 responsive: true, maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: {
-                        labels: {
-                            color: getCss('--text-dim'), font: { size: 13, weight: '600' }, boxWidth: 14,
-                            filter: (item) => item.text !== ''
-                        }
-                    },
+                    legend: { labels: { color: getCss('--text-dim'), font: { size: 13, weight: '600' }, boxWidth: 14 } },
                     tooltip: {
                         callbacks: {
-                            label: (c) => c.raw == null ? 'Sin producción esa hora' : `${c.dataset.label}: ${Number(c.raw).toFixed(1)}s`
+                            label: (c) => {
+                                if (c.raw == null) return `${c.dataset.label}: sin producción esa hora`;
+                                return `${c.dataset.label}: ${Number(c.raw).toFixed(1)}s`;
+                            },
+                            afterBody: (items) => {
+                                const idx = items[0]?.dataIndex;
+                                const p = points[idx];
+                                if (!p) return [];
+                                const notes = [];
+                                notes.push(`Piezas esa hora: ${p.production}`);
+                                if (p.availableSeconds) notes.push(`Segundos disponibles usados: ${p.availableSeconds}s`);
+                                if (p.isInProgress) notes.push('⏳ Esta hora sigue en curso — el número es parcial, no definitivo.');
+                                return notes;
+                            }
                         }
                     }
                 },
@@ -604,17 +601,6 @@
 
     string FurnaceHref(int id) => id == 6 ? "/TubeMills" : $"/Furnace{id}";
 
-    // ---------------------------------------------------------------------------
-    // Logo del cliente según palabras clave en el nombre de la línea (Product_Desc).
-    // Se revisa en ESTE orden — el primero que haga match gana. Coincidencia por
-    // "palabra completa" (no substring suelto) para que, por ejemplo, "WS" no matchee
-    // dentro de otra palabra por accidente.
-    //
-    // Los archivos van en /wwwroot/images/logos/ con estos nombres exactos — súbelos ahí,
-    // no hay que tocar código para agregarlos:
-    //   honda.png · chrysler.png · gm.png · lucid.png · default-car.png ·
-    //   bmw.png · tesla.png · toyota.png · rivian.png
-    // ---------------------------------------------------------------------------
     static readonly (string Token, string LogoFile, string AltText)[] ClientLogoRules = new[]
     {
         ("PCM", "honda.png", "Honda"),

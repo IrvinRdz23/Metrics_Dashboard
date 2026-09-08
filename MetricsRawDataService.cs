@@ -50,13 +50,55 @@ public class MetricsRawDataService : IMetricsRawDataService
         _logger = logger;
     }
 
+    /// <summary>
+    /// BUG ENCONTRADO (turno 3 "vacío" entre ~00:00 y su hora de fin, ej. 5-6am): IsWithinShift
+    /// solo compara la HORA DEL RELOJ contra el rango del Shift_Desc — no le importa de qué
+    /// día vinieron las filas. Un turno que cruza medianoche (ej. "22:40-06:00") aparece TANTO
+    /// en el reporte de HOY (el turno que arranca esta noche, casi vacío) como en el de AYER
+    /// (el que arrancó anoche y sigue corriendo, con datos reales) — y ambos matchean por hora
+    /// de reloj. Antes siempre se usaba el de HOY, que en la madrugada es el equivocado.
+    ///
+    /// Ahora: si el turno detectado en el reporte de HOY es uno que cruza medianoche y "ahora"
+    /// cae en su mitad de madrugada (después de las 00:00, antes de que termine), eso significa
+    /// que en realidad pertenece al bloque de AYER — se prueba con AYER y, si ahí sí hay datos
+    /// reales (Total o Plan > 0), se usa eso en su lugar.
+    /// </summary>
     public async Task<(List<RawMetricRow> Rows, string ShiftDesc)> FetchCurrentShiftRowsAsync(CancellationToken ct = default)
     {
-        var all = await FetchDayRowsAsync(DateTime.Today, ct);
-        var now = DateTime.Now.TimeOfDay;
-        var filtered = all.Where(r => IsWithinShift(r.ShiftDesc, now)).ToList();
-        var shiftDesc = filtered.FirstOrDefault()?.ShiftDesc ?? string.Empty;
-        return (filtered, shiftDesc);
+        var now = DateTime.Now;
+        var todaysAll = await FetchDayRowsAsync(now.Date, ct);
+        var todaysMatch = todaysAll.Where(r => IsWithinShift(r.ShiftDesc, now.TimeOfDay)).ToList();
+        var matchedShiftDesc = todaysMatch.FirstOrDefault()?.ShiftDesc;
+
+        if (IsInMidnightCrossingTail(matchedShiftDesc, now.TimeOfDay))
+        {
+            var yesterdaysAll = await FetchDayRowsAsync(now.Date.AddDays(-1), ct);
+            var yesterdaysMatch = yesterdaysAll.Where(r => IsWithinShift(r.ShiftDesc, now.TimeOfDay)).ToList();
+
+            if (yesterdaysMatch.Any(r => r.Total > 0 || r.PlannedForOee > 0))
+            {
+                var yShiftDesc = yesterdaysMatch.FirstOrDefault()?.ShiftDesc ?? string.Empty;
+                return (yesterdaysMatch, yShiftDesc);
+            }
+        }
+
+        var shiftDesc = todaysMatch.FirstOrDefault()?.ShiftDesc ?? string.Empty;
+        return (todaysMatch, shiftDesc);
+    }
+
+    /// <summary>¿"now" cae en la mitad de madrugada de un turno que cruza medianoche
+    /// (ej. Shift 3 22:40-06:00, y son las 5:30)? Si sí, ese turno en realidad pertenece al
+    /// @Start_Date de AYER, no al de hoy.</summary>
+    private static bool IsInMidnightCrossingTail(string? shiftDesc, TimeSpan now)
+    {
+        var m = ShiftTimeRegex.Match(shiftDesc ?? string.Empty);
+        if (!m.Success) return false;
+
+        var start = new TimeSpan(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), 0);
+        var end = new TimeSpan(int.Parse(m.Groups[3].Value), int.Parse(m.Groups[4].Value), 0);
+
+        if (end > start) return false; // no cruza medianoche, nada que corregir
+        return now < end; // estamos después de medianoche pero antes de que termine -> es la cola de AYER
     }
 
     public async Task<(List<RawMetricRow> Rows, string ShiftDesc)> FetchHistoricalRowsAsync(DateTime date, int shiftId, CancellationToken ct = default)
@@ -205,12 +247,6 @@ public class MetricsRawDataService : IMetricsRawDataService
         catch (IndexOutOfRangeException) { return -1; }
     }
 
-    // ------------------------------------------------------------------
-    // Lecturas defensivas: este SP arma su resultado con varios UNION ALL y columnas
-    // calculadas con CASE/dynamic SQL, así que NO asumimos el tipo exacto que .NET cree
-    // que debería tener cada columna. Se toma el valor crudo (GetValue) y se convierte
-    // de forma segura sin importar si llega como int, decimal, double o incluso string.
-    // ------------------------------------------------------------------
     private static int SafeGetInt(SqlDataReader reader, int ordinal, int fallback = 0)
     {
         if (ordinal < 0 || reader.IsDBNull(ordinal)) return fallback;
