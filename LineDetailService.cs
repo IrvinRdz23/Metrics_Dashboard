@@ -117,7 +117,9 @@ public class LineDetailService : ILineDetailService
             var elapsedThisHour = Math.Clamp(totalElapsedTheoreticalSeconds - secondsBeforeThisHour, 0, 3600);
             var isInProgress = elapsedThisHour > 0 && elapsedThisHour < 3600;
 
-            double? actual = h.Production > 0 ? elapsedThisHour / h.Production : null;
+            // Si da exactamente 0, algo no cuadró en la cuenta — mejor "sin dato" (null) que
+            // mostrar un 0s falso, que no tiene sentido para una hora con piezas producidas.
+            double? actual = (h.Production > 0 && elapsedThisHour > 0) ? elapsedThisHour / h.Production : null;
 
             return new CycleTimePoint
             {
