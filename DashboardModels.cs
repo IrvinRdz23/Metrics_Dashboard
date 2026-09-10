@@ -202,8 +202,10 @@ public class FurnaceMetric
 }
 
 /// <summary>
-/// Punto de la serie hora por hora (Report_Group=2), sumando Total de todas las líneas
-/// (excepto Tube Mills) para esa hora, del turno actual únicamente.
+/// Punto de la serie hora por hora (Report_Group=2). Se usa tanto para la tendencia
+/// general (ya no se muestra en el grid, pero se deja calculada por si acaso) como para
+/// las 4 tendencias por categoría (Core Builder/Back End/Clam Shells/Tube Mills) de la
+/// pantalla de tendencias.
 /// </summary>
 public class HourlyPoint
 {
@@ -216,6 +218,13 @@ public class HourlyPoint
     /// hora ya se sale del horario real del turno (ver por qué en ApplyExpectedCumulative) —
     /// así la línea amarilla simplemente no dibuja ahí, en vez de saltar de golpe al 100%.</summary>
     public int? ExpectedCumulative { get; set; }
+
+    /// <summary>SOLO se usa en la tendencia de Back End: SAP escaneado APROXIMADO esa hora.
+    /// El SP no trae timestamp de escaneo por hora (Report_Group=3/SAP es un acumulado del
+    /// día, no por hora), así que se reparte el total de SAP del día proporcional a cuánto
+    /// se produjo en cada hora — es una aproximación razonable (el escaneo suele pasar poco
+    /// después de producir), no un dato exacto hora por hora.</summary>
+    public int SapProduction { get; set; }
 }
 
 /// <summary>
@@ -241,7 +250,18 @@ public class PlantDashboardSnapshot
     public string ShiftDesc { get; set; } = string.Empty;
 
     public List<FurnaceMetric> Furnaces { get; set; } = new();
+
+    /// <summary>Tendencia de TODA la planta (Furnace 1-5, sin Tube Mills) — ya no se muestra en
+    /// el grid principal (se reemplazó por las 4 tendencias de abajo, cada una en su propia
+    /// gráfica), se deja calculada por si algo más la llega a necesitar.</summary>
     public List<HourlyPoint> HourlyTrend { get; set; } = new();
+
+    /// <summary>Las 4 tendencias por categoría de la "pantalla de tendencias" (a la que se
+    /// llega con la flecha del borde derecho del dashboard general).</summary>
+    public List<HourlyPoint> CoreBuilderHourlyTrend { get; set; } = new();
+    public List<HourlyPoint> BackEndHourlyTrend { get; set; } = new();
+    public List<HourlyPoint> ClamShellHourlyTrend { get; set; } = new();
+    public List<HourlyPoint> TubeMillsHourlyTrend { get; set; } = new();
 
     /// <summary>
     /// Los 4 grupos que rotan en la barra superior, en este orden fijo:
@@ -262,9 +282,9 @@ public class PlantDashboardSnapshot
     public int? HistoricalShiftId { get; set; }
 
     /// <summary>
-    /// Furnaces incluye Furnace 1-5 Y Tube Mills (FurnaceId = 6) al final — Tube Mills solo se
-    /// usa para el 6to recuadro del grid (que alterna con la tendencia cada 15s) y para el
-    /// modal de detalle si se le da clic; nunca se cuenta en los totales de abajo.
+    /// Furnaces incluye Furnace 1-5 Y Tube Mills (FurnaceId = 6) al final — Tube Mills ahora
+    /// es una card fija más del grid (ya no alterna con nada); nunca se cuenta en los
+    /// totales de abajo.
     /// </summary>
     public int TotalProduction => Furnaces.Where(f => f.FurnaceId <= 5).Sum(f => f.TotalProduction);
     public int TotalPlanned => Furnaces.Where(f => f.FurnaceId <= 5).Sum(f => f.TotalPlanned);

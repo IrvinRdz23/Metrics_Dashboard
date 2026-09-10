@@ -143,7 +143,36 @@
         .app.manual-mode .carousel-arrow { display: inline-flex; align-items: center; justify-content: center; }
         .kpi-arrow { position: relative; z-index: 1; color: var(--accent); }
 
-        .grid-main { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: clamp(10px, 1vw, 16px); min-height: 0; }
+        /* ---------- PANTALLAS: dashboard principal <-> tendencias por categoría ---------- */
+        .screens-viewport { position: relative; overflow: hidden; min-height: 0; border-radius: 4px; }
+        .screens-track {
+        display: flex; width: 200%; height: 100%;
+        transition: transform .5s cubic-bezier(.22, 1, .36, 1);
+        }
+        .screen { width: 50%; flex-shrink: 0; min-height: 0; display: flex; flex-direction: column; }
+
+        .grid-main { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: clamp(10px, 1vw, 16px); min-height: 0; flex: 1; }
+
+        .trends-grid { display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); gap: clamp(10px, 1vw, 16px); min-height: 0; flex: 1; }
+
+        /* Flechas fantasma en los bordes: invisibles hasta que pasas el cursor por su franja,
+        se difuminan con un degradado suave. Derecha en la pantalla principal -> tendencias;
+        izquierda en tendencias -> regresa. Nunca se mueven solas. */
+        .edge-arrow {
+        position: fixed; top: 0; bottom: 0; width: 68px; z-index: 45;
+        display: flex; align-items: center; justify-content: center; cursor: pointer;
+        opacity: 0; transition: opacity .3s ease;
+        }
+        .edge-arrow:hover { opacity: 1; }
+        .edge-arrow.right-arrow { right: 0; background: linear-gradient(to left, rgba(0,0,0,.3), transparent 80%); }
+        .edge-arrow.left-arrow { left: 0; background: linear-gradient(to right, rgba(0,0,0,.3), transparent 80%); }
+        :root[data-theme="light"] .edge-arrow.right-arrow { background: linear-gradient(to left, rgba(20,30,60,.16), transparent 80%); }
+        :root[data-theme="light"] .edge-arrow.left-arrow { background: linear-gradient(to right, rgba(20,30,60,.16), transparent 80%); }
+        .edge-arrow .arrow-icon {
+        font-size: 2.6rem; font-weight: 300; color: var(--text-dim); opacity: .55;
+        user-select: none; filter: blur(.2px);
+        }
+        .edge-arrow:hover .arrow-icon { opacity: 1; color: var(--accent); }
 
         .card {
         background: var(--card); border: 1px solid var(--border); border-radius: 18px;
@@ -199,8 +228,8 @@
         }
 
         .trend-card { display: flex; flex-direction: column; }
-        .trend-card h2 { font-size: clamp(1.15rem, 1.4vw, 1.55rem); margin: 0 0 10px 0; font-weight: 800; display: flex; align-items: center; justify-content: space-between; }
-        .trend-card h2 .hint { font-size: clamp(.68rem, .8vw, .85rem); font-weight: 600; color: var(--text-faint); }
+        .trend-card h2 { font-size: clamp(1rem, 1.25vw, 1.35rem); margin: 0 0 10px 0; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+        .trend-card h2 .hint { font-size: clamp(.62rem, .74vw, .8rem); font-weight: 600; color: var(--text-faint); text-transform: none; letter-spacing: 0; }
         .trend-card .chart-wrap { flex: 1; min-height: 0; }
 
         .drilldown-overlay { position: fixed; inset: 0; background: rgba(4,7,14,.6); display: none; align-items: center; justify-content: center; z-index: 50; }
@@ -320,7 +349,40 @@
             </div>
         </header>
 
-        <div class="grid-main" id="grid"></div>
+        <div class="screens-viewport">
+            <div class="screens-track" id="screensTrack">
+                <div class="screen screen-main">
+                    <div class="grid-main" id="grid"></div>
+                </div>
+                <div class="screen screen-trends">
+                    <div class="trends-grid" id="trendsGrid">
+                        <div class="card trend-card">
+                            <h2>Core Builders</h2>
+                            <div class="chart-wrap"><canvas id="chart-cb"></canvas></div>
+                        </div>
+                        <div class="card trend-card">
+                            <h2>Back End <span class="hint">incluye SAP escaneado (aprox.)</span></h2>
+                            <div class="chart-wrap"><canvas id="chart-be"></canvas></div>
+                        </div>
+                        <div class="card trend-card">
+                            <h2>Clam Shells</h2>
+                            <div class="chart-wrap"><canvas id="chart-cs"></canvas></div>
+                        </div>
+                        <div class="card trend-card">
+                            <h2>Tube Mills</h2>
+                            <div class="chart-wrap"><canvas id="chart-tm"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="edge-arrow right-arrow" id="rightArrow" title="Ver tendencias por categoría">
+        <span class="arrow-icon">›</span>
+    </div>
+    <div class="edge-arrow left-arrow" id="leftArrow" title="Volver al dashboard" style="display:none;">
+        <span class="arrow-icon">‹</span>
     </div>
 
     <div class="drilldown-overlay" id="drilldownOverlay">
@@ -463,12 +525,13 @@
 
         if (isFirstRender) {
         grid.innerHTML = '';
-        snapshot.furnaces.filter(f => f.furnaceId <= 5).forEach(f => grid.appendChild(buildFurnaceCard(f)));
-        rebuildSixthSlot();
+        // Ahora se agregan las 6 cards directas (Furnace 1-5 + Tube Mills) — Tube Mills ya
+        // no alterna con nada, es una card fija más del grid.
+        snapshot.furnaces.forEach(f => grid.appendChild(buildFurnaceCard(f)));
         } else {
         snapshot.furnaces.forEach(f => updateFurnaceCard(f, isLiveUpdate));
-        updateTrendChart();
         }
+        if (currentScreen === 'trends') renderTrendsScreen();
         applySelection();
         }
 
@@ -569,9 +632,6 @@
         const barRight = Math.max(bar.x, bar.base);
         const y = bar.y;
 
-        // Con 0 piezas la barra prácticamente no tiene ancho, así que el "0%" y el
-        // "0/N piezas" quedan pegados y se encima el texto — mejor no dibujar el % ahí,
-        // el detalle de la derecha ya deja claro que va en 0.
         if (line.total > 0) {
         const oeeLabel = Math.round(line.oeeShift * 100) + '%';
         ctx.font = '800 15px Inter, sans-serif';
@@ -725,107 +785,94 @@
         refreshFurnaceCardDisplay(f);
         }
 
-        let sixthSlotShowing = 'trend';
-        const SIXTH_SLOT_ROTATE_MS = 15000;
+        // ---------------------------------------------------------------
+        // PANTALLA DE TENDENCIAS (flecha derecha del dashboard general): 4 gráficas, una
+        // por categoría (Core Builders / Back End / Clam Shells / Tube Mills), cada una con
+        // Producción/hora + Acumulado + Acumulado esperado — Back End además trae SAP
+        // escaneado (aproximado). Se navega 100% manual, nunca se mueve sola.
+        // ---------------------------------------------------------------
+        let currentScreen = 'main'; // 'main' | 'trends'
 
-        function buildSixthSlot() {
-        if (sixthSlotShowing === 'tubemills') {
-        const tm = snapshot.furnaces.find(f => f.furnaceId === 6);
-        if (tm) {
-        const el = buildFurnaceCard(tm);
-        el.classList.add('sixth-slot-marker');
-        return el;
-        }
-        }
-        const el = buildTrendCard();
-        el.classList.add('sixth-slot-marker');
-        return el;
-        }
-
-        function rebuildSixthSlot() {
-        const grid = document.getElementById('grid');
-        const old = grid.querySelector('.sixth-slot-marker');
-        if (charts.trend) { charts.trend.destroy(); delete charts.trend; }
-        if (charts.f6) { charts.f6.destroy(); delete charts.f6; }
-        if (old) old.remove();
-        grid.appendChild(buildSixthSlot());
+        function goToScreen(screen) {
+        currentScreen = screen;
+        document.getElementById('screensTrack').style.transform = screen === 'trends' ? 'translateX(-50%)' : 'translateX(0)';
+        document.getElementById('rightArrow').style.display = screen === 'main' ? 'flex' : 'none';
+        document.getElementById('leftArrow').style.display = screen === 'trends' ? 'flex' : 'none';
+        if (screen === 'trends') renderTrendsScreen();
         }
 
-        setInterval(() => {
-        sixthSlotShowing = sixthSlotShowing === 'trend' ? 'tubemills' : 'trend';
-        rebuildSixthSlot();
-        }, SIXTH_SLOT_ROTATE_MS);
+        document.getElementById('rightArrow').onclick = () => goToScreen('trends');
+        document.getElementById('leftArrow').onclick = () => goToScreen('main');
 
-        function buildTrendCard() {
-        const div = document.createElement('div');
-        div.className = 'card trend-card';
-        div.innerHTML = `<h2>Tendencia de Planta <span class="hint">Producción por hora + acumulado del turno</span></h2><div class="chart-wrap"><canvas id="chart-trend"></canvas></div>`;
-        setTimeout(() => { charts['trend'] = new Chart(document.getElementById('chart-trend'), trendConfig()); }, 0);
-        return div;
-        }
-
-        function cumulativeSeries() {
+        function categoryCumulative(trend, key) {
         let running = 0;
-        return snapshot.hourlyTrend.map(h => (running += h.production));
+        return trend.map(h => (running += (h[key] || 0)));
         }
 
-        function trendConfig() {
-        return {
-        data: {
-        labels: snapshot.hourlyTrend.map(h => h.hour),
-        datasets: [
+        function buildCategoryTrendConfig(trend, withSapLine) {
+        const datasets = [
         {
         type: 'bar', label: 'Producción / hora',
-        data: snapshot.hourlyTrend.map(h => h.production),
+        data: trend.map(h => h.production),
         backgroundColor: hexToRgba(getCss('--accent'), .55),
-        borderRadius: 6, maxBarThickness: 40, yAxisID: 'y', order: 2
+        borderRadius: 6, maxBarThickness: 40, yAxisID: 'y', order: 3
         },
         {
         type: 'line', label: 'Acumulado del turno',
-        data: cumulativeSeries(),
+        data: categoryCumulative(trend, 'production'),
         borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .12),
         fill: true, tension: .35, pointRadius: 3, pointBackgroundColor: getCss('--good'),
-        yAxisID: 'y1', order: 1
+        yAxisID: 'y1', order: 2
         },
         {
         type: 'line', label: 'Acumulado esperado a esta hora',
-        data: snapshot.hourlyTrend.map(h => h.expectedCumulative),
+        data: trend.map(h => h.expectedCumulative),
         borderColor: getCss('--warn'), backgroundColor: 'transparent',
         borderDash: [6, 4], tension: .35, pointRadius: 3, pointBackgroundColor: getCss('--warn'),
-        fill: false, yAxisID: 'y1', order: 0
+        fill: false, yAxisID: 'y1', order: 1
         }
-        ]
-        },
+        ];
+        if (withSapLine) {
+        datasets.push({
+        type: 'line', label: 'SAP escaneado (aprox.)',
+        data: categoryCumulative(trend, 'sapProduction'),
+        borderColor: getCss('--bad'), backgroundColor: 'transparent',
+        borderDash: [2, 3], tension: .35, pointRadius: 2, fill: false,
+        yAxisID: 'y1', order: 0
+        });
+        }
+        return {
+        data: { labels: trend.map(h => h.hour), datasets },
         options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
-        animation: { duration: 500 },
-        plugins: { legend: { labels: { color: getCss('--text-dim'), font: { size: 14, weight: '600' }, boxWidth: 14 } } },
+        animation: { duration: 400 },
+        plugins: { legend: { labels: { color: getCss('--text-dim'), font: { size: 11, weight: '600' }, boxWidth: 11 } } },
         scales: {
-        x: { ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
-        y: {
-        position: 'left', beginAtZero: true,
-        ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') },
-        title: { display: true, text: 'Piezas / hora', color: getCss('--text-faint'), font: { size: 13, weight: '600' } }
-        },
-        y1: {
-        position: 'right', beginAtZero: true,
-        ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { display: false },
-        title: { display: true, text: 'Acumulado del turno', color: getCss('--text-faint'), font: { size: 13, weight: '600' } }
-        }
+        x: { ticks: { color: getCss('--text-dim'), font: { size: 11 } }, grid: { color: getCss('--grid-line') } },
+        y: { position: 'left', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 11 } }, grid: { color: getCss('--grid-line') } },
+        y1: { position: 'right', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 11 } }, grid: { display: false } }
         }
         }
         };
         }
 
-        function updateTrendChart() {
-        const chart = charts['trend'];
-        if (!chart) return;
-        chart.data.labels = snapshot.hourlyTrend.map(h => h.hour);
-        chart.data.datasets[0].data = snapshot.hourlyTrend.map(h => h.production);
-        chart.data.datasets[1].data = cumulativeSeries();
-        chart.data.datasets[2].data = snapshot.hourlyTrend.map(h => h.expectedCumulative);
-        chart.update('none');
+        function renderTrendsScreen() {
+        const specs = [
+        { id: 'chart-cb', trend: snapshot.coreBuilderHourlyTrend || [], sap: false },
+        { id: 'chart-be', trend: snapshot.backEndHourlyTrend || [], sap: true },
+        { id: 'chart-cs', trend: snapshot.clamShellHourlyTrend || [], sap: false },
+        { id: 'chart-tm', trend: snapshot.tubeMillsHourlyTrend || [], sap: false }
+        ];
+        specs.forEach(spec => {
+        const cfg = buildCategoryTrendConfig(spec.trend, spec.sap);
+        if (charts[spec.id]) {
+        charts[spec.id].data = cfg.data;
+        charts[spec.id].update('none');
+        } else {
+        charts[spec.id] = new Chart(document.getElementById(spec.id), cfg);
+        }
+        });
         }
 
         function selectFurnace(id) {
@@ -929,6 +976,7 @@
         for (const k in charts) delete charts[k];
         document.getElementById('grid').innerHTML = '';
         render(false);
+        if (currentScreen === 'trends') renderTrendsScreen();
         };
         const savedTheme = localStorage.getItem('pm-theme');
         if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);

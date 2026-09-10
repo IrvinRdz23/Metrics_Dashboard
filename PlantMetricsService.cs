@@ -14,12 +14,11 @@ public interface IPlantMetricsService
 }
 
 /// <summary>
-/// Dashboard GENERAL. Furnaces incluye 1-5 (los que sí se muestran como card fija) y también
-/// Tube Mills al final (FurnaceId=6, solo para el 6to recuadro que alterna con la tendencia
-/// cada 15s) — pero TotalProduction/TotalPlanned/PlantOee siguen excluyendo Tube Mills (ver
-/// esas propiedades en PlantDashboardSnapshot). Ya no ejecuta el SP directamente: usa
-/// IMetricsRawDataService, que se comparte con IFurnaceDetailService para que el SP se
-/// llame una sola vez por ciclo.
+/// Dashboard GENERAL. Furnaces incluye 1-5 y Tube Mills (FurnaceId=6) al final — Tube Mills
+/// ahora es una card fija más del grid. TotalProduction/TotalPlanned/PlantOee siguen
+/// excluyendo Tube Mills (ver esas propiedades en PlantDashboardSnapshot). Ya no ejecuta el
+/// SP directamente: usa IMetricsRawDataService, compartido con IFurnaceDetailService para
+/// que el SP se llame una sola vez por ciclo.
 ///
 /// Desde que se agregó Heijunka: qué línea "cuenta" para OEE/producción/plan ya NO depende
 /// solo de Planned_Shift_for_OEE != 0 — se le pregunta a IHeijunkaService (Heijunka_Plan_List)
@@ -84,21 +83,11 @@ public class PlantMetricsService : IPlantMetricsService
         var linesIndex = new Dictionary<(int furnaceId, string desc), ProductLineMetric>();
         var productListIdLookup = rows.BuildProductListIdLookup();
 
-        // Mapeo Product_Group_ID -> horno (1..5), tomado del catálogo compartido, sin Tube Mills (7).
         var groupToFurnace = FurnaceCatalog.Map
             .Where(kv => kv.Key >= 1 && kv.Key <= 5)
             .SelectMany(kv => kv.Value.ProductGroupIds.Select(gid => (GroupId: gid, FurnaceId: kv.Key)))
             .ToDictionary(x => x.GroupId, x => x.FurnaceId);
 
-        // Se incluyen TODAS las líneas (incluso con Planned_Shift_for_OEE = 0) para poder
-        // mostrarlas en el detalle; FurnaceMetric ya se encarga de no contarlas en las
-        // estadísticas (ver CountedLines en el modelo).
-        //
-        // OJO: el SP a veces regresa la MISMA línea 2 veces (probablemente por su join interno
-        // a Heijunka_Plan_List, que ahora que esa tabla tiene datos reales para la semana
-        // puede estar generando un fan-out). Si ya vimos esta línea (mismo horno + mismo
-        // nombre), NO se agrega una segunda entrada — se actualiza la que ya existe con los
-        // datos más "reales" (el mayor Total/Plan de las dos filas), para nunca duplicar.
         foreach (var r in rows.Where(r => r.ReportGroup == 1 && groupToFurnace.ContainsKey(r.GroupId)))
         {
             var furnaceId = groupToFurnace[r.GroupId];
@@ -143,21 +132,12 @@ public class PlantMetricsService : IPlantMetricsService
             }
         }
 
-        var hourlyTotals = new Dictionary<string, int>();
-        foreach (var r in rows.Where(r => r.ReportGroup == 2 && groupToFurnace.ContainsKey(r.GroupId) && !string.IsNullOrWhiteSpace(r.Hour) && r.Hour != "-"))
-        {
-            hourlyTotals.TryGetValue(r.Hour, out var acc);
-            hourlyTotals[r.Hour] = acc + r.Total;
-        }
-
         foreach (var f in furnaces)
         {
             f.Lines = f.Lines.OrderBy(l => l.ProductOrder).ToList();
         }
 
-        // ---------- Tube Mills como Furnace #6 (para el 6to recuadro del grid, que alterna con
-        // la tendencia cada 15s, y para el modal si le dan clic) — nunca cuenta en TotalProduction/
-        // TotalPlanned/PlantOee (ver esas propiedades en el modelo, ya filtran FurnaceId<=5). ----------
+        // ---------- Tube Mills como Furnace #6 — ya es una card fija más del grid. ----------
         var tubeMills = new FurnaceMetric { FurnaceId = 6, FurnaceName = "Tube Mills" };
         var tubeMillsLinesIndex = new Dictionary<string, ProductLineMetric>();
         foreach (var r in rows.Where(r => r.ReportGroup == 1 && r.GroupId == 7))
@@ -198,10 +178,7 @@ public class PlantMetricsService : IPlantMetricsService
         tubeMills.Lines = tubeMills.Lines.OrderBy(l => l.ProductOrder).ToList();
         furnaces.Add(tubeMills);
 
-        // ---------- HEIJUNKA: se resuelve UNA vez para todas las líneas (Furnace 1-5 + Tube
-        // Mills) con un solo batch, y se le pega el resultado a cada ProductLineMetric. Si
-        // Heijunka no tiene datos para la semana vigente, todas quedan en null y cada línea
-        // cae sola al criterio viejo (ver ProductLineMetric.CountsForStats). ----------
+        // ---------- HEIJUNKA ----------
         var effectiveDate = forDate ?? DateTime.Today;
         var shiftId = rows.FirstOrDefault(r => r.ReportGroup == 1)?.ShiftId ?? 0;
         var allLines = furnaces.SelectMany(f => f.Lines).ToList();
@@ -214,11 +191,6 @@ public class PlantMetricsService : IPlantMetricsService
         }
 
         // ---------- Carrusel de la barra superior: Core Builders / Back End / Clam Shells / Tube Mills ----------
-        // Ahora se clasifica por LineSegment (Product_Group_ID primero: 6=Clam Shells,
-        // 7=Tube Mills; el resto por el texto del nombre, igual que SapRules) en vez de solo
-        // el texto — así Clam Shells sale SIEMPRE aparte de Core Builders, aunque su nombre
-        // también contuviera "CB". El OEE de cada grupo solo promedia líneas con producción
-        // > 0 (mismo criterio que en FurnaceMetric.Oee).
         var furnace1to5Lines = furnaces.Where(f => f.FurnaceId <= 5).SelectMany(f => f.Lines).Where(l => l.CountsForStats).ToList();
         var coreBuilderLines = furnace1to5Lines.Where(l => l.Segment == LineSegment.CoreBuilder).ToList();
         var backEndLines = furnace1to5Lines.Where(l => l.Segment == LineSegment.BackEnd).ToList();
@@ -237,13 +209,66 @@ public class PlantMetricsService : IPlantMetricsService
             };
         }
 
-        var topKpiGroups = new List<KpiGroup>
+        var coreBuilderKpi = BuildKpiGroup("Core Builders", coreBuilderLines);
+        var backEndKpi = BuildKpiGroup("Back End", backEndLines);
+        var clamShellKpi = BuildKpiGroup("Clam Shells", clamShellLines);
+        var tubeMillsKpi = BuildKpiGroup("Tube Mills", tubeMillsLines);
+
+        var topKpiGroups = new List<KpiGroup> { coreBuilderKpi, backEndKpi, clamShellKpi, tubeMillsKpi };
+
+        // ---------- Tendencia por hora — general (se deja calculada, ya no se muestra en el
+        // grid) y las 4 por categoría, para la pantalla de tendencias (flecha del borde derecho). ----------
+        var hourlyTotals = new Dictionary<string, int>();
+        var hourlyBySegment = new Dictionary<string, Dictionary<string, int>>
         {
-            BuildKpiGroup("Core Builders", coreBuilderLines),
-            BuildKpiGroup("Back End", backEndLines),
-            BuildKpiGroup("Clam Shells", clamShellLines),
-            BuildKpiGroup("Tube Mills", tubeMillsLines)
+            [LineSegment.CoreBuilder] = new(),
+            [LineSegment.BackEnd] = new(),
+            [LineSegment.ClamShell] = new(),
+            [LineSegment.TubeMills] = new()
         };
+
+        foreach (var r in rows.Where(r => r.ReportGroup == 2 && !string.IsNullOrWhiteSpace(r.Hour) && r.Hour != "-"))
+        {
+            string? segment = null;
+            if (r.GroupId == 7) segment = LineSegment.TubeMills;
+            else if (groupToFurnace.ContainsKey(r.GroupId)) segment = LineSegment.Classify(r.GroupId, r.Desc);
+            if (segment == null) continue;
+
+            if (segment != LineSegment.TubeMills)
+            {
+                hourlyTotals.TryGetValue(r.Hour, out var plantAcc);
+                hourlyTotals[r.Hour] = plantAcc + r.Total;
+            }
+
+            var dict = hourlyBySegment[segment];
+            dict.TryGetValue(r.Hour, out var acc);
+            dict[r.Hour] = acc + r.Total;
+        }
+
+        List<HourlyPoint> BuildSegmentTrend(string segment, int segmentTotalPlanned)
+        {
+            var trend = hourlyBySegment[segment].Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList();
+            trend = ShiftTimeHelper.SortByShiftElapsed(trend, shiftDesc);
+            ShiftTimeHelper.ApplyExpectedCumulative(trend, shiftDesc, ShiftTimeHelper.GetDurationHours(shiftDesc), segmentTotalPlanned, isLiveToday);
+            return trend;
+        }
+
+        var coreBuilderTrend = BuildSegmentTrend(LineSegment.CoreBuilder, coreBuilderKpi.TotalPlanned);
+        var backEndTrend = BuildSegmentTrend(LineSegment.BackEnd, backEndKpi.TotalPlanned);
+        var clamShellTrend = BuildSegmentTrend(LineSegment.ClamShell, clamShellKpi.TotalPlanned);
+        var tubeMillsTrend = BuildSegmentTrend(LineSegment.TubeMills, tubeMillsKpi.TotalPlanned);
+
+        // SAP escaneado por hora de Back End — aproximado (ver comentario en HourlyPoint.SapProduction):
+        // se reparte el SAP total del día proporcional a cuánto se produjo cada hora.
+        var backEndTotalSap = backEndLines.Sum(l => l.TotalSap);
+        var backEndTotalProdForSap = backEndTrend.Sum(h => h.Production);
+        if (backEndTotalProdForSap > 0)
+        {
+            foreach (var point in backEndTrend)
+            {
+                point.SapProduction = (int)Math.Round((double)point.Production / backEndTotalProdForSap * backEndTotalSap);
+            }
+        }
 
         var hourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList();
         hourlyTrend = ShiftTimeHelper.SortByShiftElapsed(hourlyTrend, shiftDesc);
@@ -256,6 +281,10 @@ public class PlantMetricsService : IPlantMetricsService
             ShiftDurationHours = ShiftTimeHelper.GetDurationHours(shiftDesc),
             Furnaces = furnaces,
             HourlyTrend = hourlyTrend,
+            CoreBuilderHourlyTrend = coreBuilderTrend,
+            BackEndHourlyTrend = backEndTrend,
+            ClamShellHourlyTrend = clamShellTrend,
+            TubeMillsHourlyTrend = tubeMillsTrend,
             TopKpiGroups = topKpiGroups
         };
     }
@@ -268,6 +297,10 @@ public class PlantMetricsService : IPlantMetricsService
             .Append(new FurnaceMetric { FurnaceId = 6, FurnaceName = "Tube Mills" })
             .ToList(),
         HourlyTrend = new List<HourlyPoint>(),
+        CoreBuilderHourlyTrend = new List<HourlyPoint>(),
+        BackEndHourlyTrend = new List<HourlyPoint>(),
+        ClamShellHourlyTrend = new List<HourlyPoint>(),
+        TubeMillsHourlyTrend = new List<HourlyPoint>(),
         TopKpiGroups = new List<KpiGroup>
         {
             new() { Label = "Core Builders" },
