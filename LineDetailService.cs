@@ -11,7 +11,7 @@ public interface ILineDetailService
     Task<LineDetailSnapshot> GetHistoricalSnapshotAsync(int lineId, DateTime date, int shiftId, CancellationToken ct = default);
 
     /// <summary>Construye el snapshot de una línea a partir de filas ya obtenidas (sin volver a golpear el SP).</summary>
-    Task<LineDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int lineId, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default);
+    Task<LineDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int lineId, CancellationToken ct = default, bool isLiveToday = true, DateTime? forDate = null);
 }
 
 /// <summary>
@@ -68,7 +68,7 @@ public class LineDetailService : ILineDetailService
         }
     }
 
-    public async Task<LineDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int lineId, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default)
+    public async Task<LineDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int lineId, CancellationToken ct = default, bool isLiveToday = true, DateTime? forDate = null)
     {
         var idLookup = rows.BuildProductListIdLookup();
 

@@ -11,7 +11,7 @@ public interface IFurnaceDetailService
     Task<FurnaceDetailSnapshot> GetHistoricalSnapshotAsync(int furnaceId, DateTime date, int shiftId, CancellationToken ct = default);
 
     /// <summary>Construye el snapshot de un horno a partir de filas ya obtenidas (sin volver a golpear el SP).</summary>
-    Task<FurnaceDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int furnaceId, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default);
+    Task<FurnaceDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int furnaceId, CancellationToken ct = default, bool isLiveToday = true, DateTime? forDate = null);
 }
 
 /// <summary>
@@ -72,7 +72,7 @@ public class FurnaceDetailService : IFurnaceDetailService
         }
     }
 
-    public async Task<FurnaceDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int furnaceId, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default)
+    public async Task<FurnaceDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int furnaceId, CancellationToken ct = default, bool isLiveToday = true, DateTime? forDate = null)
     {
         if (!FurnaceCatalog.Map.TryGetValue(furnaceId, out var info))
         {
