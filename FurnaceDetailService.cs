@@ -4,11 +4,14 @@ namespace Metrics_Dashboard.Services;
 
 public interface IFurnaceDetailService
 {
-    /// <summary>Snapshot completo de un horno (o Tube Mills con furnaceId=6), llamando al SP.</summary>
+    /// <summary>Snapshot completo de un horno (o Tube Mills con furnaceId=6), llamando al SP, EN VIVO.</summary>
     Task<FurnaceDetailSnapshot> GetSnapshotAsync(int furnaceId, CancellationToken ct = default);
 
+    /// <summary>Snapshot histórico de un horno para un día pasado + turno específico.</summary>
+    Task<FurnaceDetailSnapshot> GetHistoricalSnapshotAsync(int furnaceId, DateTime date, int shiftId, CancellationToken ct = default);
+
     /// <summary>Construye el snapshot de un horno a partir de filas ya obtenidas (sin volver a golpear el SP).</summary>
-    Task<FurnaceDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int furnaceId, CancellationToken ct = default);
+    Task<FurnaceDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int furnaceId, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -22,6 +25,11 @@ public interface IFurnaceDetailService
 /// no tiene datos esa semana). Ver ProductLineMetric.CountsForStats. La separación Core
 /// Builder/Back End/Clam Shells/Tube Mills vive en el modelo (FurnaceDetailSnapshot) — aquí
 /// solo hace falta pegarle GroupId a cada línea para que esa clasificación funcione.
+///
+/// Ahora soporta histórico (mismo patrón que PlantMetricsService): GetHistoricalSnapshotAsync
+/// usa FetchHistoricalRowsAsync en vez de FetchCurrentShiftRowsAsync, y BuildFromRowsAsync
+/// recibe isLiveToday/forDate para que Heijunka y el acumulado esperado usen la fecha
+/// correcta en vez de "hoy" a fuerzas.
 /// </summary>
 public class FurnaceDetailService : IFurnaceDetailService
 {
@@ -41,7 +49,7 @@ public class FurnaceDetailService : IFurnaceDetailService
         try
         {
             var (rows, shiftDesc) = await _rawDataService.FetchCurrentShiftRowsAsync(ct);
-            return await BuildFromRowsAsync(rows, shiftDesc, furnaceId, ct);
+            return await BuildFromRowsAsync(rows, shiftDesc, furnaceId, ct: ct);
         }
         catch (Exception ex)
         {
@@ -50,7 +58,21 @@ public class FurnaceDetailService : IFurnaceDetailService
         }
     }
 
-    public async Task<FurnaceDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int furnaceId, CancellationToken ct = default)
+    public async Task<FurnaceDetailSnapshot> GetHistoricalSnapshotAsync(int furnaceId, DateTime date, int shiftId, CancellationToken ct = default)
+    {
+        try
+        {
+            var (rows, shiftDesc) = await _rawDataService.FetchHistoricalRowsAsync(date, shiftId, ct);
+            return await BuildFromRowsAsync(rows, shiftDesc, furnaceId, isLiveToday: false, forDate: date, ct: ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo histórico del horno {FurnaceId} de {Date} turno {ShiftId}", furnaceId, date, shiftId);
+            return EmptySnapshot(furnaceId);
+        }
+    }
+
+    public async Task<FurnaceDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int furnaceId, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default)
     {
         if (!FurnaceCatalog.Map.TryGetValue(furnaceId, out var info))
         {
@@ -116,28 +138,36 @@ public class FurnaceDetailService : IFurnaceDetailService
             }
         }
 
-        var hourlyTotals = new Dictionary<string, int>();
-        foreach (var r in rows.Where(r => r.ReportGroup == 2 && groupIds.Contains(r.GroupId) && !string.IsNullOrWhiteSpace(r.Hour) && r.Hour != "-"))
-        {
-            hourlyTotals.TryGetValue(r.Hour, out var acc);
-            hourlyTotals[r.Hour] = acc + r.Total;
-        }
-
         snapshot.Lines = snapshot.Lines.OrderBy(l => l.ProductOrder).ToList();
 
-        // ---------- HEIJUNKA: siempre en vivo (no hay vista histórica de horno todavía) ----------
-        var today = DateTime.Today;
+        // ---------- HEIJUNKA ----------
+        // Se mueve ANTES del cálculo de tendencia por hora (ver abajo) — así se puede filtrar
+        // la producción NO planeada de la gráfica de Acumulado/Acumulado esperado (punto 5).
+        var effectiveDate = forDate ?? DateTime.Today;
         var shiftId = rows.FirstOrDefault(r => r.ReportGroup == 1)?.ShiftId ?? 0;
         var heijunkaResults = await _heijunkaService.IsPlannedBatchAsync(
-            snapshot.Lines.Select(l => l.ProductListId).Where(id => id > 0), today, shiftId, ct);
+            snapshot.Lines.Select(l => l.ProductListId).Where(id => id > 0), effectiveDate, shiftId, ct);
         foreach (var line in snapshot.Lines)
         {
             line.HeijunkaPlanned = heijunkaResults.TryGetValue(line.ProductListId, out var planned) ? planned : null;
         }
 
+        // ---------- Tendencia por hora ----------
+        // Solo cuenta la producción de líneas que SÍ tenían plan este turno (CountsForStats,
+        // Heijunka con respaldo al criterio viejo) — antes se sumaba TODO Report_Group=2 sin
+        // filtrar, así que la producción no planeada inflaba el Acumulado y el Acumulado
+        // esperado. Se filtra vía linesIndex (ya trae CountsForStats resuelto arriba).
+        var hourlyTotals = new Dictionary<string, int>();
+        foreach (var r in rows.Where(r => r.ReportGroup == 2 && groupIds.Contains(r.GroupId) && !string.IsNullOrWhiteSpace(r.Hour) && r.Hour != "-"))
+        {
+            if (!linesIndex.TryGetValue(r.Desc, out var line) || !line.CountsForStats) continue;
+            hourlyTotals.TryGetValue(r.Hour, out var acc);
+            hourlyTotals[r.Hour] = acc + r.Total;
+        }
+
         snapshot.HourlyTrend = ShiftTimeHelper.SortByShiftElapsed(
             hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList(), shiftDesc);
-        ShiftTimeHelper.ApplyExpectedCumulative(snapshot.HourlyTrend, shiftDesc, snapshot.ShiftDurationHours, snapshot.TotalPlanned);
+        ShiftTimeHelper.ApplyExpectedCumulative(snapshot.HourlyTrend, shiftDesc, snapshot.ShiftDurationHours, snapshot.TotalPlanned, isLiveToday);
 
         return snapshot;
     }

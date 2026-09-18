@@ -59,6 +59,7 @@
         .brand-text .subtitle { color: var(--text-dim); font-size: clamp(.78rem, .9vw, .95rem); display: flex; align-items: center; gap: 8px; margin-top: 3px; font-weight: 600; }
 
         .shift-badge { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border); padding: 3px 11px; border-radius: 999px; font-size: clamp(.68rem, .8vw, .85rem); font-weight: 700; letter-spacing: .3px; }
+        .historical-badge { background: var(--no-plan-bg); color: var(--no-plan-text); border: 1px solid var(--no-plan-border); padding: 3px 11px; border-radius: 999px; font-size: clamp(.68rem, .8vw, .85rem); font-weight: 800; letter-spacing: .3px; }
 
         /* ---------- SEGMENTOS DEL HEADER (item 6): Core Builder / Back End (+SAP) / Clam
         Shells (solo Furnace 1) / Tube Mills (solo su propia página, sin split ni SAP) ---------- */
@@ -81,6 +82,12 @@
         }
         .btn:hover { background: var(--card-hover); border-color: var(--furnace-color); }
 
+        .historical-picker { display: flex; align-items: center; gap: 6px; }
+        .historical-picker input, .historical-picker select {
+        background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
+        padding: 6px 9px; font-size: clamp(.74rem, .84vw, .88rem); font-weight: 600; font-family: 'Inter', sans-serif;
+        }
+
         /* ---------- BODY ---------- */
         .body-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: clamp(10px, 1vw, 16px); min-height: 0; }
 
@@ -102,12 +109,12 @@
         .lines-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: clamp(6px, .8vh, 10px); padding-right: 3px; }
 
         .line-row {
-        display: grid; grid-template-columns: minmax(140px, 260px) 1fr 110px; align-items: center; gap: clamp(10px, 1.4vw, 20px);
-        background: var(--bg); border: 1px solid var(--border-soft); border-radius: 11px; padding: clamp(8px, .9vh, 12px) clamp(12px, 1.2vw, 18px);
-        flex: 1 1 0; min-height: 40px; transition: background .8s ease;
+        display: grid; grid-template-columns: minmax(150px, 280px) 1fr 120px; align-items: center; gap: clamp(10px, 1.4vw, 20px);
+        background: var(--bg); border: 1px solid var(--border-soft); border-radius: 11px; padding: clamp(9px, 1vh, 13px) clamp(12px, 1.2vw, 18px);
+        flex: 1 1 0; min-height: 44px; transition: background .8s ease;
         }
         .line-row.flash { background: var(--flash); }
-        .line-row .line-name { font-size: clamp(.85rem, 1.02vw, 1.1rem); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .line-row .line-name { font-size: clamp(.95rem, 1.15vw, 1.25rem); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .line-link { color: inherit; text-decoration: none; border-bottom: 1px dashed var(--border); }
         .line-link:hover { color: var(--furnace-color); border-bottom-color: var(--furnace-color); }
@@ -115,19 +122,19 @@
         a.no-prod-chip { text-decoration: none; cursor: pointer; }
         a.no-prod-chip:hover { background: var(--no-plan-border); color: #fff; }
 
-        .line-row .line-plan { font-size: clamp(.72rem, .82vw, .88rem); color: var(--text-faint); text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+        .line-row .line-plan { font-size: clamp(.8rem, .92vw, 1rem); color: var(--text-faint); text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; }
 
         .line-bar-area { display: flex; align-items: center; gap: clamp(8px, 1vw, 14px); min-width: 0; }
-        .line-bar-track { flex: 1; height: clamp(22px, 2.6vh, 32px); border-radius: 7px; background: var(--grid-line); overflow: hidden; position: relative; min-width: 0; }
+        .line-bar-track { flex: 1; height: clamp(26px, 3vh, 38px); border-radius: 8px; background: var(--grid-line); overflow: hidden; position: relative; min-width: 0; }
         .target-marker { position: absolute; top: -2px; bottom: -2px; width: 0; border-left: 2px dashed rgba(255,255,255,.55); z-index: 2; }
-        .line-bar-fill { height: 100%; border-radius: 7px; display: flex; align-items: center; padding-left: 9px; transition: width .5s ease; }
-        .line-bar-fill span { font-size: clamp(.78rem, .92vw, 1rem); font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
-        .line-bar-detail { font-size: clamp(.72rem, .82vw, .88rem); color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-weight: 700; white-space: nowrap; min-width: 88px; }
+        .line-bar-fill { height: 100%; border-radius: 8px; display: flex; align-items: center; padding-left: 10px; transition: width .5s ease; }
+        .line-bar-fill span { font-size: clamp(.95rem, 1.1vw, 1.25rem); font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+        .line-bar-detail { font-size: clamp(.86rem, 1vw, 1.1rem); color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-weight: 800; white-space: nowrap; min-width: 100px; }
 
         .line-row.unplanned-line-row { border-color: var(--bad); background: rgba(255,107,120,0.06); }
         .unplanned-badge {
-        flex: 1; height: clamp(22px, 2.6vh, 32px); border-radius: 7px; display: flex; align-items: center; padding-left: 12px;
-        background: rgba(255,107,120,0.14); border: 1px dashed var(--bad); color: var(--bad); font-size: clamp(.74rem, .88vw, .95rem); font-weight: 800; letter-spacing: .3px;
+        flex: 1; height: clamp(26px, 3vh, 38px); border-radius: 8px; display: flex; align-items: center; padding-left: 12px;
+        background: rgba(255,107,120,0.14); border: 1px dashed var(--bad); color: var(--bad); font-size: clamp(.82rem, .96vw, 1.05rem); font-weight: 800; letter-spacing: .3px;
         }
 
         .no-prod-section { flex: 0 0 auto; margin-top: clamp(8px, 1vh, 12px); padding-top: clamp(8px, 1vh, 12px); border-top: 2px dashed var(--border); }
@@ -145,11 +152,11 @@
         .mini-stats-card { flex: 0 0 auto; }
         .mini-stats-row { display: flex; gap: clamp(10px, 1.4vw, 20px); }
         .mini-stat { text-align: center; flex: 1; }
-        .mini-stat .v { font-size: clamp(1.3rem, 1.8vw, 2rem); font-weight: 900; font-family: 'JetBrains Mono', monospace; line-height: 1; }
-        .mini-stat .l { font-size: clamp(.6rem, .7vw, .76rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .4px; font-weight: 700; margin-top: 4px; }
+        .mini-stat .v { font-size: clamp(1.5rem, 2.1vw, 2.4rem); font-weight: 900; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+        .mini-stat .l { font-size: clamp(.62rem, .72vw, .8rem); color: var(--text-faint); text-transform: uppercase; letter-spacing: .4px; font-weight: 700; margin-top: 4px; }
 
         .chips-card { flex: 0 0 auto; }
-        .chip-row { display: flex; justify-content: space-between; align-items: center; padding: clamp(5px, .7vh, 8px) 0; border-bottom: 1px solid var(--border-soft); font-size: clamp(.78rem, .92vw, 1rem); }
+        .chip-row { display: flex; justify-content: space-between; align-items: center; padding: clamp(5px, .7vh, 8px) 0; border-bottom: 1px solid var(--border-soft); font-size: clamp(.86rem, 1vw, 1.1rem); }
         .chip-row:last-child { border-bottom: none; }
         .chip-row .k { color: var(--text-dim); font-weight: 600; }
         .chip-row .v { font-weight: 800; font-family: 'JetBrains Mono', monospace; }
@@ -170,10 +177,17 @@
                     <div class="subtitle">
                         <span id="dateLabel"></span>
                         <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
-                        <span style="display:flex;align-items:center;gap:6px;">
-                            <span class="live-dot"></span>
-                            <span id="lastUpdate">--:--</span>
-                        </span>
+                        @if (IsHistorical)
+                        {
+                            <span class="historical-badge">📅 Histórico</span>
+                        }
+                        else
+                        {
+                            <span style="display:flex;align-items:center;gap:6px;">
+                                <span class="live-dot"></span>
+                                <span id="lastUpdate">--:--</span>
+                            </span>
+                        }
                     </div>
                 </div>
             </div>
@@ -181,7 +195,23 @@
             <div class="segments-row" id="segmentsRow"></div>
 
             <div class="header-actions controls-collapsible">
-                <a class="btn" href="/Dashboard" title="Volver al dashboard general">📊 General</a>
+                @if (IsHistorical)
+                {
+                    <form class="historical-picker" id="historicalPicker" method="get" action="@Context.Request.Path">
+                        <input type="date" id="pickerDate" name="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        <select id="pickerShift" name="shiftId">
+                            <option value="1">Turno 1</option>
+                            <option value="2">Turno 2</option>
+                            <option value="3">Turno 3</option>
+                        </select>
+                        <button type="submit" class="btn">Ver</button>
+                    </form>
+                    <a class="btn" href="/Dashboard/Historical?date=@HistoricalDateStr&shiftId=@HistoricalShiftId" title="Volver al histórico general">📅 Histórico general</a>
+                }
+                else
+                {
+                    <a class="btn" href="/Dashboard" title="Volver al dashboard general">📊 General</a>
+                }
                 <button class="btn" id="toggleTheme">🌗</button>
                 <button class="btn" id="togglePresentation">🖥️</button>
             </div>
@@ -225,6 +255,8 @@
     <script>
         let snapshot = @Html.Raw(Json.Serialize(Model));
         const FURNACE_ID = @Model.FurnaceId;
+        const IS_HISTORICAL = @(IsHistorical ? "true" : "false");
+        const HIST_QS = IS_HISTORICAL ? `?date=@HistoricalDateStr&shiftId=@HistoricalShiftId` : '';
         const charts = {};
 
         function oeeColor(oee) {
@@ -241,7 +273,16 @@
         }
         function pct(v) { return (v * 100).toFixed(0) + '%'; }
 
-        document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+        document.getElementById('dateLabel').textContent = IS_HISTORICAL
+        ? new Date(snapshot.generatedAt).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+        : new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+
+        if (IS_HISTORICAL) {
+        const pickerDate = document.getElementById('pickerDate');
+        const pickerShift = document.getElementById('pickerShift');
+        if (pickerDate) pickerDate.value = '@HistoricalDateStr';
+        if (pickerShift) pickerShift.value = '@HistoricalShiftId';
+        }
 
         // ---------------------------------------------------------------
         // SEGMENTOS DEL HEADER (item 6): Tube Mills (furnaceId=6) solo se ve a sí mismo, sin
@@ -283,7 +324,9 @@
         document.getElementById('prodVal').textContent = snapshot.totalProduction.toLocaleString();
         document.getElementById('remVal').textContent = snapshot.remainingToPlan.toLocaleString();
         document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
+        if (!IS_HISTORICAL) {
         document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+        }
         document.getElementById('linesCountChip').textContent = snapshot.lines.length + ' líneas';
         document.getElementById('activeLinesVal').textContent = snapshot.linesWithProduction + ' / ' + snapshot.lines.length;
         document.getElementById('noProdVal').textContent = snapshot.linesWithoutProduction;
@@ -300,6 +343,8 @@
         renderTrend();
         }
 
+        // Los links a /Line/{id} cargan la fecha/turno histórico actual (HIST_QS), así se
+        // navega manteniendo el mismo día/turno en vez de caer siempre a "en vivo".
         function renderLinesList(isLiveUpdate) {
         const active = snapshot.lines.filter(l => l.total > 0 && !l.isUnplannedProduction).sort((a, b) => a.productOrder - b.productOrder);
         const unplanned = snapshot.lines.filter(l => l.isUnplannedProduction).sort((a, b) => a.productOrder - b.productOrder);
@@ -313,7 +358,7 @@
         const changed = isLiveUpdate && prevTotalByDesc[l.productDesc] !== undefined && prevTotalByDesc[l.productDesc] !== String(l.total);
         return `
         <div class="line-row ${changed ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
-        <div class="line-name" title="${l.productDesc}">${l.productListId > 0 ? `<a href="/Line/${l.productListId}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>` : l.productDesc}</div>
+        <div class="line-name" title="${l.productDesc}">${l.productListId > 0 ? `<a href="/Line/${l.productListId}${HIST_QS}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>` : l.productDesc}</div>
         <div class="line-bar-area">
         <div class="line-bar-track">
         <div class="target-marker" style="left:85%"></div>
@@ -331,7 +376,7 @@
         const changed = isLiveUpdate && prevTotalByDesc[l.productDesc] !== undefined && prevTotalByDesc[l.productDesc] !== String(l.total);
         return `
         <div class="line-row unplanned-line-row ${changed ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
-        <div class="line-name" title="${l.productDesc}">${l.productListId > 0 ? `<a href="/Line/${l.productListId}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>` : l.productDesc}</div>
+        <div class="line-name" title="${l.productDesc}">${l.productListId > 0 ? `<a href="/Line/${l.productListId}${HIST_QS}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>` : l.productDesc}</div>
         <div class="line-bar-area">
         <div class="unplanned-badge">⚠ PRODUCCIÓN NO PLANEADA</div>
         <span class="line-bar-detail">${l.total.toLocaleString()} piezas</span>
@@ -354,7 +399,7 @@
         document.getElementById('noProdCount').textContent = `(${inactive.length})`;
         document.getElementById('noProdChips').innerHTML = inactive
         .map(l => l.productListId > 0
-        ? `<a href="/Line/${l.productListId}" class="no-prod-chip" title="Ver TV de esta línea">${l.productDesc}</a>`
+        ? `<a href="/Line/${l.productListId}${HIST_QS}" class="no-prod-chip" title="Ver TV de esta línea">${l.productDesc}</a>`
         : `<span class="no-prod-chip" title="SIN PRODUCCIÓN EN EL TURNO">${l.productDesc}</span>`)
         .join('');
         }
@@ -418,6 +463,7 @@
         setTimeout(() => Object.values(charts).forEach(c => c && c.resize()), 260);
         };
 
+        if (!IS_HISTORICAL) {
         const connection = new signalR.HubConnectionBuilder()
         .withUrl('/hubs/metrics')
         .withAutomaticReconnect()
@@ -432,6 +478,7 @@
         connection.start()
         .then(() => connection.invoke('JoinFurnace', FURNACE_ID))
         .catch(err => console.error('SignalR error:', err));
+        }
 
         render(false);
     </script>
@@ -448,4 +495,8 @@
         6 => "#64748b",
         _ => "#4da3ff"
     };
+
+    bool IsHistorical => ViewData["IsHistorical"] as bool? ?? false;
+    string HistoricalDateStr => ViewData["HistoricalDate"] as string ?? "";
+    int HistoricalShiftId => ViewData["HistoricalShiftId"] as int? ?? 1;
 }

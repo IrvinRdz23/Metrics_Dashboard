@@ -95,6 +95,7 @@
     .brand-text h1 { font-size: clamp(1.4rem, 2.3vw, 2.5rem); margin: 0; font-weight: 900; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .brand-text .subtitle { color: var(--text-dim); font-size: clamp(.85rem, 1vw, 1.05rem); display: flex; align-items: center; gap: 10px; margin-top: 4px; font-weight: 600; }
     .shift-badge { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border); padding: 3px 12px; border-radius: 999px; font-size: clamp(.72rem, .85vw, .9rem); font-weight: 700; letter-spacing: .3px; }
+    .historical-badge { background: var(--no-plan-bg); color: var(--no-plan-text); border: 1px solid var(--no-plan-border); padding: 3px 12px; border-radius: 999px; font-size: clamp(.72rem, .85vw, .9rem); font-weight: 800; letter-spacing: .3px; }
 
     .header-right { display: flex; align-items: center; gap: clamp(16px, 2vw, 30px); flex-shrink: 0; }
     .live-block { display: flex; align-items: center; gap: 8px; }
@@ -110,6 +111,12 @@
         display: flex; align-items: center; gap: 7px; transition: background .15s, border-color .15s;
     }
     .btn:hover { background: var(--card-hover); border-color: var(--furnace-color); }
+
+    .historical-picker { display: flex; align-items: center; gap: 6px; }
+    .historical-picker input, .historical-picker select {
+        background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
+        padding: 8px 10px; font-size: clamp(.78rem, .9vw, .95rem); font-weight: 600; font-family: 'Inter', sans-serif;
+    }
 
     /* ---------- BODY ---------- */
     .body-grid { display: grid; grid-template-rows: 1.15fr auto 1fr; gap: clamp(10px, 1.1vh, 16px); min-height: 0; }
@@ -232,20 +239,39 @@
                 <div class="subtitle">
                     <span>@Model.FurnaceName</span>
                     <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
+                    @if (IsHistorical)
+                    {
+                        <span class="historical-badge">📅 Histórico</span>
+                    }
                 </div>
             </div>
         </div>
 
         <div class="header-right">
-            <div class="live-block">
-                <span class="live-dot"></span>
-                <div>
-                    <div class="value" id="lastUpdate">--:--</div>
-                    <div class="label">Actualizado</div>
+            @if (!IsHistorical)
+            {
+                <div class="live-block">
+                    <span class="live-dot"></span>
+                    <div>
+                        <div class="value" id="lastUpdate">--:--</div>
+                        <div class="label">Actualizado</div>
+                    </div>
                 </div>
-            </div>
+            }
             <div class="header-actions controls-collapsible">
-                <a class="btn" href="@FurnaceHref(Model.FurnaceId)" title="Volver al horno">📊 @Model.FurnaceName</a>
+                @if (IsHistorical)
+                {
+                    <form class="historical-picker" id="historicalPicker" method="get" action="@Context.Request.Path">
+                        <input type="date" id="pickerDate" name="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" value="@HistoricalDateStr" />
+                        <select id="pickerShift" name="shiftId">
+                            <option value="1">Turno 1</option>
+                            <option value="2">Turno 2</option>
+                            <option value="3">Turno 3</option>
+                        </select>
+                        <button type="submit" class="btn">Ver</button>
+                    </form>
+                }
+                <a class="btn" href="@FurnaceHref(Model.FurnaceId)@(IsHistorical ? $"?date={HistoricalDateStr}&shiftId={HistoricalShiftId}" : "")" title="Volver al horno">📊 @Model.FurnaceName</a>
                 <button class="btn" id="toggleTheme">🌗 Tema</button>
                 <button class="btn" id="togglePresentation">🖥️ Presentación</button>
             </div>
@@ -258,6 +284,7 @@
 <script>
     let snapshot = @Html.Raw(Json.Serialize(Model));
     const LINE_ID = @Model.ProductListId;
+    const IS_HISTORICAL = @(IsHistorical ? "true" : "false");
     const charts = {};
 
     function oeeColor(oee) {
@@ -277,7 +304,9 @@
     function render() {
         document.getElementById('lineTitle').textContent = snapshot.productDesc;
         document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
-        document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+        if (!IS_HISTORICAL) {
+            document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+        }
 
         const grid = document.getElementById('bodyGrid');
 
@@ -454,14 +483,6 @@
         });
     }
 
-    // ---------------------------------------------------------------
-    // TIEMPO DE CICLO: REAL (aprox. por hora) vs. TEÓRICO (Cycle_Time_Secs) vs. TU PROMEDIO
-    // del turno (línea de referencia, ya sin la banda de ±1 desviación estándar — se quitó
-    // porque no aportaba). La hora EN CURSO ya viene prorrateada del lado del servidor (no
-    // asume que la hora completa ya pasó), y el tooltip ahora muestra los segundos
-    // disponibles usados y si esa hora sigue corriendo, para que se entienda de dónde sale
-    // cada número.
-    // ---------------------------------------------------------------
     function renderCycleTimeChart() {
         const canvas = document.getElementById('cycleTimeChart');
         if (!canvas) return;
@@ -568,20 +589,22 @@
         setTimeout(() => Object.values(charts).forEach(c => c && c.resize()), 260);
     };
 
-    const connection = new signalR.HubConnectionBuilder()
-        .withUrl('/hubs/metrics')
-        .withAutomaticReconnect()
-        .build();
+    if (!IS_HISTORICAL) {
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl('/hubs/metrics')
+            .withAutomaticReconnect()
+            .build();
 
-    connection.on('LineSnapshotUpdated', (payload) => {
-        if (payload.productListId !== LINE_ID) return;
-        snapshot = payload;
-        render();
-    });
+        connection.on('LineSnapshotUpdated', (payload) => {
+            if (payload.productListId !== LINE_ID) return;
+            snapshot = payload;
+            render();
+        });
 
-    connection.start()
-        .then(() => connection.invoke('JoinLine', LINE_ID))
-        .catch(err => console.error('SignalR error:', err));
+        connection.start()
+            .then(() => connection.invoke('JoinLine', LINE_ID))
+            .catch(err => console.error('SignalR error:', err));
+    }
 
     render();
 </script>
@@ -600,6 +623,10 @@
     };
 
     string FurnaceHref(int id) => id == 6 ? "/TubeMills" : $"/Furnace{id}";
+
+    bool IsHistorical => ViewData["IsHistorical"] as bool? ?? false;
+    string HistoricalDateStr => ViewData["HistoricalDate"] as string ?? "";
+    int HistoricalShiftId => ViewData["HistoricalShiftId"] as int? ?? 1;
 
     static readonly (string Token, string LogoFile, string AltText)[] ClientLogoRules = new[]
     {

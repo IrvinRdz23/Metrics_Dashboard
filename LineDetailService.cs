@@ -4,11 +4,14 @@ namespace Metrics_Dashboard.Services;
 
 public interface ILineDetailService
 {
-    /// <summary>Snapshot de una sola línea, identificada por su Product_List_ID real, llamando al SP.</summary>
+    /// <summary>Snapshot de una sola línea, identificada por su Product_List_ID real, llamando al SP, EN VIVO.</summary>
     Task<LineDetailSnapshot> GetSnapshotAsync(int lineId, CancellationToken ct = default);
 
+    /// <summary>Snapshot histórico de una línea para un día pasado + turno específico.</summary>
+    Task<LineDetailSnapshot> GetHistoricalSnapshotAsync(int lineId, DateTime date, int shiftId, CancellationToken ct = default);
+
     /// <summary>Construye el snapshot de una línea a partir de filas ya obtenidas (sin volver a golpear el SP).</summary>
-    Task<LineDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int lineId, CancellationToken ct = default);
+    Task<LineDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int lineId, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -17,6 +20,10 @@ public interface ILineDetailService
 /// Product_List_ID real — no hace falta tocar el SP, se resuelve con el mismo raw data que
 /// ya trae MetricsBroadcastService en cada ciclo. Igual que el resto: HasPlan ahora respeta
 /// Heijunka si hay datos esa semana (ver ProductLineMetric.CountsForStats para la misma idea).
+///
+/// Ahora soporta histórico: GetHistoricalSnapshotAsync usa FetchHistoricalRowsAsync en vez
+/// de FetchCurrentShiftRowsAsync, y BuildFromRowsAsync recibe isLiveToday/forDate para que
+/// Heijunka y el acumulado esperado usen la fecha correcta en vez de "hoy" a fuerzas.
 /// </summary>
 public class LineDetailService : ILineDetailService
 {
@@ -38,7 +45,7 @@ public class LineDetailService : ILineDetailService
         try
         {
             var (rows, shiftDesc) = await _rawDataService.FetchCurrentShiftRowsAsync(ct);
-            return await BuildFromRowsAsync(rows, shiftDesc, lineId, ct);
+            return await BuildFromRowsAsync(rows, shiftDesc, lineId, ct: ct);
         }
         catch (Exception ex)
         {
@@ -47,7 +54,21 @@ public class LineDetailService : ILineDetailService
         }
     }
 
-    public async Task<LineDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int lineId, CancellationToken ct = default)
+    public async Task<LineDetailSnapshot> GetHistoricalSnapshotAsync(int lineId, DateTime date, int shiftId, CancellationToken ct = default)
+    {
+        try
+        {
+            var (rows, shiftDesc) = await _rawDataService.FetchHistoricalRowsAsync(date, shiftId, ct);
+            return await BuildFromRowsAsync(rows, shiftDesc, lineId, isLiveToday: false, forDate: date, ct: ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo histórico de la línea {LineId} de {Date} turno {ShiftId}", lineId, date, shiftId);
+            return EmptySnapshot(lineId);
+        }
+    }
+
+    public async Task<LineDetailSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, int lineId, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default)
     {
         var idLookup = rows.BuildProductListIdLookup();
 
@@ -89,15 +110,10 @@ public class LineDetailService : ILineDetailService
             ?? 0;
 
         // ---------- Tiempo de ciclo real aproximado por hora ----------
-        // TERCER INTENTO — los 2 anteriores (descansos, reloj de pared) daban números que no
-        // cuadraban, así que cambio de estrategia por completo: en vez de reconstruir el
-        // tiempo transcurrido yo mismo, uso el mismo Accumulated_Rate que ya calcula bien el
-        // SP (confirmado por ti — es "esperado a esta hora", que sí sale correcto) y le doy
-        // la vuelta a la fórmula: si Accumulated_Rate = segundos_transcurridos ÷ Ciclo_Teórico,
-        // entonces segundos_transcurridos = Accumulated_Rate × Ciclo_Teórico. Ese total de
-        // segundos del TURNO se reparte entre las horas: a cada hora ya completada le tocan
-        // sus 3600s completos, a la hora en curso le toca lo que sobre, a las futuras nada
-        // (por eso no tienen barra). Ya no depende de reloj de pared ni de descansos.
+        // Se usa el mismo Accumulated_Rate que ya calcula bien el SP y se le da la vuelta a
+        // la fórmula: segundos_transcurridos = Accumulated_Rate × Ciclo_Teórico. Ese total se
+        // reparte entre las horas: a cada hora ya completada le tocan sus 3600s completos, a
+        // la hora en curso le toca lo que sobre, a las futuras nada.
         var shiftStart = ParseShiftStart(shiftDesc);
         var theoreticalCT = mainRow?.CycleTimeSecs ?? 0;
         var totalElapsedTheoreticalSeconds = shiftStart.HasValue && theoreticalCT > 0
@@ -117,8 +133,6 @@ public class LineDetailService : ILineDetailService
             var elapsedThisHour = Math.Clamp(totalElapsedTheoreticalSeconds - secondsBeforeThisHour, 0, 3600);
             var isInProgress = elapsedThisHour > 0 && elapsedThisHour < 3600;
 
-            // Si da exactamente 0, algo no cuadró en la cuenta — mejor "sin dato" (null) que
-            // mostrar un 0s falso, que no tiene sentido para una hora con piezas producidas.
             double? actual = (h.Production > 0 && elapsedThisHour > 0) ? elapsedThisHour / h.Production : null;
 
             return new CycleTimePoint
@@ -127,21 +141,19 @@ public class LineDetailService : ILineDetailService
                 Production = h.Production,
                 ActualCycleTimeSecs = actual,
                 AvailableSeconds = (int)Math.Round(elapsedThisHour),
-                IsInProgress = isInProgress
+                IsInProgress = isInProgress && isLiveToday
             };
         }).ToList();
 
-        // Media del tiempo de ciclo real, solo con las horas del turno actual que tuvieron
-        // producción — se muestra como línea de referencia en la gráfica (ya no hay banda
-        // de desviación estándar, se quitó por no aportar).
         var samples = cycleTimeTrend.Where(p => p.ActualCycleTimeSecs.HasValue).Select(p => p.ActualCycleTimeSecs!.Value).ToList();
         double? actualMean = samples.Count > 0 ? samples.Average() : null;
 
         var plannedShift = mainRow?.PlannedForOee ?? 0;
         var shiftDurationHours = ShiftTimeHelper.GetDurationHours(shiftDesc);
-        ShiftTimeHelper.ApplyExpectedCumulative(hourlyTrend, shiftDesc, shiftDurationHours, plannedShift);
+        ShiftTimeHelper.ApplyExpectedCumulative(hourlyTrend, shiftDesc, shiftDurationHours, plannedShift, isLiveToday);
 
-        var heijunkaResult = await _heijunkaService.IsPlannedBatchAsync(new[] { lineId }, DateTime.Today, shiftId, ct);
+        var effectiveDate = forDate ?? DateTime.Today;
+        var heijunkaResult = await _heijunkaService.IsPlannedBatchAsync(new[] { lineId }, effectiveDate, shiftId, ct);
         var heijunkaPlanned = heijunkaResult.TryGetValue(lineId, out var planned) ? planned : null;
 
         return new LineDetailSnapshot
@@ -181,18 +193,6 @@ public class LineDetailService : ILineDetailService
         var elapsed = time - shiftStart;
         if (elapsed < TimeSpan.Zero)
         {
-            // Dos casos MUY distintos dan negativo aquí, y hay que tratarlos distinto:
-            //   1) El turno cruza medianoche de verdad (ej. bucket "00:00" de un turno que
-            //      empezó 22:40 la noche anterior) -> la diferencia es GRANDE (varias horas),
-            //      y sí hay que sumarle 24h para que ordene después del inicio del turno.
-            //   2) El turno arranca a media hora, no en punto (ej. "Shift 2 15:15-23:25" — el
-            //      primer bloque se llama "16:00" y representa la ventana 15:00-16:00, pero
-            //      el turno arrancó a las 15:15, 15 min DESPUÉS de que "empieza" ese bloque)
-            //      -> la diferencia es CHICA (minutos), y sumarle 24h da un disparate. Aquí
-            //      lo correcto es simplemente 0: no hay nada que contar antes de que el turno
-            //      arrancara.
-            // Se distinguen por el tamaño: si faltan más de 12 horas para cuadrar, es el caso
-            // 1 (cruza medianoche); si es menos, es el caso 2 (arranque a media hora).
             elapsed = elapsed < TimeSpan.FromHours(-12) ? elapsed + TimeSpan.FromHours(24) : TimeSpan.Zero;
         }
         return elapsed;
