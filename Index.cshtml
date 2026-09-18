@@ -361,7 +361,7 @@
                             <div class="chart-wrap"><canvas id="chart-cb"></canvas></div>
                         </div>
                         <div class="card trend-card">
-                            <h2>Back End <span class="hint">incluye SAP escaneado (aprox.)</span></h2>
+                            <h2>Back End</h2>
                             <div class="chart-wrap"><canvas id="chart-be"></canvas></div>
                         </div>
                         <div class="card trend-card">
@@ -420,7 +420,9 @@
         if (oee >= 0.70) return getCss('--warn');
         return getCss('--bad');
         }
-        function furnaceColor(id) { return FURNACE_COLORS[(id - 1) % FURNACE_COLORS.length]; }
+        function furnaceColor(id) { return id === 7 ? '#c084fc' : FURNACE_COLORS[(id - 1) % FURNACE_COLORS.length]; }
+        function fnumLabel(id) { return id === 6 ? 'TM' : (id === 7 ? 'CS' : id); }
+        function detailHref(id) { return id === 6 ? '/TubeMills' : (id === 7 ? '/Furnace1' : '/Furnace' + id); }
         function getCss(varName) { return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); }
         function hexToRgba(hex, alpha) {
         const h = hex.replace('#', '');
@@ -527,7 +529,13 @@
         grid.innerHTML = '';
         // Ahora se agregan las 6 cards directas (Furnace 1-5 + Tube Mills) — Tube Mills ya
         // no alterna con nada, es una card fija más del grid.
-        snapshot.furnaces.forEach(f => grid.appendChild(buildFurnaceCard(f)));
+        // Orden fijo del grid: arriba Furnace 1, 2, 3 — abajo Furnace 5, Clam Shells (su
+        // propia card, id 7), Tube Mills. Furnace 4 se queda oculto a propósito.
+        const CARD_ORDER = [1, 2, 3, 5, 7, 6];
+        CARD_ORDER
+        .map(id => snapshot.furnaces.find(f => f.furnaceId === id))
+        .filter(Boolean)
+        .forEach(f => grid.appendChild(buildFurnaceCard(f)));
         } else {
         snapshot.furnaces.forEach(f => updateFurnaceCard(f, isLiveUpdate));
         }
@@ -588,8 +596,8 @@
         div.innerHTML = `
         <div class="card-top">
         <h2>
-        <span class="fnum">${f.furnaceId === 6 ? 'TM' : f.furnaceId}</span><span class="fname">${f.furnaceName}</span>
-        <a class="detail-link" href="${f.furnaceId === 6 ? '/TubeMills' : '/Furnace' + f.furnaceId}" onclick="event.stopPropagation()" title="Ver detalle de ${f.furnaceName}">
+        <span class="fnum">${fnumLabel(f.furnaceId)}</span><span class="fname">${f.furnaceName}</span>
+        <a class="detail-link" href="${detailHref(f.furnaceId)}" onclick="event.stopPropagation()" title="Ver detalle de ${f.furnaceName}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
         </a>
         </h2>
@@ -899,7 +907,7 @@
         function renderDrilldown(f) {
         if (!f) return;
         document.getElementById('drilldownTitle').innerHTML =
-        `<span class="fnum" style="display:inline-flex;width:22px;height:22px;border-radius:7px;background:${furnaceColor(f.furnaceId)};color:#06101f;align-items:center;justify-content:center;font-size:.75rem;">${f.furnaceId === 6 ? 'TM' : f.furnaceId}</span> ${f.furnaceName}`;
+        `<span class="fnum" style="display:inline-flex;width:22px;height:22px;border-radius:7px;background:${furnaceColor(f.furnaceId)};color:#06101f;align-items:center;justify-content:center;font-size:.75rem;">${fnumLabel(f.furnaceId)}</span> ${f.furnaceName}`;
 
         if (f.lines.length === 0) {
         document.getElementById('drilldownChips').innerHTML = `<span class="chip">Sin producción planeada en el turno actual</span>`;

@@ -80,6 +80,13 @@ public class PlantMetricsService : IPlantMetricsService
             .Select(id => new FurnaceMetric { FurnaceId = id, FurnaceName = $"Furnace {id}" })
             .ToList();
 
+        // Clam Shells ahora es su PROPIA "card" en el dashboard general (FurnaceId=7, un id
+        // que no choca con ningún horno real ni con Tube Mills=6) — ya no vive mezclada
+        // dentro de Furnace 1. Esto es SOLO para el dashboard general: el detalle de
+        // Furnace 1 (/Furnace1) sigue mostrando sus líneas de Clam Shells como siempre,
+        // porque usa FurnaceDetailService, un servicio/modelo totalmente aparte.
+        var clamShellCard = new FurnaceMetric { FurnaceId = 7, FurnaceName = "Clam Shells" };
+
         var linesIndex = new Dictionary<(int furnaceId, string desc), ProductLineMetric>();
         var productListIdLookup = rows.BuildProductListIdLookup();
 
@@ -88,10 +95,16 @@ public class PlantMetricsService : IPlantMetricsService
             .SelectMany(kv => kv.Value.ProductGroupIds.Select(gid => (GroupId: gid, FurnaceId: kv.Key)))
             .ToDictionary(x => x.GroupId, x => x.FurnaceId);
 
+        FurnaceMetric TargetCardFor(int groupId) =>
+            groupId == 6 ? clamShellCard : furnaces.First(f => f.FurnaceId == groupToFurnace[groupId]);
+
         foreach (var r in rows.Where(r => r.ReportGroup == 1 && groupToFurnace.ContainsKey(r.GroupId)))
         {
-            var furnaceId = groupToFurnace[r.GroupId];
-            var key = (furnaceId, r.Desc);
+            // Ojo: Clam Shells (Product_Group_ID=6) se guarda con "furnaceId=7" en el índice
+            // de líneas, aunque groupToFurnace lo mapee a 1 — es solo para no chocar claves
+            // con las líneas normales de Furnace 1 en este diccionario.
+            var indexFurnaceId = r.GroupId == 6 ? 7 : groupToFurnace[r.GroupId];
+            var key = (indexFurnaceId, r.Desc);
 
             if (linesIndex.TryGetValue(key, out var existing))
             {
@@ -119,14 +132,14 @@ public class PlantMetricsService : IPlantMetricsService
                 OeeShift = r.OeeShift,
                 ExcludedFromSap = SapRules.IsExcluded(r.Desc),
             };
-            furnaces.First(f => f.FurnaceId == furnaceId).Lines.Add(line);
+            TargetCardFor(r.GroupId).Lines.Add(line);
             linesIndex[key] = line;
         }
 
         foreach (var r in rows.Where(r => r.ReportGroup == 3 && r.TotalSap > 0 && groupToFurnace.ContainsKey(r.GroupId)))
         {
-            var furnaceId = groupToFurnace[r.GroupId];
-            if (linesIndex.TryGetValue((furnaceId, r.Desc), out var line))
+            var indexFurnaceId = r.GroupId == 6 ? 7 : groupToFurnace[r.GroupId];
+            if (linesIndex.TryGetValue((indexFurnaceId, r.Desc), out var line))
             {
                 line.TotalSap += r.TotalSap;
             }
@@ -136,6 +149,7 @@ public class PlantMetricsService : IPlantMetricsService
         {
             f.Lines = f.Lines.OrderBy(l => l.ProductOrder).ToList();
         }
+        clamShellCard.Lines = clamShellCard.Lines.OrderBy(l => l.ProductOrder).ToList();
 
         // ---------- Tube Mills como Furnace #6 — ya es una card fija más del grid. ----------
         var tubeMills = new FurnaceMetric { FurnaceId = 6, FurnaceName = "Tube Mills" };
@@ -176,6 +190,7 @@ public class PlantMetricsService : IPlantMetricsService
             if (tubeMillsLinesIndex.TryGetValue(r.Desc, out var line)) line.TotalSap += r.TotalSap;
         }
         tubeMills.Lines = tubeMills.Lines.OrderBy(l => l.ProductOrder).ToList();
+        furnaces.Add(clamShellCard);
         furnaces.Add(tubeMills);
 
         // ---------- HEIJUNKA ----------
@@ -191,10 +206,13 @@ public class PlantMetricsService : IPlantMetricsService
         }
 
         // ---------- Carrusel de la barra superior: Core Builders / Back End / Clam Shells / Tube Mills ----------
+        // Clam Shells ya no vive dentro de Furnace 1-5 (tiene su propia card, FurnaceId=7),
+        // así que su KPI group sale directo de clamShellCard, no de un filtro por segmento
+        // sobre furnace1to5Lines (ahí ya no hay ninguna línea de Clam Shells que filtrar).
         var furnace1to5Lines = furnaces.Where(f => f.FurnaceId <= 5).SelectMany(f => f.Lines).Where(l => l.CountsForStats).ToList();
         var coreBuilderLines = furnace1to5Lines.Where(l => l.Segment == LineSegment.CoreBuilder).ToList();
         var backEndLines = furnace1to5Lines.Where(l => l.Segment == LineSegment.BackEnd).ToList();
-        var clamShellLines = furnace1to5Lines.Where(l => l.Segment == LineSegment.ClamShell).ToList();
+        var clamShellLines = clamShellCard.Lines.Where(l => l.CountsForStats).ToList();
         var tubeMillsLines = tubeMills.Lines.Where(l => l.CountsForStats).ToList();
 
         static KpiGroup BuildKpiGroup(string label, List<ProductLineMetric> countedLines)
@@ -217,7 +235,18 @@ public class PlantMetricsService : IPlantMetricsService
         var topKpiGroups = new List<KpiGroup> { coreBuilderKpi, backEndKpi, clamShellKpi, tubeMillsKpi };
 
         // ---------- Tendencia por hora — general (se deja calculada, ya no se muestra en el
-        // grid) y las 4 por categoría, para la pantalla de tendencias (flecha del borde derecho). ----------
+        // grid) y las 4 por categoría, para la pantalla de tendencias (flecha del borde derecho).
+        // Solo cuenta la producción de líneas que SÍ tenían plan este turno (Heijunka, o el
+        // criterio viejo como respaldo) — la producción NO planeada no debe jalar ninguna
+        // de estas gráficas. ----------
+        ProductLineMetric? FindLineFor(RawMetricRow r)
+        {
+            if (r.GroupId == 7) return tubeMillsLinesIndex.TryGetValue(r.Desc, out var tm) ? tm : null;
+            if (!groupToFurnace.ContainsKey(r.GroupId)) return null;
+            var indexFurnaceId = r.GroupId == 6 ? 7 : groupToFurnace[r.GroupId];
+            return linesIndex.TryGetValue((indexFurnaceId, r.Desc), out var line) ? line : null;
+        }
+
         var hourlyTotals = new Dictionary<string, int>();
         var hourlyBySegment = new Dictionary<string, Dictionary<string, int>>
         {
@@ -233,6 +262,9 @@ public class PlantMetricsService : IPlantMetricsService
             if (r.GroupId == 7) segment = LineSegment.TubeMills;
             else if (groupToFurnace.ContainsKey(r.GroupId)) segment = LineSegment.Classify(r.GroupId, r.Desc);
             if (segment == null) continue;
+
+            var line = FindLineFor(r);
+            if (line == null || !line.CountsForStats) continue; // producción no planeada -> no cuenta aquí
 
             if (segment != LineSegment.TubeMills)
             {
@@ -294,6 +326,7 @@ public class PlantMetricsService : IPlantMetricsService
         ShiftDesc = string.Empty,
         Furnaces = Enumerable.Range(1, 5)
             .Select(id => new FurnaceMetric { FurnaceId = id, FurnaceName = $"Furnace {id}" })
+            .Append(new FurnaceMetric { FurnaceId = 7, FurnaceName = "Clam Shells" })
             .Append(new FurnaceMetric { FurnaceId = 6, FurnaceName = "Tube Mills" })
             .ToList(),
         HourlyTrend = new List<HourlyPoint>(),

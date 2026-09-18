@@ -282,20 +282,21 @@ public class PlantDashboardSnapshot
     public int? HistoricalShiftId { get; set; }
 
     /// <summary>
-    /// Furnaces incluye Furnace 1-5 Y Tube Mills (FurnaceId = 6) al final — Tube Mills ahora
-    /// es una card fija más del grid (ya no alterna con nada); nunca se cuenta en los
-    /// totales de abajo.
+    /// Furnaces incluye Furnace 1-5, Clam Shells (FurnaceId = 7, su propia card en el grid
+    /// general, separada de Furnace 1) y Tube Mills (FurnaceId = 6) al final. Solo Tube
+    /// Mills se excluye de los totales de abajo — Clam Shells sigue siendo producción real
+    /// de la planta, aunque ahora tenga su propia card.
     /// </summary>
-    public int TotalProduction => Furnaces.Where(f => f.FurnaceId <= 5).Sum(f => f.TotalProduction);
-    public int TotalPlanned => Furnaces.Where(f => f.FurnaceId <= 5).Sum(f => f.TotalPlanned);
+    public int TotalProduction => Furnaces.Where(f => f.FurnaceId != 6).Sum(f => f.TotalProduction);
+    public int TotalPlanned => Furnaces.Where(f => f.FurnaceId != 6).Sum(f => f.TotalPlanned);
 
-    /// <summary>OEE ponderado de TODAS las líneas de Furnace 1-5 con producción > 0 (Tube Mills
-    /// no cuenta aquí, y las líneas en 0 piezas tampoco cuentan hasta que arrancan).</summary>
+    /// <summary>OEE ponderado de TODAS las líneas de la planta con producción > 0, excepto
+    /// Tube Mills (las líneas en 0 piezas tampoco cuentan hasta que arrancan).</summary>
     public double PlantOee
     {
         get
         {
-            var allLines = Furnaces.Where(f => f.FurnaceId <= 5).SelectMany(f => f.Lines)
+            var allLines = Furnaces.Where(f => f.FurnaceId != 6).SelectMany(f => f.Lines)
                 .Where(l => l.CountsForStats && l.Total > 0).ToList();
             return allLines.Count == 0 ? 0 : allLines.Average(l => l.OeeShift);
         }
