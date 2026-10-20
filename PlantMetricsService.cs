@@ -1,40 +1,38 @@
 using Metrics_Dashboard.Models;
+using Microsoft.Extensions.Options;
 
 namespace Metrics_Dashboard.Services;
 
 public interface IPlantMetricsService
 {
+    /// <summary>Snapshot en vivo del turno en curso.</summary>
     Task<PlantDashboardSnapshot> GetSnapshotAsync(CancellationToken ct = default);
 
-    /// <summary>Snapshot histórico de un día pasado + un turno específico (1, 2 o 3).</summary>
+    /// <summary>Snapshot de un turno ya registrado (histórico) — mismas reglas que el vivo.</summary>
     Task<PlantDashboardSnapshot> GetHistoricalSnapshotAsync(DateTime date, int shiftId, CancellationToken ct = default);
 
-    /// <summary>Construye el snapshot general a partir de filas ya obtenidas (sin volver a golpear el SP).</summary>
-    Task<PlantDashboardSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default);
+    /// <summary>Construye el snapshot desde filas ya obtenidas (de UN solo turno).</summary>
+    Task<PlantDashboardSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, CancellationToken ct = default, bool isLive = true);
 }
 
 /// <summary>
-/// Dashboard GENERAL. Furnaces incluye 1-5 y Tube Mills (FurnaceId=6) al final — Tube Mills
-/// ahora es una card fija más del grid. TotalProduction/TotalPlanned/PlantOee siguen
-/// excluyendo Tube Mills (ver esas propiedades en PlantDashboardSnapshot). Ya no ejecuta el
-/// SP directamente: usa IMetricsRawDataService, compartido con IFurnaceDetailService para
-/// que el SP se llame una sola vez por ciclo.
-///
-/// Desde que se agregó Heijunka: qué línea "cuenta" para OEE/producción/plan ya NO depende
-/// solo de Planned_Shift_for_OEE != 0 — se le pregunta a IHeijunkaService (Heijunka_Plan_List)
-/// si esa línea tenía plan ESTE día/turno específico. Si Heijunka no tiene datos para la
-/// semana vigente, se cae automáticamente al criterio viejo (ver ProductLineMetric.CountsForStats).
+/// Dashboard general de Planta 4: 4 grupos (Condenser, Battery Cooling Plate, Heater Core,
+/// Residential). Por grupo: producción, plan, OEE (promedio de líneas que cuentan), SAP % y la
+/// tendencia hora por hora. Heijunka (si está encendido) decide qué línea cuenta; si no, cuenta
+/// toda línea con Planned_Shift_for_OEE &gt; 0.
 /// </summary>
 public class PlantMetricsService : IPlantMetricsService
 {
-    private readonly IMetricsRawDataService _rawDataService;
-    private readonly IHeijunkaService _heijunkaService;
+    private readonly IMetricsRawDataService _raw;
+    private readonly IHeijunkaService _heijunka;
+    private readonly PlantOptions _options;
     private readonly ILogger<PlantMetricsService> _logger;
 
-    public PlantMetricsService(IMetricsRawDataService rawDataService, IHeijunkaService heijunkaService, ILogger<PlantMetricsService> logger)
+    public PlantMetricsService(IMetricsRawDataService raw, IHeijunkaService heijunka, IOptions<PlantOptions> options, ILogger<PlantMetricsService> logger)
     {
-        _rawDataService = rawDataService;
-        _heijunkaService = heijunkaService;
+        _raw = raw;
+        _heijunka = heijunka;
+        _options = options.Value;
         _logger = logger;
     }
 
@@ -42,12 +40,12 @@ public class PlantMetricsService : IPlantMetricsService
     {
         try
         {
-            var (rows, shiftDesc) = await _rawDataService.FetchCurrentShiftRowsAsync(ct);
-            return await BuildFromRowsAsync(rows, shiftDesc, ct: ct);
+            var (rows, shiftDesc) = await _raw.FetchCurrentShiftRowsAsync(ct);
+            return await BuildFromRowsAsync(rows, shiftDesc, ct, isLive: true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error obteniendo snapshot general de Plant_Metrics_Production_Reports");
+            _logger.LogError(ex, "Error obteniendo el snapshot de Plant_Metrics_Production_Reports");
             return EmptySnapshot();
         }
     }
@@ -56,16 +54,19 @@ public class PlantMetricsService : IPlantMetricsService
     {
         try
         {
-            var (rows, shiftDesc) = await _rawDataService.FetchHistoricalRowsAsync(date, shiftId, ct);
-            var snapshot = await BuildFromRowsAsync(rows, shiftDesc, isLiveToday: false, forDate: date, ct: ct);
-            snapshot.IsHistorical = true;
-            snapshot.HistoricalDate = date.Date;
-            snapshot.HistoricalShiftId = shiftId;
-            return snapshot;
+            var dayRows = await _raw.FetchDayRowsAsync(date, ct);
+            var rows = dayRows.Where(r => r.ShiftId == shiftId).ToList();
+            var shiftDesc = rows.Select(r => r.ShiftDesc).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? string.Empty;
+
+            var snap = await BuildFromRowsAsync(rows, shiftDesc, ct, isLive: false);
+            snap.IsHistorical = true;
+            snap.HistoricalDate = date.Date;
+            snap.HistoricalShiftId = shiftId;
+            return snap;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error obteniendo histórico de {Date} turno {ShiftId}", date, shiftId);
+            _logger.LogError(ex, "Error obteniendo el histórico {Date} turno {Shift}", date, shiftId);
             var empty = EmptySnapshot();
             empty.IsHistorical = true;
             empty.HistoricalDate = date.Date;
@@ -74,272 +75,42 @@ public class PlantMetricsService : IPlantMetricsService
         }
     }
 
-    public async Task<PlantDashboardSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, bool isLiveToday = true, DateTime? forDate = null, CancellationToken ct = default)
+    public async Task<PlantDashboardSnapshot> BuildFromRowsAsync(List<RawMetricRow> rows, string shiftDesc, CancellationToken ct = default, bool isLive = true)
     {
-        var furnaces = Enumerable.Range(1, 5)
-            .Select(id => new FurnaceMetric { FurnaceId = id, FurnaceName = $"Furnace {id}" })
-            .ToList();
+        var now = DateTime.Now;
+        var eventDate = GroupBuilder.EventDateOf(rows);
+        var shiftId = rows.Select(r => r.ShiftId).FirstOrDefault(i => i > 0);
 
-        // Clam Shells ahora es su PROPIA "card" en el dashboard general (FurnaceId=7, un id
-        // que no choca con ningún horno real ni con Tube Mills=6) — ya no vive mezclada
-        // dentro de Furnace 1. Esto es SOLO para el dashboard general: el detalle de
-        // Furnace 1 (/Furnace1) sigue mostrando sus líneas de Clam Shells como siempre,
-        // porque usa FurnaceDetailService, un servicio/modelo totalmente aparte.
-        var clamShellCard = new FurnaceMetric { FurnaceId = 7, FurnaceName = "Clam Shells" };
-
-        var linesIndex = new Dictionary<(int furnaceId, string desc), ProductLineMetric>();
-        var productListIdLookup = rows.BuildProductListIdLookup();
-
-        var groupToFurnace = FurnaceCatalog.Map
-            .Where(kv => kv.Key >= 1 && kv.Key <= 5)
-            .SelectMany(kv => kv.Value.ProductGroupIds.Select(gid => (GroupId: gid, FurnaceId: kv.Key)))
-            .ToDictionary(x => x.GroupId, x => x.FurnaceId);
-
-        FurnaceMetric TargetCardFor(int groupId) =>
-            groupId == 6 ? clamShellCard : furnaces.First(f => f.FurnaceId == groupToFurnace[groupId]);
-
-        foreach (var r in rows.Where(r => r.ReportGroup == 1 && groupToFurnace.ContainsKey(r.GroupId)))
+        var snapshot = new PlantDashboardSnapshot
         {
-            // Ojo: Clam Shells (Product_Group_ID=6) se guarda con "furnaceId=7" en el índice
-            // de líneas, aunque groupToFurnace lo mapee a 1 — es solo para no chocar claves
-            // con las líneas normales de Furnace 1 en este diccionario.
-            var indexFurnaceId = r.GroupId == 6 ? 7 : groupToFurnace[r.GroupId];
-            var key = (indexFurnaceId, r.Desc);
-
-            if (linesIndex.TryGetValue(key, out var existing))
-            {
-                if (r.Total > existing.Total || r.PlannedForOee > existing.PlannedShift)
-                {
-                    existing.Total = r.Total;
-                    existing.AccumulatedRate = r.AccumRate;
-                    existing.PlannedShift = r.PlannedForOee;
-                    existing.OeeShift = r.OeeShift;
-                    existing.CycleTimeSecs = r.CycleTimeSecs;
-                }
-                continue;
-            }
-
-            var line = new ProductLineMetric
-            {
-                ProductDesc = r.Desc,
-                GroupId = r.GroupId,
-                ProductListId = productListIdLookup.TryGetValue((r.GroupId, r.Desc), out var plid) ? plid : 0,
-                ProductOrder = r.ProductOrder,
-                CycleTimeSecs = r.CycleTimeSecs,
-                Total = r.Total,
-                AccumulatedRate = r.AccumRate,
-                PlannedShift = r.PlannedForOee,
-                OeeShift = r.OeeShift,
-                ExcludedFromSap = SapRules.IsExcluded(r.Desc),
-            };
-            TargetCardFor(r.GroupId).Lines.Add(line);
-            linesIndex[key] = line;
-        }
-
-        foreach (var r in rows.Where(r => r.ReportGroup == 3 && r.TotalSap > 0 && groupToFurnace.ContainsKey(r.GroupId)))
-        {
-            var indexFurnaceId = r.GroupId == 6 ? 7 : groupToFurnace[r.GroupId];
-            if (linesIndex.TryGetValue((indexFurnaceId, r.Desc), out var line))
-            {
-                line.TotalSap += r.TotalSap;
-            }
-        }
-
-        foreach (var f in furnaces)
-        {
-            f.Lines = f.Lines.OrderBy(l => l.ProductOrder).ToList();
-        }
-        clamShellCard.Lines = clamShellCard.Lines.OrderBy(l => l.ProductOrder).ToList();
-
-        // ---------- Tube Mills como Furnace #6 — ya es una card fija más del grid. ----------
-        var tubeMills = new FurnaceMetric { FurnaceId = 6, FurnaceName = "Tube Mills" };
-        var tubeMillsLinesIndex = new Dictionary<string, ProductLineMetric>();
-        foreach (var r in rows.Where(r => r.ReportGroup == 1 && r.GroupId == 7))
-        {
-            if (tubeMillsLinesIndex.TryGetValue(r.Desc, out var existingTm))
-            {
-                if (r.Total > existingTm.Total || r.PlannedForOee > existingTm.PlannedShift)
-                {
-                    existingTm.Total = r.Total;
-                    existingTm.AccumulatedRate = r.AccumRate;
-                    existingTm.PlannedShift = r.PlannedForOee;
-                    existingTm.OeeShift = r.OeeShift;
-                    existingTm.CycleTimeSecs = r.CycleTimeSecs;
-                }
-                continue;
-            }
-
-            var line = new ProductLineMetric
-            {
-                ProductDesc = r.Desc,
-                GroupId = r.GroupId,
-                ProductListId = productListIdLookup.TryGetValue((r.GroupId, r.Desc), out var tmPlid) ? tmPlid : 0,
-                ProductOrder = r.ProductOrder,
-                CycleTimeSecs = r.CycleTimeSecs,
-                Total = r.Total,
-                AccumulatedRate = r.AccumRate,
-                PlannedShift = r.PlannedForOee,
-                OeeShift = r.OeeShift,
-                ExcludedFromSap = SapRules.IsExcluded(r.Desc),
-            };
-            tubeMills.Lines.Add(line);
-            tubeMillsLinesIndex[r.Desc] = line;
-        }
-        foreach (var r in rows.Where(r => r.ReportGroup == 3 && r.GroupId == 7 && r.TotalSap > 0))
-        {
-            if (tubeMillsLinesIndex.TryGetValue(r.Desc, out var line)) line.TotalSap += r.TotalSap;
-        }
-        tubeMills.Lines = tubeMills.Lines.OrderBy(l => l.ProductOrder).ToList();
-        furnaces.Add(clamShellCard);
-        furnaces.Add(tubeMills);
-
-        // ---------- HEIJUNKA ----------
-        var effectiveDate = forDate ?? DateTime.Today;
-        var shiftId = rows.FirstOrDefault(r => r.ReportGroup == 1)?.ShiftId ?? 0;
-        var allLines = furnaces.SelectMany(f => f.Lines).ToList();
-        var heijunkaResults = await _heijunkaService.IsPlannedBatchAsync(
-            allLines.Select(l => l.ProductListId).Where(id => id > 0), effectiveDate, shiftId, ct);
-
-        foreach (var line in allLines)
-        {
-            line.HeijunkaPlanned = heijunkaResults.TryGetValue(line.ProductListId, out var planned) ? planned : null;
-        }
-
-        // ---------- Carrusel de la barra superior: Core Builders / Back End / Clam Shells / Tube Mills ----------
-        // Clam Shells ya no vive dentro de Furnace 1-5 (tiene su propia card, FurnaceId=7),
-        // así que su KPI group sale directo de clamShellCard, no de un filtro por segmento
-        // sobre furnace1to5Lines (ahí ya no hay ninguna línea de Clam Shells que filtrar).
-        var furnace1to5Lines = furnaces.Where(f => f.FurnaceId <= 5).SelectMany(f => f.Lines).Where(l => l.CountsForStats).ToList();
-        var coreBuilderLines = furnace1to5Lines.Where(l => l.Segment == LineSegment.CoreBuilder).ToList();
-        var backEndLines = furnace1to5Lines.Where(l => l.Segment == LineSegment.BackEnd).ToList();
-        var clamShellLines = clamShellCard.Lines.Where(l => l.CountsForStats).ToList();
-        var tubeMillsLines = tubeMills.Lines.Where(l => l.CountsForStats).ToList();
-
-        static KpiGroup BuildKpiGroup(string label, List<ProductLineMetric> countedLines)
-        {
-            var withProduction = countedLines.Where(l => l.Total > 0).ToList();
-            return new KpiGroup
-            {
-                Label = label,
-                TotalProduction = countedLines.Sum(l => l.Total),
-                TotalPlanned = countedLines.Sum(l => l.PlannedShift),
-                Oee = withProduction.Count == 0 ? 0 : withProduction.Average(l => l.OeeShift)
-            };
-        }
-
-        var coreBuilderKpi = BuildKpiGroup("Core Builders", coreBuilderLines);
-        var backEndKpi = BuildKpiGroup("Back End", backEndLines);
-        var clamShellKpi = BuildKpiGroup("Clam Shells", clamShellLines);
-        var tubeMillsKpi = BuildKpiGroup("Tube Mills", tubeMillsLines);
-
-        var topKpiGroups = new List<KpiGroup> { coreBuilderKpi, backEndKpi, clamShellKpi, tubeMillsKpi };
-
-        // ---------- Tendencia por hora — general (se deja calculada, ya no se muestra en el
-        // grid) y las 4 por categoría, para la pantalla de tendencias (flecha del borde derecho).
-        // Solo cuenta la producción de líneas que SÍ tenían plan este turno (Heijunka, o el
-        // criterio viejo como respaldo) — la producción NO planeada no debe jalar ninguna
-        // de estas gráficas. ----------
-        ProductLineMetric? FindLineFor(RawMetricRow r)
-        {
-            if (r.GroupId == 7) return tubeMillsLinesIndex.TryGetValue(r.Desc, out var tm) ? tm : null;
-            if (!groupToFurnace.ContainsKey(r.GroupId)) return null;
-            var indexFurnaceId = r.GroupId == 6 ? 7 : groupToFurnace[r.GroupId];
-            return linesIndex.TryGetValue((indexFurnaceId, r.Desc), out var line) ? line : null;
-        }
-
-        var hourlyTotals = new Dictionary<string, int>();
-        var hourlyBySegment = new Dictionary<string, Dictionary<string, int>>
-        {
-            [LineSegment.CoreBuilder] = new(),
-            [LineSegment.BackEnd] = new(),
-            [LineSegment.ClamShell] = new(),
-            [LineSegment.TubeMills] = new()
-        };
-
-        foreach (var r in rows.Where(r => r.ReportGroup == 2 && !string.IsNullOrWhiteSpace(r.Hour) && r.Hour != "-"))
-        {
-            string? segment = null;
-            if (r.GroupId == 7) segment = LineSegment.TubeMills;
-            else if (groupToFurnace.ContainsKey(r.GroupId)) segment = LineSegment.Classify(r.GroupId, r.Desc);
-            if (segment == null) continue;
-
-            var line = FindLineFor(r);
-            if (line == null || !line.CountsForStats) continue; // producción no planeada -> no cuenta aquí
-
-            if (segment != LineSegment.TubeMills)
-            {
-                hourlyTotals.TryGetValue(r.Hour, out var plantAcc);
-                hourlyTotals[r.Hour] = plantAcc + r.Total;
-            }
-
-            var dict = hourlyBySegment[segment];
-            dict.TryGetValue(r.Hour, out var acc);
-            dict[r.Hour] = acc + r.Total;
-        }
-
-        List<HourlyPoint> BuildSegmentTrend(string segment, int segmentTotalPlanned)
-        {
-            var trend = hourlyBySegment[segment].Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList();
-            trend = ShiftTimeHelper.SortByShiftElapsed(trend, shiftDesc);
-            ShiftTimeHelper.ApplyExpectedCumulative(trend, shiftDesc, ShiftTimeHelper.GetDurationHours(shiftDesc), segmentTotalPlanned, isLiveToday);
-            return trend;
-        }
-
-        var coreBuilderTrend = BuildSegmentTrend(LineSegment.CoreBuilder, coreBuilderKpi.TotalPlanned);
-        var backEndTrend = BuildSegmentTrend(LineSegment.BackEnd, backEndKpi.TotalPlanned);
-        var clamShellTrend = BuildSegmentTrend(LineSegment.ClamShell, clamShellKpi.TotalPlanned);
-        var tubeMillsTrend = BuildSegmentTrend(LineSegment.TubeMills, tubeMillsKpi.TotalPlanned);
-
-        // SAP escaneado por hora de Back End — aproximado (ver comentario en HourlyPoint.SapProduction):
-        // se reparte el SAP total del día proporcional a cuánto se produjo cada hora.
-        var backEndTotalSap = backEndLines.Sum(l => l.TotalSap);
-        var backEndTotalProdForSap = backEndTrend.Sum(h => h.Production);
-        if (backEndTotalProdForSap > 0)
-        {
-            foreach (var point in backEndTrend)
-            {
-                point.SapProduction = (int)Math.Round((double)point.Production / backEndTotalProdForSap * backEndTotalSap);
-            }
-        }
-
-        var hourlyTrend = hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList();
-        hourlyTrend = ShiftTimeHelper.SortByShiftElapsed(hourlyTrend, shiftDesc);
-        var plantTotalPlanned = furnaces.Where(f => f.FurnaceId <= 5).Sum(f => f.TotalPlanned);
-        ShiftTimeHelper.ApplyExpectedCumulative(hourlyTrend, shiftDesc, ShiftTimeHelper.GetDurationHours(shiftDesc), plantTotalPlanned, isLiveToday);
-
-        return new PlantDashboardSnapshot
-        {
+            PlantName = _options.PlantName,
             ShiftDesc = shiftDesc,
+            ShiftId = shiftId,
             ShiftDurationHours = ShiftTimeHelper.GetDurationHours(shiftDesc),
-            Furnaces = furnaces,
-            HourlyTrend = hourlyTrend,
-            CoreBuilderHourlyTrend = coreBuilderTrend,
-            BackEndHourlyTrend = backEndTrend,
-            ClamShellHourlyTrend = clamShellTrend,
-            TubeMillsHourlyTrend = tubeMillsTrend,
-            TopKpiGroups = topKpiGroups
+            EventDate = eventDate,
+            HeijunkaEnabled = _options.HeijunkaEnabled,
         };
+
+        // Líneas de los 4 grupos y UN solo llamado a Heijunka para todas.
+        var linesByGroup = ProductGroupCatalog.Groups.ToDictionary(g => g.Id, g => GroupBuilder.BuildLines(rows, g.Id));
+        var heijunka = await _heijunka.IsPlannedBatchAsync(
+            linesByGroup.Values.SelectMany(l => l).Select(l => l.ProductListId), eventDate, shiftId, ct);
+
+        foreach (var (groupId, lines) in linesByGroup)
+        {
+            GroupBuilder.ApplyHeijunka(lines, heijunka);
+            snapshot.Groups.Add(GroupBuilder.CreateGroup(rows, groupId, lines, shiftDesc, isLive, now));
+        }
+
+        return snapshot;
     }
 
-    private static PlantDashboardSnapshot EmptySnapshot() => new()
+    private PlantDashboardSnapshot EmptySnapshot() => new()
     {
-        ShiftDesc = string.Empty,
-        Furnaces = Enumerable.Range(1, 5)
-            .Select(id => new FurnaceMetric { FurnaceId = id, FurnaceName = $"Furnace {id}" })
-            .Append(new FurnaceMetric { FurnaceId = 7, FurnaceName = "Clam Shells" })
-            .Append(new FurnaceMetric { FurnaceId = 6, FurnaceName = "Tube Mills" })
-            .ToList(),
-        HourlyTrend = new List<HourlyPoint>(),
-        CoreBuilderHourlyTrend = new List<HourlyPoint>(),
-        BackEndHourlyTrend = new List<HourlyPoint>(),
-        ClamShellHourlyTrend = new List<HourlyPoint>(),
-        TubeMillsHourlyTrend = new List<HourlyPoint>(),
-        TopKpiGroups = new List<KpiGroup>
-        {
-            new() { Label = "Core Builders" },
-            new() { Label = "Back End" },
-            new() { Label = "Clam Shells" },
-            new() { Label = "Tube Mills" }
-        }
+        PlantName = _options.PlantName,
+        HeijunkaEnabled = _options.HeijunkaEnabled,
+        Groups = ProductGroupCatalog.Groups
+            .Select((g, i) => new GroupMetric { GroupId = g.Id, GroupName = g.Name, ColorIndex = i })
+            .ToList()
     };
 }

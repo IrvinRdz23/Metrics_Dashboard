@@ -1,129 +1,218 @@
-using Metrics_Dashboard.Models;
+using System.Globalization;
 using System.Text.RegularExpressions;
+using Metrics_Dashboard.Models;
 
 namespace Metrics_Dashboard.Services;
 
+/// <summary>Una hora "cubeta" del turno: Label = cierre de hora ("07:00"), offsets en minutos desde el inicio del turno.</summary>
+public record ShiftBucket(string Label, double StartMin, double EndMin);
+
 /// <summary>
-/// Duración del turno en horas, parseada del propio Shift_Desc (ej. "Shift 1 06:00-15:20" -> 9.33h).
-/// Se usa para calcular la meta de producción por hora (Plan / horas de turno) en las gráficas
-/// de tendencia — nunca se hardcodea la duración del turno, sale del mismo texto que ya
-/// trae el SP.
+/// Todo lo que tiene que ver con horarios de turno. El turno NUNCA se hardcodea: se lee del
+/// Shift_Desc que regresa el SP (ej. "Shift 1 06:00-15:20").
 /// </summary>
 public static class ShiftTimeHelper
 {
-    private static readonly Regex ShiftTimeRegex = new(@"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})", RegexOptions.Compiled);
+    private static readonly Regex ShiftRx =
+        new(@"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})", RegexOptions.Compiled);
 
-    public static double GetDurationHours(string? shiftDesc)
+    public static bool TryParse(string? desc, out TimeSpan start, out TimeSpan end)
     {
-        if (string.IsNullOrWhiteSpace(shiftDesc)) return 8.0;
+        start = TimeSpan.Zero;
+        end = TimeSpan.Zero;
+        if (string.IsNullOrWhiteSpace(desc)) return false;
+        var m = ShiftRx.Match(desc);
+        if (!m.Success) return false;
+        start = new TimeSpan(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), 0);
+        end = new TimeSpan(int.Parse(m.Groups[3].Value), int.Parse(m.Groups[4].Value), 0);
+        return true;
+    }
 
-        var m = ShiftTimeRegex.Match(shiftDesc);
-        if (!m.Success) return 8.0;
+    public static TimeSpan StartOf(string? desc) => TryParse(desc, out var s, out _) ? s : TimeSpan.Zero;
 
-        var start = new TimeSpan(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), 0);
-        var end = new TimeSpan(int.Parse(m.Groups[3].Value), int.Parse(m.Groups[4].Value), 0);
+    public static double GetDurationMinutes(string? desc)
+    {
+        if (!TryParse(desc, out var s, out var e)) return 480;
+        var d = (e - s).TotalMinutes;
+        if (d <= 0) d += 1440;
+        return d;
+    }
 
-        var duration = end - start;
-        if (duration <= TimeSpan.Zero) duration += TimeSpan.FromHours(24); // turno cruza medianoche
+    public static double GetDurationHours(string? desc) => GetDurationMinutes(desc) / 60.0;
 
-        return duration.TotalHours;
+    public static bool CrossesMidnight(string? desc) => TryParse(desc, out var s, out var e) && e <= s;
+
+    /// <summary>¿La hora del reloj cae dentro del rango del turno (sin importar de qué día es)?</summary>
+    public static bool IsWithinShift(string? desc, DateTime now)
+    {
+        if (!TryParse(desc, out var s, out var e)) return false;
+        var t = now.TimeOfDay;
+        return e > s ? (t >= s && t < e) : (t >= s || t < e);
     }
 
     /// <summary>
-    /// Ordena los puntos de la gráfica de tendencia por MINUTOS TRANSCURRIDOS DESDE EL INICIO
-    /// DEL TURNO, no alfabéticamente por el texto de la hora. Sin esto, una hora como "00:00"
-    /// (el último bucket de un turno que cruza medianoche, ej. Turno 2/3) ordena ANTES que
-    /// "06:00" solo por comparación de texto, aunque en realidad sea la última hora del turno.
+    /// Turno que cruza medianoche y ya estamos en su "cola" (ej. 05:30 de un turno 23:20-06:00):
+    /// ese turno pertenece al reporte de AYER, no al de hoy.
     /// </summary>
-    public static List<HourlyPoint> SortByShiftElapsed(List<HourlyPoint> points, string? shiftDesc)
-    {
-        var m = ShiftTimeRegex.Match(shiftDesc ?? string.Empty);
-        if (!m.Success) return points.OrderBy(p => p.Hour, StringComparer.Ordinal).ToList();
+    public static bool IsInMidnightCrossingTail(string? desc, DateTime now) =>
+        CrossesMidnight(desc) && TryParse(desc, out _, out var e) && now.TimeOfDay < e;
 
-        var shiftStart = new TimeSpan(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), 0);
-        return points.OrderBy(p => ElapsedSinceShiftStart(p.Hour, shiftStart)).ToList();
+    /// <summary>Turno activo ahora que pertenece al reporte de HOY (excluye la cola de un turno de ayer).</summary>
+    public static bool IsActiveToday(string? desc, DateTime now) =>
+        IsWithinShift(desc, now) && !IsInMidnightCrossingTail(desc, now);
+
+    /// <summary>¿El turno que arrancó el día <paramref name="shiftDay"/> ya terminó?</summary>
+    public static bool HasEnded(string? desc, DateTime shiftDay, DateTime now)
+    {
+        if (!TryParse(desc, out var s, out _)) return false;
+        var endDt = shiftDay.Date + s + TimeSpan.FromMinutes(GetDurationMinutes(desc));
+        return now >= endDt;
+    }
+
+    /// <summary>"7:00" / "07:00:00" -> "07:00".</summary>
+    public static string NormalizeHour(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return string.Empty;
+        if (TimeSpan.TryParse(s.Trim(), CultureInfo.InvariantCulture, out var ts))
+            return $"{ts.Hours:00}:{ts.Minutes:00}";
+        return s.Trim();
+    }
+
+    /// <summary>Minutos transcurridos del turno ahora mismo (0 si aún no arranca).</summary>
+    public static double ElapsedNowMinutes(string? desc, DateTime now)
+    {
+        var m = (now.TimeOfDay - StartOf(desc)).TotalMinutes;
+        if (m < 0) m += 1440;
+        return Math.Min(m, GetDurationMinutes(desc));
     }
 
     /// <summary>
-    /// Rellena HourlyPoint.ExpectedCumulative en cada punto: el acumulado que "deberíamos
-    /// llevar" a esa hora si el ritmo fuera parejo durante todo el turno (Plan × fracción de
-    /// turno transcurrida). Es la línea amarilla que compite contra el acumulado real (verde)
-    /// en las gráficas de tendencia — de dónde sale el inicio del turno también lo dice el
-    /// propio Shift_Desc, nada hardcodeado.
-    ///
-    /// Dos casos especiales:
-    /// - Hora EN CURSO ahora mismo (solo isLiveToday=true): se usa la hora real de "ahora",
-    ///   no el fin de esa hora, para no sobreestimar contra el Accumulated_Rate real del SP.
-    /// - Hora que se SALE del horario real del turno (ej. el turno termina 15:20 pero el
-    ///   bucket de hora es "15:00-16:00"): se deja en null (hueco en la gráfica) en vez de
-    ///   saltar de golpe al 100% del plan — ese salto es matemáticamente "correcto" pero se
-    ///   ve como un pico confuso, así que mejor no se dibuja ese último punto.
+    /// Minutos desde el inicio del turno hasta una etiqueta de hora. Una diferencia negativa
+    /// grande (&lt; -12h) es del día siguiente (+24h); una pequeña es la hora parcial previa al
+    /// arranque (ej. cubeta "15:00" de un turno que arranca 15:15) y se queda en 0.
     /// </summary>
-    public static void ApplyExpectedCumulative(List<HourlyPoint> hourlyTrend, string? shiftDesc, double shiftDurationHours, int totalPlanned, bool isLiveToday = true)
+    public static double ElapsedSinceShiftStart(string label, string? desc)
     {
-        if (hourlyTrend.Count == 0 || totalPlanned <= 0 || shiftDurationHours <= 0) return;
+        if (!TimeSpan.TryParse(NormalizeHour(label), CultureInfo.InvariantCulture, out var ts)) return double.MaxValue;
+        var diff = (ts - StartOf(desc)).TotalMinutes;
+        if (diff < -720) return diff + 1440;
+        return diff < 0 ? 0 : diff;
+    }
 
-        var m = ShiftTimeRegex.Match(shiftDesc ?? string.Empty);
-        if (!m.Success) return;
+    /// <summary>Las cubetas de hora del turno: la primera cierra en la siguiente hora en punto, y así hasta cubrir el fin.</summary>
+    public static List<ShiftBucket> BuildBuckets(string? desc)
+    {
+        var list = new List<ShiftBucket>();
+        if (!TryParse(desc, out var start, out _)) return list;
 
-        var shiftStart = new TimeSpan(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), 0);
-        var totalMinutes = shiftDurationHours * 60.0;
-        var now = DateTime.Now.TimeOfDay;
+        var duration = GetDurationMinutes(desc);
+        var startMinuteOfHour = start.TotalMinutes % 60;
+        var firstEnd = startMinuteOfHour == 0 ? 60 : 60 - startMinuteOfHour;
 
-        if (isLiveToday)
+        double startOff = 0;
+        double endOff = firstEnd;
+        while (startOff < duration - 0.5)
         {
-            // El SP arma de antemano las casillas de TODAS las horas del turno, aunque
-            // todavía no hayan pasado (ej. a las 8am ya viene la casilla de "10:00" vacía).
-            // Esas horas que NI SIQUIERA HAN EMPEZADO se quitan por completo del turno en
-            // vivo — ni barra vacía ni línea de esperado ahí, hasta que de verdad lleguen.
-            hourlyTrend.RemoveAll(p =>
+            var labelMinutes = (start.TotalMinutes + endOff) % 1440;
+            var label = $"{(int)(labelMinutes / 60):00}:{(int)(labelMinutes % 60):00}";
+            list.Add(new ShiftBucket(label, startOff, Math.Min(endOff, duration)));
+            startOff = endOff;
+            endOff += 60;
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// Arma la serie hora por hora COMPLETA del turno: una cubeta por hora desde el arranque hasta
+    /// la hora en curso (si es en vivo) o hasta el fin (si el turno ya cerró), con 0 donde no hubo
+    /// producción. Nunca aparecen horas futuras. ExpectedCumulative = plan × fracción del turno
+    /// transcurrida al cierre de cada hora (o a este instante, para la hora en curso).
+    /// </summary>
+    public static List<HourlyPoint> FillTrend(IEnumerable<HourlyPoint> data, string? desc, bool isLive, DateTime now, int plan)
+    {
+        var dict = new Dictionary<string, HourlyPoint>();
+        foreach (var p in data)
+        {
+            var key = NormalizeHour(p.Hour);
+            if (key.Length == 0) continue;
+            if (dict.TryGetValue(key, out var ex))
             {
-                if (!TimeSpan.TryParse(p.Hour, out var end)) return false;
-                if (end == TimeSpan.Zero) end = TimeSpan.FromHours(24);
-                var start = end - TimeSpan.FromHours(1);
-                return now < start;
+                ex.Production += p.Production;
+                ex.SapProduction += p.SapProduction;
+            }
+            else
+            {
+                dict[key] = new HourlyPoint { Hour = key, Production = p.Production, SapProduction = p.SapProduction };
+            }
+        }
+
+        var result = new List<HourlyPoint>();
+        var used = new HashSet<string>();
+        var buckets = BuildBuckets(desc);
+        var duration = GetDurationMinutes(desc);
+        var nowElapsed = isLive ? ElapsedNowMinutes(desc, now) : double.MaxValue;
+
+        foreach (var b in buckets)
+        {
+            if (isLive && b.StartMin >= nowElapsed) break;
+
+            dict.TryGetValue(b.Label, out var found);
+            used.Add(b.Label);
+
+            var elapsedEnd = Math.Min(b.EndMin, nowElapsed);
+            result.Add(new HourlyPoint
+            {
+                Hour = b.Label,
+                Production = found?.Production ?? 0,
+                SapProduction = found?.SapProduction ?? 0,
+                ExpectedCumulative = plan > 0 ? (int)Math.Round(plan * (elapsedEnd / duration)) : null
             });
         }
 
-        foreach (var point in hourlyTrend)
+        // Horas con datos que no caen en ninguna cubeta (formato raro del SP): se agregan al final, en orden.
+        var extras = dict.Values
+            .Where(p => !used.Contains(p.Hour) && (p.Production > 0 || p.SapProduction > 0))
+            .OrderBy(p => ElapsedSinceShiftStart(p.Hour, desc));
+        result.AddRange(extras);
+
+        return result;
+    }
+}
+
+public interface IBreakScheduleService
+{
+    /// <summary>Minutos de descanso que caen entre dos offsets (minutos desde el inicio del turno).</summary>
+    double OverlapMinutes(string? shiftDesc, double fromMin, double toMin);
+}
+
+/// <summary>Descansos configurables en appsettings (PlantMetrics:Breaks). Si no hay ninguno, no resta nada.</summary>
+public class BreakScheduleService : IBreakScheduleService
+{
+    private readonly List<(TimeSpan Start, double Len)> _breaks = new();
+
+    public BreakScheduleService(Microsoft.Extensions.Options.IOptions<PlantOptions> options)
+    {
+        foreach (var b in options.Value.Breaks)
         {
-            if (!TimeSpan.TryParse(point.Hour, out var bucketEnd)) continue;
-            if (bucketEnd == TimeSpan.Zero) bucketEnd = TimeSpan.FromHours(24); // "00:00" = fin del día
-
-            var bucketStart = bucketEnd - TimeSpan.FromHours(1);
-            var effectiveTime = bucketEnd;
-
-            if (isLiveToday && now >= bucketStart && now < bucketEnd)
-            {
-                effectiveTime = now; // la hora sigue corriendo -> usa "ahora", no el fin de hora
-            }
-
-            var elapsedMinutes = ElapsedSinceShiftStart(effectiveTime, shiftStart).TotalMinutes;
-
-            // Este bucket ya se sale del horario real del turno (ej. turno termina 15:20 pero
-            // el bucket es 15:00-16:00) -> mejor sin dato aquí que un salto brusco al 100%.
-            if (elapsedMinutes > totalMinutes + 1)
-            {
-                point.ExpectedCumulative = null;
-                continue;
-            }
-
-            var fraction = Math.Min(1.0, elapsedMinutes / totalMinutes);
-            point.ExpectedCumulative = (int)Math.Round(totalPlanned * fraction);
+            if (!TimeSpan.TryParse(b.Start, CultureInfo.InvariantCulture, out var s)) continue;
+            if (!TimeSpan.TryParse(b.End, CultureInfo.InvariantCulture, out var e)) continue;
+            var len = (e - s).TotalMinutes;
+            if (len <= 0) len += 1440;
+            _breaks.Add((s, len));
         }
     }
 
-    private static TimeSpan ElapsedSinceShiftStart(string hourLabel, TimeSpan shiftStart)
+    public double OverlapMinutes(string? shiftDesc, double fromMin, double toMin)
     {
-        if (!TimeSpan.TryParse(hourLabel, out var bucketEnd)) return TimeSpan.MaxValue;
-        if (bucketEnd == TimeSpan.Zero) bucketEnd = TimeSpan.FromHours(24);
-        return ElapsedSinceShiftStart(bucketEnd, shiftStart);
-    }
-
-    private static TimeSpan ElapsedSinceShiftStart(TimeSpan time, TimeSpan shiftStart)
-    {
-        var elapsed = time - shiftStart;
-        if (elapsed < TimeSpan.Zero) elapsed += TimeSpan.FromHours(24); // turno cruza medianoche
-        return elapsed;
+        if (_breaks.Count == 0 || toMin <= fromMin) return 0;
+        var shiftStart = ShiftTimeHelper.StartOf(shiftDesc);
+        double total = 0;
+        foreach (var (start, len) in _breaks)
+        {
+            var offset = (start - shiftStart).TotalMinutes;
+            if (offset < 0) offset += 1440;
+            total += Math.Max(0, Math.Min(toMin, offset + len) - Math.Max(fromMin, offset));
+        }
+        return total;
     }
 }

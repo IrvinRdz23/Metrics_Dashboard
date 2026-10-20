@@ -1,124 +1,115 @@
-using Metrics_Dashboard.Models;
 using System.Data.SqlClient;
-using System.Globalization;
-using System.Text.RegularExpressions;
+using Metrics_Dashboard.Models;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace Metrics_Dashboard.Services;
 
 public interface IMetricsRawDataService
 {
-    /// <summary>
-    /// Ejecuta [dbo].[Plant_Metrics_Production_Reports] para HOY y regresa todas las filas
-    /// del turno vigente (detectado por hora real contra el rango en Shift_Desc), de
-    /// TODOS los Product_Group_ID (incluyendo el 7 / Tube Mills — cada consumidor decide
-    /// si lo usa o lo excluye). De aquí se derivan tanto el dashboard general como los 6
-    /// dashboards de detalle por horno, sin volver a golpear la base de datos.
-    /// </summary>
+    /// <summary>Filas del turno en curso (ya filtradas a ese turno) y su Shift_Desc.</summary>
     Task<(List<RawMetricRow> Rows, string ShiftDesc)> FetchCurrentShiftRowsAsync(CancellationToken ct = default);
 
-    /// <summary>
-    /// Igual que arriba pero para un día pasado y un turno específico (1, 2 o 3) — usado por
-    /// el histórico. No hay detección de "hora actual" aquí: se filtra directo por Shift_ID.
-    /// </summary>
-    Task<(List<RawMetricRow> Rows, string ShiftDesc)> FetchHistoricalRowsAsync(DateTime date, int shiftId, CancellationToken ct = default);
-
-    /// <summary>Todas las filas de UN día completo (los 3 turnos, sin filtrar) — para las gráficas de OEE histórico.</summary>
+    /// <summary>Todas las filas (todos los turnos) del reporte diario de una fecha.</summary>
     Task<List<RawMetricRow>> FetchDayRowsAsync(DateTime date, CancellationToken ct = default);
 
-    /// <summary>Todas las filas de UNA semana completa (7 días × 3 turnos) en una sola llamada al SP
-    /// (@Get_Weekly_Report=1) — mucho más barato que 7 llamadas diarias.</summary>
-    Task<List<RawMetricRow>> FetchWeekRowsAsync(DateTime anyDateInWeek, CancellationToken ct = default);
-
-    /// <summary>Todos los meses del AÑO de la fecha dada, en una sola llamada al SP (@Get_Monthly_Report=1).
-    /// Forma de columnas distinta a las anteriores — ver MonthlyRawRow.</summary>
-    Task<List<MonthlyRawRow>> FetchYearMonthlyRowsAsync(DateTime anyDateInYear, CancellationToken ct = default);
+    /// <summary>
+    /// Para el histórico: turnos de la fecha y cuál usar. Si no se pide uno, el último turno ya
+    /// cerrado de ese día (o el primero si todavía no cierra ninguno).
+    /// </summary>
+    Task<(int ShiftId, List<ShiftInfo> Shifts)> ResolveShiftAsync(DateTime date, int? shiftId, CancellationToken ct = default);
 }
 
+/// <summary>
+/// Único punto que habla con [dbo].[Plant_Metrics_Production_Reports]. Un solo llamado por ciclo
+/// (con caché corta) alimenta el dashboard general, los detalles de grupo y las TVs de línea.
+/// Solo se conservan los Product_Group_ID del catálogo de Planta 4 (8-11).
+/// </summary>
 public class MetricsRawDataService : IMetricsRawDataService
 {
     private readonly string _connectionString;
-    private readonly int _plantListId;
+    private readonly PlantOptions _options;
+    private readonly IMemoryCache _cache;
     private readonly ILogger<MetricsRawDataService> _logger;
+    private readonly SemaphoreSlim _gate = new(1, 1);
 
-    // "Shift 1 06:00-15:20" -> captura 06:00 y 15:20
-    private static readonly Regex ShiftTimeRegex = new(@"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})", RegexOptions.Compiled);
-
-    public MetricsRawDataService(IConfiguration config, ILogger<MetricsRawDataService> logger)
+    public MetricsRawDataService(IConfiguration config, IOptions<PlantOptions> options, IMemoryCache cache, ILogger<MetricsRawDataService> logger)
     {
         _connectionString = config.GetConnectionString("M2SReportServices") ?? string.Empty;
-        _plantListId = config.GetValue<int>("PlantMetrics:PlantListId", 1);
+        _options = options.Value;
+        _cache = cache;
         _logger = logger;
     }
 
-    /// <summary>
-    /// BUG ENCONTRADO (turno 3 "vacío" entre ~00:00 y su hora de fin, ej. 5-6am): IsWithinShift
-    /// solo compara la HORA DEL RELOJ contra el rango del Shift_Desc — no le importa de qué
-    /// día vinieron las filas. Un turno que cruza medianoche (ej. "22:40-06:00") aparece TANTO
-    /// en el reporte de HOY (el turno que arranca esta noche, casi vacío) como en el de AYER
-    /// (el que arrancó anoche y sigue corriendo, con datos reales) — y ambos matchean por hora
-    /// de reloj. Antes siempre se usaba el de HOY, que en la madrugada es el equivocado.
-    ///
-    /// Ahora: si el turno detectado en el reporte de HOY es uno que cruza medianoche y "ahora"
-    /// cae en su mitad de madrugada (después de las 00:00, antes de que termine), eso significa
-    /// que en realidad pertenece al bloque de AYER — se prueba con AYER y, si ahí sí hay datos
-    /// reales (Total o Plan > 0), se usa eso en su lugar.
-    /// </summary>
     public async Task<(List<RawMetricRow> Rows, string ShiftDesc)> FetchCurrentShiftRowsAsync(CancellationToken ct = default)
     {
         var now = DateTime.Now;
-        var todaysAll = await FetchDayRowsAsync(now.Date, ct);
-        var todaysMatch = todaysAll.Where(r => IsWithinShift(r.ShiftDesc, now.TimeOfDay)).ToList();
-        var matchedShiftDesc = todaysMatch.FirstOrDefault()?.ShiftDesc;
+        var today = await FetchDayRowsAsync(now.Date, ct);
+        var todayShifts = today.DistinctShifts();
 
-        if (IsInMidnightCrossingTail(matchedShiftDesc, now.TimeOfDay))
-        {
-            var yesterdaysAll = await FetchDayRowsAsync(now.Date.AddDays(-1), ct);
-            var yesterdaysMatch = yesterdaysAll.Where(r => IsWithinShift(r.ShiftDesc, now.TimeOfDay)).ToList();
+        // 1) Turno activo que pertenece al reporte de hoy. Si hay traslape (ej. turno 1 termina 15:20 y
+        //    el 2 arranca 15:15) gana el que arrancó más tarde.
+        var active = todayShifts
+            .Where(s => ShiftTimeHelper.IsActiveToday(s.ShiftDesc, now))
+            .OrderByDescending(s => ShiftTimeHelper.StartOf(s.ShiftDesc))
+            .FirstOrDefault();
+        if (active != null) return (OnlyShift(today, active.ShiftId), active.ShiftDesc);
 
-            if (yesterdaysMatch.Any(r => r.Total > 0 || r.PlannedForOee > 0))
-            {
-                var yShiftDesc = yesterdaysMatch.FirstOrDefault()?.ShiftDesc ?? string.Empty;
-                return (yesterdaysMatch, yShiftDesc);
-            }
-        }
+        // 2) Madrugada de un turno que cruza medianoche (ej. 05:30 del turno 23:20-06:00): su reporte es el de AYER.
+        var yesterday = await FetchDayRowsAsync(now.Date.AddDays(-1), ct);
+        var tail = yesterday.DistinctShifts().FirstOrDefault(s => ShiftTimeHelper.IsInMidnightCrossingTail(s.ShiftDesc, now));
+        if (tail != null) return (OnlyShift(yesterday, tail.ShiftId), tail.ShiftDesc);
 
-        var shiftDesc = todaysMatch.FirstOrDefault()?.ShiftDesc ?? string.Empty;
-        return (todaysMatch, shiftDesc);
+        // 3) Hueco entre turnos: el último que ya arrancó hoy (o el primero del día).
+        var fallback = todayShifts
+            .Where(s => ShiftTimeHelper.StartOf(s.ShiftDesc) <= now.TimeOfDay)
+            .OrderByDescending(s => ShiftTimeHelper.StartOf(s.ShiftDesc))
+            .FirstOrDefault() ?? todayShifts.FirstOrDefault();
+        return fallback == null
+            ? (new List<RawMetricRow>(), string.Empty)
+            : (OnlyShift(today, fallback.ShiftId), fallback.ShiftDesc);
     }
 
-    /// <summary>¿"now" cae en la mitad de madrugada de un turno que cruza medianoche
-    /// (ej. Shift 3 22:40-06:00, y son las 5:30)? Si sí, ese turno en realidad pertenece al
-    /// @Start_Date de AYER, no al de hoy.</summary>
-    private static bool IsInMidnightCrossingTail(string? shiftDesc, TimeSpan now)
+    public async Task<(int ShiftId, List<ShiftInfo> Shifts)> ResolveShiftAsync(DateTime date, int? shiftId, CancellationToken ct = default)
     {
-        var m = ShiftTimeRegex.Match(shiftDesc ?? string.Empty);
-        if (!m.Success) return false;
+        var rows = await FetchDayRowsAsync(date.Date, ct);
+        var shifts = rows.DistinctShifts();
+        if (shiftId.HasValue && shifts.Any(s => s.ShiftId == shiftId.Value)) return (shiftId.Value, shifts);
 
-        var start = new TimeSpan(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), 0);
-        var end = new TimeSpan(int.Parse(m.Groups[3].Value), int.Parse(m.Groups[4].Value), 0);
-
-        if (end > start) return false; // no cruza medianoche, nada que corregir
-        return now < end; // estamos después de medianoche pero antes de que termine -> es la cola de AYER
-    }
-
-    public async Task<(List<RawMetricRow> Rows, string ShiftDesc)> FetchHistoricalRowsAsync(DateTime date, int shiftId, CancellationToken ct = default)
-    {
-        var all = await FetchDayRowsAsync(date, ct);
-        var filtered = all.Where(r => r.ShiftId == shiftId).ToList();
-        var shiftDesc = filtered.FirstOrDefault()?.ShiftDesc ?? string.Empty;
-        return (filtered, shiftDesc);
+        var now = DateTime.Now;
+        var chosen = shifts.LastOrDefault(s => ShiftTimeHelper.HasEnded(s.ShiftDesc, date, now)) ?? shifts.FirstOrDefault();
+        return (chosen?.ShiftId ?? 0, shifts);
     }
 
     public async Task<List<RawMetricRow>> FetchDayRowsAsync(DateTime date, CancellationToken ct = default)
-        => await ExecuteDayShapedReportAsync(date.Date, weekly: false, ct);
+    {
+        date = date.Date;
+        var key = $"raw|{_options.PlantListId}|{date:yyyyMMdd}";
+        if (_cache.TryGetValue(key, out List<RawMetricRow>? cached) && cached != null) return cached;
 
-    public async Task<List<RawMetricRow>> FetchWeekRowsAsync(DateTime anyDateInWeek, CancellationToken ct = default)
-        => await ExecuteDayShapedReportAsync(anyDateInWeek.Date, weekly: true, ct);
+        await _gate.WaitAsync(ct);
+        try
+        {
+            if (_cache.TryGetValue(key, out cached) && cached != null) return cached;
 
-    /// <summary>@Get_Daily_Report=1 y @Get_Weekly_Report=1 regresan la MISMA forma de columnas
-    /// (Report_Group 1/2/3, Hour_by_Hour, Shift_ID, etc.) — la semanal solo trae 7 días de esas
-    /// filas en vez de 1. Por eso comparten el mismo lector.</summary>
-    private async Task<List<RawMetricRow>> ExecuteDayShapedReportAsync(DateTime date, bool weekly, CancellationToken ct)
+            var rows = _options.UseDemoData
+                ? DemoData.BuildDayRows(date, DateTime.Now)
+                : await QueryStoredProcedureAsync(date, ct);
+
+            var ttl = date == DateTime.Today ? Math.Max(1, _options.LiveCacheSeconds) : 60;
+            _cache.Set(key, rows, TimeSpan.FromSeconds(ttl));
+            return rows;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private static List<RawMetricRow> OnlyShift(List<RawMetricRow> rows, int shiftId) =>
+        rows.Where(r => r.ShiftId == shiftId).ToList();
+
+    private async Task<List<RawMetricRow>> QueryStoredProcedureAsync(DateTime date, CancellationToken ct)
     {
         var rows = new List<RawMetricRow>();
 
@@ -130,185 +121,132 @@ public class MetricsRawDataService : IMetricsRawDataService
             CommandType = System.Data.CommandType.StoredProcedure,
             CommandTimeout = 60
         };
-
         cmd.Parameters.AddWithValue("@Start_Date", date);
-        cmd.Parameters.AddWithValue("@Plant_List_ID", _plantListId);
-        cmd.Parameters.AddWithValue("@Get_Daily_Report", !weekly);
-        cmd.Parameters.AddWithValue("@Get_Weekly_Report", weekly);
+        cmd.Parameters.AddWithValue("@Plant_List_ID", _options.PlantListId);
+        cmd.Parameters.AddWithValue("@Get_Daily_Report", true);
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
 
-        int ordReportGroup = reader.GetOrdinal("Report_Group");
-        int ordGroupId = reader.GetOrdinal("Product_Group_ID");
-        int ordDesc = reader.GetOrdinal("Product_Desc");
-        int ordProductOrder = reader.GetOrdinal("Product_Order");
-        int ordProductListId = reader.GetOrdinal("Product_List_ID");
-        int ordCycleTime = reader.GetOrdinal("Cycle_Time_Secs");
-        int ordPlannedForOee = reader.GetOrdinal("Planned_Shift_for_OEE");
-        int ordAccumRate = reader.GetOrdinal("Accumulated_Rate");
-        int ordOeeShift = reader.GetOrdinal("OEE_Shift");
-        int ordTotal = reader.GetOrdinal("Total");
-        int ordTotalSap = reader.GetOrdinal("Total_SAP");
-        int ordHour = reader.GetOrdinal("Hour_by_Hour");
-        int ordShiftId = reader.GetOrdinal("Shift_ID");
-        int ordShiftDesc = reader.GetOrdinal("Shift_Desc");
-        int ordEventDateShort = TryGetOrdinal(reader, "Event_Date_Short");
+        int oRg = reader.GetOrdinal("Report_Group");
+        int oGroup = reader.GetOrdinal("Product_Group_ID");
+        int oListId = reader.GetOrdinal("Product_List_ID");
+        int oOrder = reader.GetOrdinal("Product_Order");
+        int oDesc = reader.GetOrdinal("Product_Desc");
+        int oCt = reader.GetOrdinal("Cycle_Time_Secs");
+        int oPlan = reader.GetOrdinal("Planned_Shift_for_OEE");
+        int oAccum = reader.GetOrdinal("Accumulated_Rate");
+        int oOee = reader.GetOrdinal("OEE_Shift");
+        int oTotal = reader.GetOrdinal("Total");
+        int oSap = reader.GetOrdinal("Total_SAP");
+        int oHour = reader.GetOrdinal("Hour_by_Hour");
+        int oShiftId = reader.GetOrdinal("Shift_ID");
+        int oShiftDesc = reader.GetOrdinal("Shift_Desc");
+        int oDate = reader.GetOrdinal("Event_Date_Short");
 
         while (await reader.ReadAsync(ct))
         {
-            rows.Add(new RawMetricRow(
-                ReportGroup: SafeGetInt(reader, ordReportGroup, -1),
-                GroupId: SafeGetInt(reader, ordGroupId, -1),
-                Desc: SafeGetString(reader, ordDesc),
-                ProductOrder: SafeGetInt(reader, ordProductOrder),
-                ProductListId: SafeGetInt(reader, ordProductListId),
-                CycleTimeSecs: SafeGetDouble(reader, ordCycleTime),
-                PlannedForOee: SafeGetInt(reader, ordPlannedForOee),
-                AccumRate: SafeGetInt(reader, ordAccumRate),
-                OeeShift: SafeGetDouble(reader, ordOeeShift),
-                Total: SafeGetInt(reader, ordTotal),
-                TotalSap: SafeGetInt(reader, ordTotalSap),
-                Hour: SafeGetString(reader, ordHour),
-                ShiftId: SafeGetInt(reader, ordShiftId, -1),
-                ShiftDesc: SafeGetString(reader, ordShiftDesc),
-                EventDateShort: ordEventDateShort >= 0 ? SafeGetString(reader, ordEventDateShort) : string.Empty
-            ));
+            try
+            {
+                var groupId = Int(reader, oGroup);
+                if (!ProductGroupCatalog.IsValid(groupId)) continue;
+
+                rows.Add(new RawMetricRow(
+                    ReportGroup: Int(reader, oRg),
+                    GroupId: groupId,
+                    Desc: Str(reader, oDesc),
+                    ProductOrder: Int(reader, oOrder),
+                    ProductListId: Int(reader, oListId),
+                    CycleTimeSecs: Dbl(reader, oCt),
+                    PlannedForOee: Int(reader, oPlan),
+                    AccumRate: Int(reader, oAccum),
+                    OeeShift: Dbl(reader, oOee),
+                    Total: Int(reader, oTotal),
+                    TotalSap: Int(reader, oSap),
+                    Hour: Str(reader, oHour),
+                    ShiftId: Int(reader, oShiftId),
+                    ShiftDesc: Str(reader, oShiftDesc),
+                    EventDateShort: Str(reader, oDate)));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Fila del SP ignorada por formato inesperado.");
+            }
         }
 
         return rows;
     }
 
-    /// <summary>
-    /// @Get_Monthly_Report=1: UN llamado regresa TODOS los meses del año de @Start_Date
-    /// (el SP genera el año completo internamente y agrega por mes). Columnas distintas al
-    /// modo diario/semanal — se leen por nombre y de forma defensiva; si algún nombre no
-    /// coincide con el real en tu SP, se loguea y esa columna regresa vacía en vez de tronar.
-    /// </summary>
-    public async Task<List<MonthlyRawRow>> FetchYearMonthlyRowsAsync(DateTime anyDateInYear, CancellationToken ct = default)
+    private static int Int(SqlDataReader r, int o) => r.IsDBNull(o) ? 0 : Convert.ToInt32(r.GetValue(o));
+    private static double Dbl(SqlDataReader r, int o) => r.IsDBNull(o) ? 0 : Convert.ToDouble(r.GetValue(o));
+    private static string Str(SqlDataReader r, int o) => r.IsDBNull(o) ? string.Empty : Convert.ToString(r.GetValue(o)) ?? string.Empty;
+}
+
+/// <summary>Datos de mentira (PlantMetrics:UseDemoData = true) para probar todo sin SQL Server.</summary>
+public static class DemoData
+{
+    private static readonly (string Shift, string Desc)[] Shifts =
     {
-        var rows = new List<MonthlyRawRow>();
+        ("1", "Shift 1 06:00-15:20"),
+        ("2", "Shift 2 15:15-23:25"),
+        ("3", "Shift 3 23:20-06:00"),
+    };
 
-        await using var conn = new SqlConnection(_connectionString);
-        await conn.OpenAsync(ct);
+    private static readonly Dictionary<int, string[]> Lines = new()
+    {
+        [8] = new[] { "PTC BMW Condenser", "PTC Honda TG7 Condenser", "PTC Honda T90 Condenser", "PTC Honda Civic Condenser", "PTC Rivian Condenser", "PTC BEV3 Condenser", "PTC Honda MDX Condenser" },
+        [9] = new[] { "BCP Tesla Y Plate", "BCP BMW Plate", "BCP GM Plate", "BCP Rivian Plate" },
+        [10] = new[] { "HC Toyota Heater Core", "HC GM Heater Core", "HC Honda Heater Core", "HC Ford Heater Core", "HC Nissan Heater Core" },
+        [11] = new[] { "RES Radiator A", "RES Radiator B", "RES Radiator C" },
+    };
 
-        await using var cmd = new SqlCommand("[dbo].[Plant_Metrics_Production_Reports]", conn)
+    public static List<RawMetricRow> BuildDayRows(DateTime date, DateTime now)
+    {
+        var rows = new List<RawMetricRow>();
+        var dateShort = date.ToString("yyyy/MM/dd");
+
+        foreach (var (shiftId, desc) in Shifts)
         {
-            CommandType = System.Data.CommandType.StoredProcedure,
-            CommandTimeout = 60
-        };
+            int sid = int.Parse(shiftId);
+            var start = date + ShiftTimeHelper.StartOf(desc);
+            var durationMin = ShiftTimeHelper.GetDurationMinutes(desc);
+            var frac = Math.Clamp((now - start).TotalMinutes / durationMin, 0, 1);
+            var buckets = ShiftTimeHelper.BuildBuckets(desc);
 
-        cmd.Parameters.AddWithValue("@Start_Date", anyDateInYear.Date);
-        cmd.Parameters.AddWithValue("@Plant_List_ID", _plantListId);
-        cmd.Parameters.AddWithValue("@Get_Monthly_Report", true);
+            foreach (var (groupId, names) in Lines)
+            {
+                for (int i = 0; i < names.Length; i++)
+                {
+                    var name = names[i];
+                    var rnd = new Random(HashCode.Combine(date.DayOfYear, sid, groupId, i));
+                    var listId = groupId * 100 + i + 1;
+                    var ct = Math.Round(25 + rnd.NextDouble() * 55, 2);
+                    var planned = (int)(durationMin * 60 * 0.8 / ct);
+                    var accum = (int)Math.Round(planned * frac);
+                    var eff = 0.55 + rnd.NextDouble() * 0.6;
+                    var total = i == names.Length - 1 && groupId == 11 ? 0 : (int)(accum * eff);
+                    var oee = accum <= 0 ? 0 : (double)total / accum;
+                    var sap = (int)(total * (0.6 + rnd.NextDouble() * 0.35));
+                    var order = (groupId - 7) * 100 + (i + 1) * 10;
 
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
+                    rows.Add(new RawMetricRow(1, groupId, name, order, 0, ct, planned, accum, oee, total, 0, "-", sid, desc, dateShort));
+                    rows.Add(new RawMetricRow(3, groupId, name, order, listId, ct, 0, 0, 0, 0, sap, "-", sid, desc, dateShort));
 
-        int ordReportGroup = TryGetOrdinal(reader, "Report_Group");
-        int ordGroupId = TryGetOrdinal(reader, "Product_Group_ID");
-        int ordDesc = TryGetOrdinal(reader, "Product_Desc");
-        int ordPlannedShift = TryGetOrdinal(reader, "Planned_Shift");
-        int ordMonthName = TryGetOrdinal(reader, "Event_Date_Short_Month_Name");
-        int ordMonthNumber = TryGetOrdinal(reader, "Event_Date_Short_Month_Number");
-        int ordAccumRate = TryGetOrdinal(reader, "Accumulated_Rate");
-        int ordTotal = TryGetOrdinal(reader, "Total");
-        int ordTotalSap = TryGetOrdinal(reader, "Total_SAP");
-        int ordPlannedForOee = TryGetOrdinal(reader, "Planned_for_OEE");
-        int ordOee = TryGetOrdinal(reader, "OEE");
-
-        if (ordReportGroup < 0 || ordMonthNumber < 0 || ordTotal < 0)
-        {
-            _logger.LogError("FetchYearMonthlyRowsAsync: no encontré las columnas esperadas del modo @Get_Monthly_Report=1 — revisa los nombres de columna contra tu SP real.");
-            return rows;
+                    // Producción repartida en las horas ya transcurridas (con algo de ruido).
+                    var elapsed = durationMin * frac;
+                    var live = buckets.Where(b => b.StartMin < elapsed).ToList();
+                    var weights = live.Select(b => (Math.Min(b.EndMin, elapsed) - b.StartMin) * (0.7 + rnd.NextDouble() * 0.6)).ToList();
+                    var wsum = weights.Sum();
+                    int assigned = 0;
+                    for (int h = 0; h < live.Count; h++)
+                    {
+                        var v = h == live.Count - 1 ? total - assigned : (int)Math.Round(total * weights[h] / (wsum <= 0 ? 1 : wsum));
+                        v = Math.Max(0, v);
+                        assigned += v;
+                        rows.Add(new RawMetricRow(2, groupId, name, order, listId, ct, 0, accum, 0, v, 0, live[h].Label, sid, desc, dateShort));
+                    }
+                }
+            }
         }
-
-        while (await reader.ReadAsync(ct))
-        {
-            rows.Add(new MonthlyRawRow(
-                ReportGroup: SafeGetInt(reader, ordReportGroup, -1),
-                GroupId: ordGroupId >= 0 ? SafeGetInt(reader, ordGroupId, -1) : -1,
-                Desc: ordDesc >= 0 ? SafeGetString(reader, ordDesc) : string.Empty,
-                PlannedShift: ordPlannedShift >= 0 ? SafeGetInt(reader, ordPlannedShift) : 0,
-                MonthName: ordMonthName >= 0 ? SafeGetString(reader, ordMonthName) : string.Empty,
-                MonthNumber: SafeGetInt(reader, ordMonthNumber),
-                AccumulatedRate: ordAccumRate >= 0 ? SafeGetInt(reader, ordAccumRate) : 0,
-                Total: SafeGetInt(reader, ordTotal),
-                TotalSap: ordTotalSap >= 0 ? SafeGetInt(reader, ordTotalSap) : 0,
-                PlannedForOee: ordPlannedForOee >= 0 ? SafeGetInt(reader, ordPlannedForOee) : 0,
-                Oee: ordOee >= 0 ? SafeGetDouble(reader, ordOee) : 0
-            ));
-        }
-
         return rows;
-    }
-
-    private static int TryGetOrdinal(SqlDataReader reader, string columnName)
-    {
-        try { return reader.GetOrdinal(columnName); }
-        catch (IndexOutOfRangeException) { return -1; }
-    }
-
-    private static int SafeGetInt(SqlDataReader reader, int ordinal, int fallback = 0)
-    {
-        if (ordinal < 0 || reader.IsDBNull(ordinal)) return fallback;
-        var value = reader.GetValue(ordinal);
-        return value switch
-        {
-            int i => i,
-            short s => s,
-            byte b => b,
-            long l => (int)l,
-            decimal d => (int)d,
-            double db => (int)db,
-            float f => (int)f,
-            string str => int.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) ? parsed : fallback,
-            _ => TryConvert(() => Convert.ToInt32(value, CultureInfo.InvariantCulture), fallback)
-        };
-    }
-
-    private static double SafeGetDouble(SqlDataReader reader, int ordinal, double fallback = 0)
-    {
-        if (ordinal < 0 || reader.IsDBNull(ordinal)) return fallback;
-        var value = reader.GetValue(ordinal);
-        return value switch
-        {
-            double db => db,
-            float f => f,
-            decimal d => (double)d,
-            int i => i,
-            short s => s,
-            byte b => b,
-            long l => l,
-            string str => double.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) ? parsed : fallback,
-            _ => TryConvert(() => Convert.ToDouble(value, CultureInfo.InvariantCulture), fallback)
-        };
-    }
-
-    private static string SafeGetString(SqlDataReader reader, int ordinal)
-    {
-        if (ordinal < 0 || reader.IsDBNull(ordinal)) return string.Empty;
-        var value = reader.GetValue(ordinal);
-        return value?.ToString()?.Trim() ?? string.Empty;
-    }
-
-    private static T TryConvert<T>(Func<T> convert, T fallback)
-    {
-        try { return convert(); } catch { return fallback; }
-    }
-
-    /// <summary>
-    /// ¿La hora actual cae dentro del rango que trae este Shift_Desc? (ej. "Shift 1 06:00-15:20").
-    /// Soporta turnos que cruzan medianoche. Nada hardcodeado: el rango sale del propio SP.
-    /// </summary>
-    private static bool IsWithinShift(string shiftDesc, TimeSpan now)
-    {
-        var m = ShiftTimeRegex.Match(shiftDesc ?? string.Empty);
-        if (!m.Success) return false;
-
-        var start = new TimeSpan(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), 0);
-        var end = new TimeSpan(int.Parse(m.Groups[3].Value), int.Parse(m.Groups[4].Value), 0);
-
-        return end <= start
-            ? (now >= start || now < end)
-            : (now >= start && now < end);
     }
 }

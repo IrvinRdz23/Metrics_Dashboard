@@ -1,188 +1,131 @@
-using Metrics_Dashboard.Models;
 using System.Data.SqlClient;
+using Metrics_Dashboard.Models;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace Metrics_Dashboard.Services;
 
 public interface IHeijunkaService
 {
     /// <summary>
-    /// true = Heijunka dice que esta línea (Product_List_ID) tenía plan ese día/turno.
-    /// false = Heijunka dice que NO tenía plan.
-    /// null = no hay datos de Heijunka para esa semana todavía, o la línea no se pudo mapear
-    /// a un Product_List_Group_ID — en ese caso, el que llama debe usar el criterio viejo
-    /// (Planned_Shift_for_OEE != 0) como respaldo, tal como pidió Irvin.
+    /// Product_List_ID -> ¿tenía plan ese día/turno? Un ID que NO aparece en el diccionario significa
+    /// "sin información de Heijunka" (apagado, sin datos esa semana, o línea sin grupo): quien llama
+    /// cae al criterio de siempre (Planned_Shift_for_OEE &gt; 0).
     /// </summary>
-    Task<Dictionary<int, bool?>> IsPlannedBatchAsync(IEnumerable<int> productListIds, DateTime date, int shiftId, CancellationToken ct = default);
+    Task<Dictionary<int, bool>> IsPlannedBatchAsync(IEnumerable<int> productListIds, DateTime shiftDate, int shiftId, CancellationToken ct = default);
 }
 
 /// <summary>
-/// Cruce completo: Product_List_ID (SP) -> Product_List_Group_ID (tabla Product_List) ->
-/// bandera del día/turno (Heijunka_Plan_List, Start_Date = lunes de la semana vigente).
-///
-/// Ambos catálogos se cachean en memoria (Singleton) porque son datos que casi no cambian
-/// día a día — Product_List es configuración de líneas, y Heijunka_Plan_List se actualiza
-/// por semana, no por request. Se refrescan solos cada cierto tiempo, y el plan Heijunka
-/// además se recarga automáticamente si cambia la semana.
+/// Heijunka listo para cuando Planta 4 lo use. Con PlantMetrics:HeijunkaEnabled = false no toca la
+/// base y todas las vistas se comportan como "sin datos de Heijunka". Con true aplica las mismas
+/// reglas que Planta 1: Product_List_ID -> Product_List_Group_ID (tabla Product_List) ->
+/// fila de la semana en Heijunka_Plan_List -> columna {Día}_Shift_{N}.
 /// </summary>
 public class HeijunkaService : IHeijunkaService
 {
     private readonly string _connectionString;
+    private readonly PlantOptions _options;
+    private readonly IMemoryCache _cache;
     private readonly ILogger<HeijunkaService> _logger;
 
-    private static readonly TimeSpan MappingRefreshInterval = TimeSpan.FromMinutes(30);
-    private static readonly TimeSpan PlanRefreshInterval = TimeSpan.FromMinutes(15);
-
-    private readonly SemaphoreSlim _mappingLock = new(1, 1);
-    private readonly SemaphoreSlim _planLock = new(1, 1);
-
-    private Dictionary<int, int> _productListToGroup = new(); // Product_List_ID -> Product_List_Group_ID
-    private DateTime _mappingLoadedAt = DateTime.MinValue;
-
-    private Dictionary<int, HeijunkaGroupPlan> _plansByGroup = new(); // Product_List_Group_ID -> plan de la semana vigente
-    private DateTime _plansLoadedAt = DateTime.MinValue;
-    private DateTime _plansForMonday = DateTime.MinValue;
-    private bool _hasDataForCurrentWeek;
-
-    public HeijunkaService(IConfiguration config, ILogger<HeijunkaService> logger)
+    public HeijunkaService(IConfiguration config, IOptions<PlantOptions> options, IMemoryCache cache, ILogger<HeijunkaService> logger)
     {
         _connectionString = config.GetConnectionString("M2SReportServices") ?? string.Empty;
+        _options = options.Value;
+        _cache = cache;
         _logger = logger;
     }
 
-    public async Task<Dictionary<int, bool?>> IsPlannedBatchAsync(IEnumerable<int> productListIds, DateTime date, int shiftId, CancellationToken ct = default)
+    public async Task<Dictionary<int, bool>> IsPlannedBatchAsync(IEnumerable<int> productListIds, DateTime shiftDate, int shiftId, CancellationToken ct = default)
     {
-        await EnsureMappingLoadedAsync(ct);
-        await EnsurePlansLoadedAsync(date, ct);
+        var result = new Dictionary<int, bool>();
+        if (!_options.HeijunkaEnabled) return result;
 
-        var result = new Dictionary<int, bool?>();
-        var day = date.DayOfWeek;
+        var ids = productListIds.Where(i => i > 0).Distinct().ToList();
+        if (ids.Count == 0 || shiftId <= 0) return result;
 
-        foreach (var id in productListIds.Distinct())
+        if (_options.UseDemoData)
         {
-            if (!_hasDataForCurrentWeek) { result[id] = null; continue; }
-            if (id <= 0 || !_productListToGroup.TryGetValue(id, out var groupId)) { result[id] = null; continue; }
-            if (!_plansByGroup.TryGetValue(groupId, out var plan)) { result[id] = null; continue; }
+            foreach (var id in ids) result[id] = id % 7 != 0;
+            return result;
+        }
 
-            result[id] = plan.IsPlanned(day, shiftId);
+        try
+        {
+            var groupOf = await GetProductListGroupsAsync(ct);
+            var weekPlan = await GetWeekPlanAsync(shiftDate, shiftId, ct);
+
+            foreach (var id in ids)
+            {
+                if (!groupOf.TryGetValue(id, out var listGroupId)) continue;
+                if (!weekPlan.TryGetValue(listGroupId, out var plan)) continue; // sin fila esa semana -> criterio viejo
+                if (!plan.Enabled) continue;                                    // Heijunka apagado para ese grupo
+                result[id] = plan.Planned;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudo consultar Heijunka; se usa el criterio de Planned_Shift_for_OEE.");
+            result.Clear();
         }
 
         return result;
     }
 
-    private async Task EnsureMappingLoadedAsync(CancellationToken ct)
+    /// <summary>Product_List_ID -> Product_List_Group_ID, de esta planta. Casi nunca cambia: 10 min de caché.</summary>
+    private async Task<Dictionary<int, int>> GetProductListGroupsAsync(CancellationToken ct)
     {
-        if (DateTime.UtcNow - _mappingLoadedAt < MappingRefreshInterval && _productListToGroup.Count > 0) return;
+        if (_cache.TryGetValue("hj-product-groups", out Dictionary<int, int>? cached) && cached != null) return cached;
 
-        await _mappingLock.WaitAsync(ct);
-        try
+        var map = new Dictionary<int, int>();
+        await using var conn = new SqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = new SqlCommand(
+            "SELECT Product_List_ID, Product_List_Group_ID FROM [dbo].[Product_List] WHERE Plant_List_ID = @plant", conn);
+        cmd.Parameters.AddWithValue("@plant", _options.PlantListId);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
         {
-            if (DateTime.UtcNow - _mappingLoadedAt < MappingRefreshInterval && _productListToGroup.Count > 0) return;
+            if (reader.IsDBNull(0) || reader.IsDBNull(1)) continue;
+            map[Convert.ToInt32(reader.GetValue(0))] = Convert.ToInt32(reader.GetValue(1));
+        }
 
-            var map = new Dictionary<int, int>();
-            await using var conn = new SqlConnection(_connectionString);
-            await conn.OpenAsync(ct);
-            await using var cmd = new SqlCommand(
-                "SELECT Product_List_ID, Product_List_Group_ID FROM dbo.Product_List", conn);
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
-                if (reader.IsDBNull(1)) continue;
-                map[reader.GetInt32(0)] = reader.GetInt32(1);
-            }
-
-            _productListToGroup = map;
-            _mappingLoadedAt = DateTime.UtcNow;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error cargando el mapeo Product_List -> Product_List_Group_ID para Heijunka");
-        }
-        finally
-        {
-            _mappingLock.Release();
-        }
+        _cache.Set("hj-product-groups", map, TimeSpan.FromMinutes(10));
+        return map;
     }
 
-    private async Task EnsurePlansLoadedAsync(DateTime date, CancellationToken ct)
+    /// <summary>Product_List_Group_ID -> (Heijunka_Enabled, ¿planeado en ese día/turno?) de la semana de shiftDate.</summary>
+    private async Task<Dictionary<int, (bool Enabled, bool Planned)>> GetWeekPlanAsync(DateTime shiftDate, int shiftId, CancellationToken ct)
     {
-        var monday = date.AddDays(-(int)((7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7)).Date;
+        var monday = shiftDate.Date.AddDays(-(((int)shiftDate.DayOfWeek + 6) % 7));
+        var dayName = shiftDate.DayOfWeek.ToString(); // "Monday".."Sunday" (invariante)
 
-        if (monday == _plansForMonday && DateTime.UtcNow - _plansLoadedAt < PlanRefreshInterval) return;
+        // Sábado y domingo solo tienen turnos 1 y 2; lunes a viernes tienen 1, 2 y 3.
+        var weekend = shiftDate.DayOfWeek == DayOfWeek.Saturday || shiftDate.DayOfWeek == DayOfWeek.Sunday;
+        var columnExists = shiftId >= 1 && shiftId <= (weekend ? 2 : 3);
+        var plannedExpr = columnExists ? $"CAST([{dayName}_Shift_{shiftId}] AS int)" : "CAST(0 AS int)";
 
-        await _planLock.WaitAsync(ct);
-        try
+        var key = $"hj-week|{monday:yyyyMMdd}|{dayName}|{shiftId}";
+        if (_cache.TryGetValue(key, out Dictionary<int, (bool, bool)>? cached) && cached != null) return cached;
+
+        var plan = new Dictionary<int, (bool Enabled, bool Planned)>();
+        await using var conn = new SqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = new SqlCommand(
+            $"SELECT Product_List_Group_ID, CAST(Heijunka_Enabled AS int), {plannedExpr} " +
+            "FROM [dbo].[Heijunka_Plan_List] WHERE CAST(Start_Date AS date) = @monday", conn);
+        cmd.Parameters.AddWithValue("@monday", monday);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
         {
-            if (monday == _plansForMonday && DateTime.UtcNow - _plansLoadedAt < PlanRefreshInterval) return;
-
-            var plans = new Dictionary<int, HeijunkaGroupPlan>();
-            var found = false;
-
-            await using var conn = new SqlConnection(_connectionString);
-            await conn.OpenAsync(ct);
-            await using var cmd = new SqlCommand(@"
-                SELECT Product_List_Group_ID,
-                       Monday_Shift_1, Monday_Shift_2, Monday_Shift_3,
-                       Tuesday_Shift_1, Tuesday_Shift_2, Tuesday_Shift_3,
-                       Wednesday_Shift_1, Wednesday_Shift_2, Wednesday_Shift_3,
-                       Thursday_Shift_1, Thursday_Shift_2, Thursday_Shift_3,
-                       Friday_Shift_1, Friday_Shift_2, Friday_Shift_3,
-                       Saturday_Shift_1, Saturday_Shift_2,
-                       Sunday_Shift_1, Sunday_Shift_2
-                FROM dbo.Heijunka_Plan_List
-                WHERE Start_Date = @Monday", conn);
-            cmd.Parameters.AddWithValue("@Monday", monday);
-
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
-                found = true;
-                var groupId = reader.GetInt32(0);
-                var plan = new HeijunkaGroupPlan { ProductListGroupId = groupId };
-
-                bool G(int i) => !reader.IsDBNull(i) && Convert.ToBoolean(reader.GetValue(i));
-
-                plan.SetFlag(DayOfWeek.Monday, 1, G(1));
-                plan.SetFlag(DayOfWeek.Monday, 2, G(2));
-                plan.SetFlag(DayOfWeek.Monday, 3, G(3));
-                plan.SetFlag(DayOfWeek.Tuesday, 1, G(4));
-                plan.SetFlag(DayOfWeek.Tuesday, 2, G(5));
-                plan.SetFlag(DayOfWeek.Tuesday, 3, G(6));
-                plan.SetFlag(DayOfWeek.Wednesday, 1, G(7));
-                plan.SetFlag(DayOfWeek.Wednesday, 2, G(8));
-                plan.SetFlag(DayOfWeek.Wednesday, 3, G(9));
-                plan.SetFlag(DayOfWeek.Thursday, 1, G(10));
-                plan.SetFlag(DayOfWeek.Thursday, 2, G(11));
-                plan.SetFlag(DayOfWeek.Thursday, 3, G(12));
-                plan.SetFlag(DayOfWeek.Friday, 1, G(13));
-                plan.SetFlag(DayOfWeek.Friday, 2, G(14));
-                plan.SetFlag(DayOfWeek.Friday, 3, G(15));
-                plan.SetFlag(DayOfWeek.Saturday, 1, G(16));
-                plan.SetFlag(DayOfWeek.Saturday, 2, G(17));
-                // Sábado no tiene columna de Turno 3 -> nunca planeado
-                plan.SetFlag(DayOfWeek.Sunday, 1, G(18));
-                plan.SetFlag(DayOfWeek.Sunday, 2, G(19));
-                // Domingo tampoco tiene columna de Turno 3
-
-                plans[groupId] = plan;
-            }
-
-            _plansByGroup = plans;
-            _plansForMonday = monday;
-            _plansLoadedAt = DateTime.UtcNow;
-            _hasDataForCurrentWeek = found;
-
-            if (!found)
-            {
-                _logger.LogInformation("Heijunka_Plan_List no tiene filas para la semana del {Monday} — se usa el criterio viejo (Planned_Shift_for_OEE != 0) mientras tanto.", monday);
-            }
+            if (reader.IsDBNull(0)) continue;
+            var groupId = Convert.ToInt32(reader.GetValue(0));
+            var enabled = !reader.IsDBNull(1) && Convert.ToInt32(reader.GetValue(1)) != 0;
+            var planned = !reader.IsDBNull(2) && Convert.ToInt32(reader.GetValue(2)) != 0;
+            plan[groupId] = (enabled, planned);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error cargando Heijunka_Plan_List para la semana del {Monday}", monday);
-        }
-        finally
-        {
-            _planLock.Release();
-        }
+
+        _cache.Set(key, plan, TimeSpan.FromSeconds(60));
+        return plan;
     }
 }

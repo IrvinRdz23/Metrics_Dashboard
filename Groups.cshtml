@@ -1,0 +1,239 @@
+@model Metrics_Dashboard.Models.GroupDetailSnapshot
+@{
+    Layout = null;
+    var shifts = (ViewData["Shifts"] as List<ShiftInfo>) ?? new List<ShiftInfo>();
+    var histDate = Model.HistoricalDate?.ToString("yyyy-MM-dd") ?? DateTime.Today.ToString("yyyy-MM-dd");
+    var backUrl = Model.IsHistorical ? $"/Historical?date={histDate}&shiftId={Model.HistoricalShiftId}" : "/";
+}
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@Model.PlantName · @Model.Group.GroupName</title>
+    <script>
+        try { var t = localStorage.getItem('pm-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) { }
+    </script>
+    <link rel="stylesheet" href="/css/site.css" />
+    <script src="/lib/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app" id="app">
+
+        <header>
+            <div class="brand">
+                <a class="back-link" href="@backUrl" title="Volver al dashboard general">‹</a>
+                <img src="/images/m2s.png" alt="" onerror="this.style.display='none'" />
+                <div class="brand-text">
+                    <h1>
+                        <span class="gnum" id="gnum" style="width:34px;height:34px"></span>
+                        <span id="gname">@Model.Group.GroupName</span>
+                        <span style="color:var(--text-faint);font-weight:600">· @Model.PlantName</span>
+                        @if (Model.IsHistorical)
+                        {
+                            <span class="hist-badge">HISTÓRICO</span>
+                        }
+                    </h1>
+                    <div class="subtitle">
+                        <span id="dateLabel"></span>
+                        <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="plant-kpi">
+                @if (!Model.IsHistorical)
+                {
+                    <div class="kpi-block">
+                        <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
+                            <span class="live-dot"></span>
+                            <span class="value" style="font-size:.95rem" id="lastUpdate">--:--</span>
+                        </div>
+                        <div class="label">Última Actualización</div>
+                    </div>
+                }
+            </div>
+
+            <div class="header-actions controls-collapsible">
+                @if (Model.IsHistorical)
+                {
+                    <div class="picker">
+                        <input type="date" id="dateInput" value="@histDate" />
+                        <select id="shiftSelect">
+                            @foreach (var s in shifts)
+                            {
+                                <option value="@s.ShiftId" selected="@(s.ShiftId == Model.HistoricalShiftId)">@s.ShiftDesc</option>
+                            }
+                        </select>
+                    </div>
+                    <a class="btn" href="/Group/@Model.Group.GroupId">● En vivo</a>
+                }
+                else
+                {
+                    <a class="btn" href="/Historical" title="Ver turnos anteriores">🕘 Histórico</a>
+                }
+                <button class="btn" id="toggleTheme">🌗</button>
+                <button class="btn" id="togglePresentation">🖥️</button>
+            </div>
+        </header>
+
+        <div class="detail-body">
+            <div class="big-kpis span2">
+                <div class="big-kpi"><div class="v" id="kOee">—</div><div class="l">OEE de turno</div></div>
+                <div class="big-kpi"><div class="v" id="kProd">0</div><div class="l">Producción</div></div>
+                <div class="big-kpi"><div class="v" id="kPlan">0</div><div class="l">Plan de turno</div></div>
+                <div class="big-kpi"><div class="v" id="kRemain">0</div><div class="l">Falta para el plan</div></div>
+                <div class="big-kpi"><div class="v" id="kSap">—</div><div class="l">SAP %</div></div>
+            </div>
+
+            <div class="card detail-card" id="chartCard">
+                <h2><span>Producción por hora y acumulado</span><span class="hint">Solo líneas con plan</span></h2>
+                <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+            </div>
+
+            <div class="card detail-card detail-card-scroll">
+                <h2><span>Líneas</span><span class="hint" id="linesHint"></span></h2>
+                <table class="lines-table">
+                    <thead>
+                        <tr><th>Línea</th><th>OEE</th><th>Producción</th><th>Esperado</th><th>Plan</th><th>SAP</th></tr>
+                    </thead>
+                    <tbody id="linesBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let snap = @Html.Raw(Json.Serialize(Model));
+        const IS_HIST = snap.isHistorical === true;
+        const GROUP_ID = snap.group.groupId;
+        const HIST_QS = IS_HIST ? `?date=${String(snap.historicalDate).slice(0, 10)}&shiftId=${snap.historicalShiftId}` : '';
+        const GROUP_COLORS = ['#4da3ff', '#35d68f', '#f2b84b', '#c084fc'];
+        let chart = null;
+
+        function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+        function oeeColor(o) { return o >= 0.85 ? getCss('--good') : (o >= 0.70 ? getCss('--warn') : getCss('--bad')); }
+        function pct(v) { return (v * 100).toFixed(0) + '%'; }
+        function fmt(n) { return Number(n || 0).toLocaleString(); }
+        function hexToRgba(hex, a) {
+            const h = hex.replace('#', '');
+            const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+            return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+        }
+
+        function chartData() {
+            const g = snap.group, t = g.hourlyTrend || [];
+            const color = GROUP_COLORS[g.colorIndex % GROUP_COLORS.length];
+            let run = 0;
+            return {
+                labels: t.map(h => h.hour),
+                datasets: [
+                    { type: 'bar', label: 'Producción / hora', data: t.map(h => h.production), backgroundColor: hexToRgba(color, .65), borderRadius: 6, maxBarThickness: 46, yAxisID: 'y', order: 4 },
+                    { type: 'line', label: 'SAP / hora', data: t.map(h => h.sapProduction), borderColor: getCss('--sap'), backgroundColor: getCss('--sap'), tension: .3, pointRadius: 3, borderWidth: 2, yAxisID: 'y', order: 1 },
+                    { type: 'line', label: 'Acumulado', data: t.map(h => (run += h.production)), borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .1), fill: true, tension: .3, pointRadius: 3, borderWidth: 2, yAxisID: 'y1', order: 2 },
+                    { type: 'line', label: 'Esperado acumulado', data: t.map(h => h.expectedCumulative), borderColor: getCss('--warn'), borderDash: [6, 5], pointRadius: 0, borderWidth: 2, spanGaps: false, yAxisID: 'y1', order: 3 }
+                ]
+            };
+        }
+
+        function buildChart() {
+            const tick = { color: getCss('--text-dim'), font: { size: 13 } };
+            chart = new Chart(document.getElementById('trendChart'), {
+                type: 'bar',
+                data: chartData(),
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    animation: { duration: 400 },
+                    plugins: { legend: { position: 'bottom', labels: { color: getCss('--text-dim'), font: { size: 13, weight: '600' }, boxWidth: 12 } } },
+                    scales: {
+                        x: { ticks: tick, grid: { color: getCss('--grid-line') } },
+                        y: { position: 'left', beginAtZero: true, ticks: tick, grid: { color: getCss('--grid-line') }, title: { display: true, text: 'Piezas / hora', color: getCss('--text-faint') } },
+                        y1: { position: 'right', beginAtZero: true, ticks: tick, grid: { display: false }, title: { display: true, text: 'Acumulado', color: getCss('--text-faint') } }
+                    }
+                }
+            });
+        }
+
+        function lineRow(l) {
+            const name = l.productListId > 0
+                ? `<a class="line-link" href="/Line/${l.productListId}${HIST_QS}" title="Ver TV de esta línea">${l.productDesc}</a>` : l.productDesc;
+            const sapCell = l.totalSap > 0 ? `${fmt(l.totalSap)}${l.total > 0 ? ' (' + pct(l.totalSap / l.total) + ')' : ''}` : '0';
+            // Producción NO planeada (Heijunka): en rojo, NO cuenta para OEE, producción ni plan.
+            if (l.isUnplannedProduction) {
+                return `<tr class="unplanned-row"><td>${name}</td><td><span class="tag tag-unplanned">NO PLANEADA</span></td>
+                    <td class="num">${fmt(l.total)}</td><td class="num">—</td><td class="num">—</td><td class="num">${sapCell}</td></tr>`;
+            }
+            if (!l.countsForStats) {
+                return `<tr class="noplan-row"><td>${name}</td><td><span class="tag tag-noplan">SIN PLAN</span></td>
+                    <td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`;
+            }
+            return `<tr><td>${name}</td>
+                <td><div class="bar-cell"><div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%;background:${oeeColor(l.oeeShift)}"></div></div>
+                <span class="mono">${pct(l.oeeShift)}</span></div></td>
+                <td class="num">${fmt(l.total)}</td><td class="num">${fmt(l.accumulatedRate)}</td><td class="num">${fmt(l.plannedShift)}</td><td class="num">${sapCell}</td></tr>`;
+        }
+
+        function render() {
+            const g = snap.group;
+            const color = GROUP_COLORS[g.colorIndex % GROUP_COLORS.length];
+            const gnum = document.getElementById('gnum');
+            gnum.textContent = g.colorIndex + 1;
+            gnum.style.setProperty('--gcolor', color);
+
+            document.getElementById('shiftLabel').textContent = snap.shiftDesc || '—';
+            document.getElementById('dateLabel').textContent = new Date(snap.eventDate).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+            const lu = document.getElementById('lastUpdate');
+            if (lu) lu.textContent = new Date(snap.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+
+            const counted = g.lines.filter(l => l.countsForStats);
+            const has = counted.length > 0;
+            const oee = document.getElementById('kOee');
+            oee.textContent = has ? pct(g.oee) : '—';
+            oee.style.color = has ? oeeColor(g.oee) : 'var(--neutral)';
+            document.getElementById('kProd').textContent = fmt(g.totalProduction);
+            document.getElementById('kPlan').textContent = fmt(g.totalPlanned);
+            document.getElementById('kRemain').textContent = fmt(g.remainingToPlan);
+            document.getElementById('kSap').textContent = has ? pct(g.sapPercent) : '—';
+
+            const unplanned = g.lines.filter(l => l.isUnplannedProduction).length;
+            document.getElementById('linesHint').textContent =
+                `${counted.length} con plan · ${g.lines.length} en total` + (unplanned ? ` · ${unplanned} no planeada(s)` : '');
+            document.getElementById('linesBody').innerHTML = [...g.lines].sort((a, b) => a.productOrder - b.productOrder).map(lineRow).join('');
+
+            if (!chart) buildChart();
+            else { chart.data = chartData(); chart.update('none'); }
+        }
+
+        document.getElementById('toggleTheme').onclick = () => {
+            const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            try { localStorage.setItem('pm-theme', next); } catch (e) { }
+            if (chart) { chart.destroy(); chart = null; }
+            render();
+        };
+        document.getElementById('togglePresentation').onclick = () => {
+            document.getElementById('app').classList.toggle('presentation');
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => { });
+            else document.exitFullscreen?.().catch(() => { });
+            setTimeout(() => chart && chart.resize(), 300);
+        };
+        const dateInput = document.getElementById('dateInput');
+        const shiftSelect = document.getElementById('shiftSelect');
+        if (dateInput) dateInput.onchange = () => { if (dateInput.value) location.href = `/Group/${GROUP_ID}?date=${dateInput.value}`; };
+        if (shiftSelect) shiftSelect.onchange = () => { location.href = `/Group/${GROUP_ID}?date=${dateInput.value}&shiftId=${shiftSelect.value}`; };
+
+        // Vivo: refresco automático cada 10 s con el JSON del grupo.
+        if (!IS_HIST) {
+            setInterval(async () => {
+                try {
+                    const r = await fetch(`/Group/${GROUP_ID}/Data`, { cache: 'no-store' });
+                    if (r.ok) { snap = await r.json(); render(); }
+                } catch (e) { console.error(e); }
+            }, 10000);
+        }
+
+        render();
+    </script>
+</body>
+</html>

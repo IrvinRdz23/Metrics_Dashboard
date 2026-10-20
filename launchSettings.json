@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Metrics_Dashboard_P4": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5044",
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
+    }
+  }
+}

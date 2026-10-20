@@ -2,41 +2,21 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Metrics_Dashboard.Hubs;
 
-/// <summary>
-/// Hub delgado: el push real lo hace MetricsBroadcastService (BackgroundService).
-/// - Dashboard general -> grupo "General" (se une automático al conectar).
-/// - Dashboards de horno/Tube Mills -> grupo "Furnace-{id}" (se unen explícitamente
-///   llamando a JoinFurnace(id) desde el cliente, id 1..5 = hornos, 6 = Tube Mills).
-/// - Dashboards de línea individual -> grupo "Line-{productListId}" (JoinLine(id)).
-/// </summary>
+/// <summary>Hub vacío: el servidor solo empuja "SnapshotUpdated". Cuenta clientes para no consultar el SP en balde.</summary>
 public class MetricsHub : Hub
 {
-    public const string GeneralGroup = "General";
+    private static int _connected;
+    public static int ConnectedClients => Volatile.Read(ref _connected);
 
-    public static string FurnaceGroup(int furnaceId) => $"Furnace-{furnaceId}";
-    public static string LineGroup(int lineId) => $"Line-{lineId}";
-
-    public override async Task OnConnectedAsync()
+    public override Task OnConnectedAsync()
     {
-        await Groups.AddToGroupAsync(Context.ConnectionId, GeneralGroup);
-        await base.OnConnectedAsync();
+        Interlocked.Increment(ref _connected);
+        return base.OnConnectedAsync();
     }
 
-    public override async Task OnDisconnectedAsync(Exception? exception)
+    public override Task OnDisconnectedAsync(Exception? exception)
     {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, GeneralGroup);
-        await base.OnDisconnectedAsync(exception);
-    }
-
-    /// <summary>Llamado desde el JS de cada dashboard de horno para recibir sus propias actualizaciones.</summary>
-    public async Task JoinFurnace(int furnaceId)
-    {
-        await Groups.AddToGroupAsync(Context.ConnectionId, FurnaceGroup(furnaceId));
-    }
-
-    /// <summary>Llamado desde el JS de cada dashboard de línea individual.</summary>
-    public async Task JoinLine(int lineId)
-    {
-        await Groups.AddToGroupAsync(Context.ConnectionId, LineGroup(lineId));
+        Interlocked.Decrement(ref _connected);
+        return base.OnDisconnectedAsync(exception);
     }
 }
