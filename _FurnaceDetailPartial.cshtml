@@ -12,1358 +12,157 @@
     <script src="~/lib/chartjs/chart.umd.min.js"></script>
     <style>
         /* ============================================================
-        PLANT METRICS - DISEÑO PARA TV EN PISO DE PRODUCCIÓN
-        Optimizado para pantallas Full HD y visualización a distancia
-        ============================================================ */
-
-        /* =========================
-        VARIABLES Y TEMAS
-        ========================= */
+           VISTA POR HORNO - DISEÑO PARA TV (legible a ~5 m, sin scroll)
+           Todo escala con --u (1u = 1% del ancho, mínimo 14px => 19.2px en 1920).
+           Mínimos: texto secundario >= 1rem (~19px), nombres de línea >= 1.3rem,
+           cifras clave 3-4.5rem.
+           ============================================================ */
+        :root { --u: max(14px, 1vw); }
 
         :root[data-theme="dark"] {
-        --bg: #080c13;
-        --card: #121a27;
-        --card-hover: #192438;
-        --border: #31415e;
-        --border-soft: rgba(255, 255, 255, 0.09);
-        --text: #f7f9fc;
-        --text-dim: #b5c0d5;
-        --text-faint: #8391ad;
-        --accent: #55acff;
-        --accent-soft: rgba(85, 172, 255, 0.18);
-        --good: #35e39a;
-        --warn: #ffc557;
-        --bad: #ff6472;
-        --neutral: #9aa8c4;
-        --no-plan-bg: rgba(172, 138, 255, 0.18);
-        --no-plan-border: #b799ff;
-        --no-plan-text: #dccfff;
-        --grid-line: rgba(255, 255, 255, 0.08);
-        --shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.65);
-        --flash: rgba(85, 172, 255, 0.52);
-        --pill-text: #061018;
-        --seg-cb: #ffc24e;
-        --seg-be: #59b2ff;
-        --seg-cs: #c894ff;
+            --bg: #070b12; --card: #111a28; --card-2: #0b121d; --card-hover: #192438;
+            --border: #31415e; --border-soft: rgba(255,255,255,0.10);
+            --text: #ffffff; --text-dim: #c3cde0; --text-faint: #8e9cb8;
+            --accent: #55acff; --accent-soft: rgba(85,172,255,0.18);
+            --good: #35e39a; --warn: #ffc557; --bad: #ff6472; --neutral: #9aa8c4;
+            --no-plan-bg: rgba(172,138,255,0.18); --no-plan-border: #b799ff; --no-plan-text: #dccfff;
+            --grid-line: rgba(255,255,255,0.10); --shadow: 0 12px 30px -12px rgba(0,0,0,0.65);
+            --flash: rgba(85,172,255,0.50);
+            --seg-cb: #ffc24e; --seg-be: #59b2ff; --seg-cs: #c894ff; --seg-all: #e8edf7;
+            --bar-fill: rgba(89,178,255,0.78);
         }
-
         :root[data-theme="light"] {
-        --bg: #dfe5ef;
-        --card: #ffffff;
-        --card-hover: #edf2fa;
-        --border: #adb9cd;
-        --border-soft: rgba(16, 24, 40, 0.12);
-        --text: #0a1220;
-        --text-dim: #394760;
-        --text-faint: #63708a;
-        --accent: #124faa;
-        --accent-soft: rgba(18, 79, 170, 0.13);
-        --good: #087d4c;
-        --warn: #8a5900;
-        --bad: #bd2637;
-        --neutral: #53617c;
-        --no-plan-bg: rgba(109, 40, 217, 0.11);
-        --no-plan-border: #6d28d9;
-        --no-plan-text: #521aa8;
-        --grid-line: rgba(16, 24, 40, 0.11);
-        --shadow: 0 12px 28px -14px rgba(20, 30, 60, 0.28);
-        --flash: rgba(25, 87, 194, 0.24);
-        --pill-text: #ffffff;
-        --seg-cb: #8a5900;
-        --seg-be: #124faa;
-        --seg-cs: #6d28d9;
+            --bg: #dfe5ef; --card: #ffffff; --card-2: #f1f4f9; --card-hover: #edf2fa;
+            --border: #adb9cd; --border-soft: rgba(16,24,40,0.13);
+            --text: #0a1220; --text-dim: #2f3d56; --text-faint: #5b6882;
+            --accent: #124faa; --accent-soft: rgba(18,79,170,0.13);
+            --good: #087d4c; --warn: #8a5900; --bad: #bd2637; --neutral: #53617c;
+            --no-plan-bg: rgba(109,40,217,0.11); --no-plan-border: #6d28d9; --no-plan-text: #521aa8;
+            --grid-line: rgba(16,24,40,0.13); --shadow: 0 12px 28px -14px rgba(20,30,60,0.28);
+            --flash: rgba(25,87,194,0.24);
+            --seg-cb: #8a5900; --seg-be: #124faa; --seg-cs: #6d28d9; --seg-all: #0a1220;
+            --bar-fill: rgba(18,79,170,0.80);
         }
 
-        /* =========================
-        REINICIO GENERAL
-        ========================= */
+        * { box-sizing: border-box; }
 
-        * {
-        box-sizing: border-box;
+        html, body {
+            margin: 0; padding: 0; height: 100%; overflow: hidden;
+            background: var(--bg); color: var(--text);
+            font-family: 'Inter', 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
-
-        html,
-        body {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        background: var(--bg);
-        color: var(--text);
-        font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
-        -webkit-font-smoothing: antialiased;
-        text-rendering: optimizeLegibility;
-        }
-
-        button,
-        input,
-        select {
-        font: inherit;
-        }
-
-        ::-webkit-scrollbar {
-        width: 10px;
-        height: 10px;
-        }
-
-        ::-webkit-scrollbar-track {
-        background: transparent;
-        }
-
-        ::-webkit-scrollbar-thumb {
-        background: var(--border);
-        border-radius: 10px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-        background: var(--text-faint);
-        }
-
-        /* =========================
-        CONTENEDOR PRINCIPAL
-        ========================= */
 
         .app {
-        width: 100vw;
-        height: 100vh;
-        display: grid;
-        grid-template-rows: auto minmax(0, 1fr);
-        gap: clamp(8px, 1vh, 14px);
-        padding: clamp(8px, 1vh, 14px);
-        background: var(--bg);
+            height: 100vh; width: 100vw; display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr);
+            gap: calc(var(--u) * .6); padding: calc(var(--u) * .7);
+            background: var(--bg);
         }
+        .app.presentation .controls-collapsible { display: none; }
 
-        .app.presentation .controls-collapsible {
-        display: none;
-        }
-
-        /* En presentación se aprovecha todavía más el espacio */
-
-        .app.presentation {
-        padding: 8px;
-        gap: 8px;
-        }
-
-        .app.presentation header {
-        padding-top: 8px;
-        padding-bottom: 8px;
-        }
-
-        /* =========================
-        ENCABEZADO
-        ========================= */
-
+        /* ---------- HEADER (compacto) ---------- */
         header {
-        min-height: clamp(105px, 14vh, 160px);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: clamp(14px, 1.5vw, 28px);
-        padding: clamp(12px, 1.4vh, 20px) clamp(16px, 1.8vw, 30px);
-        background: var(--card);
-        border: 2px solid var(--border);
-        border-top: 7px solid var(--furnace-color);
-        border-radius: 16px;
-        box-shadow: var(--shadow);
+            display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 1.2);
+            background: var(--card); border: 1px solid var(--border); border-top: 6px solid var(--furnace-color);
+            border-radius: 16px; padding: calc(var(--u) * .55) calc(var(--u) * 1.2); box-shadow: var(--shadow);
         }
-
-        /* =========================
-        IDENTIDAD DEL HORNO
-        ========================= */
-
-        .brand {
-        display: flex;
-        align-items: center;
-        gap: clamp(12px, 1.2vw, 20px);
-        flex: 0 0 auto;
-        min-width: 0;
+        .brand { display: flex; align-items: center; gap: calc(var(--u) * 1); }
+        .logo-dot {
+            width: calc(var(--u) * 3.6); height: calc(var(--u) * 3.6); border-radius: 14px; background: var(--furnace-color);
+            display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: calc(var(--u) * 1.8);
+            color: #06101f; box-shadow: 0 6px 16px -4px var(--furnace-color); flex-shrink: 0;
         }
-
-        .brand .logo-dot {
-        width: clamp(60px, 4.8vw, 88px);
-        height: clamp(60px, 4.8vw, 88px);
-        flex-shrink: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 16px;
-        background: var(--furnace-color);
-        color: #06101f;
-        font-family: "JetBrains Mono", monospace;
-        font-size: clamp(1.45rem, 2.1vw, 2.6rem);
-        font-weight: 900;
-        line-height: 1;
-        box-shadow: 0 7px 20px -5px var(--furnace-color);
+        .brand-text h1 { margin: 0; font-size: calc(var(--u) * 2.6); font-weight: 900; line-height: 1.05; letter-spacing: .2px; }
+        .subtitle { display: flex; align-items: center; gap: calc(var(--u) * .7); margin-top: 4px; color: var(--text-dim); font-size: max(1rem, calc(var(--u) * 1.05)); font-weight: 600; }
+        #dateLabel { text-transform: capitalize; }
+        .shift-badge, .historical-badge {
+            background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border);
+            padding: 2px calc(var(--u) * .8); border-radius: 999px; font-weight: 800; font-size: max(1rem, calc(var(--u) * 1.05));
         }
+        .live-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--good); animation: pulse 1.8s infinite; }
+        @@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(53,227,154,.55); } 70% { box-shadow: 0 0 0 10px rgba(53,227,154,0); } 100% { box-shadow: 0 0 0 0 rgba(53,227,154,0); } }
 
-        .brand-text {
-        min-width: 0;
-        }
-
-        .brand-text h1 {
-        margin: 0;
-        color: var(--text);
-        font-size: clamp(1.8rem, 2.7vw, 3.6rem);
-        font-weight: 900;
-        line-height: 1;
-        letter-spacing: 0.2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        }
-
-        .brand-text .subtitle {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 10px;
-        color: var(--text-dim);
-        font-size: clamp(0.85rem, 1.05vw, 1.2rem);
-        font-weight: 700;
-        line-height: 1.15;
-        }
-
-        .shift-badge,
-        .historical-badge {
-        display: inline-flex;
-        align-items: center;
-        min-height: 30px;
-        padding: 4px 13px;
-        border-radius: 999px;
-        font-size: clamp(0.75rem, 0.9vw, 1rem);
-        font-weight: 800;
-        letter-spacing: 0.3px;
-        white-space: nowrap;
-        }
-
-        .shift-badge {
-        background: var(--accent-soft);
-        color: var(--accent);
-        border: 1px solid var(--accent);
-        }
-
-        .historical-badge {
-        background: var(--no-plan-bg);
-        color: var(--no-plan-text);
-        border: 1px solid var(--no-plan-border);
-        }
-
-        /* =========================
-        SEGMENTOS DEL ENCABEZADO
-        Core Builder / Back End / Clam Shells / Tube Mills
-        ========================= */
-
-        .segments-row {
-        flex: 1 1 auto;
-        display: flex;
-        align-items: stretch;
-        justify-content: center;
-        gap: clamp(10px, 1vw, 18px);
-        min-width: 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-        }
-
-        .segment {
-        min-width: max-content;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        gap: 6px;
-        padding: clamp(5px, 0.7vh, 10px) clamp(12px, 1.2vw, 20px);
-        border-left: 5px solid var(--seg-color, var(--accent));
-        border-radius: 4px;
-        background: rgba(255, 255, 255, 0.015);
-        }
-
-        .segment .seg-title {
-        margin-bottom: 2px;
-        color: var(--seg-color, var(--text-faint));
-        font-size: clamp(0.72rem, 0.82vw, 0.95rem);
-        font-weight: 900;
-        line-height: 1;
-        letter-spacing: 0.7px;
-        text-transform: uppercase;
-        }
-
-        .segment .seg-stats {
-        display: flex;
-        align-items: center;
-        gap: clamp(12px, 1.25vw, 22px);
-        }
-
-        .segment .seg-stat {
-        min-width: 58px;
-        text-align: center;
-        }
-
-        .segment .seg-stat .v {
-        color: var(--text);
-        font-family: "JetBrains Mono", monospace;
-        font-size: clamp(1.45rem, 2vw, 2.75rem);
-        font-weight: 900;
-        line-height: 1;
-        letter-spacing: -1px;
-        white-space: nowrap;
-        }
-
-        .segment .seg-stat .l {
-        margin-top: 6px;
-        color: var(--text-faint);
-        font-size: clamp(0.62rem, 0.72vw, 0.82rem);
-        font-weight: 800;
-        line-height: 1;
-        letter-spacing: 0.45px;
-        text-transform: uppercase;
-        white-space: nowrap;
-        }
-
-        /* =========================
-        BOTONES DEL ENCABEZADO
-        ========================= */
-
-        .header-actions {
-        flex: 0 0 auto;
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 8px;
-        }
-
+        .header-actions { display: flex; align-items: center; gap: calc(var(--u) * .5); }
         .btn {
-        min-height: 42px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 7px;
-        padding: 8px 14px;
-        background: var(--card);
-        color: var(--text);
-        border: 2px solid var(--border);
-        border-radius: 10px;
-        font-size: clamp(0.8rem, 0.9vw, 1rem);
-        font-weight: 800;
-        line-height: 1;
-        text-decoration: none;
-        white-space: nowrap;
-        cursor: pointer;
-        transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+            background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 10px;
+            padding: calc(var(--u) * .5) calc(var(--u) * .9); font-size: max(1rem, calc(var(--u) * 1)); font-weight: 700;
+            cursor: pointer; text-decoration: none; display: flex; align-items: center; gap: 6px;
+        }
+        .btn:hover { background: var(--card-hover); border-color: var(--furnace-color); }
+        .historical-picker { display: flex; align-items: center; gap: 6px; margin: 0; }
+        .historical-picker input, .historical-picker select {
+            background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+            padding: 6px 8px; font-size: max(1rem, calc(var(--u) * .95)); font-family: inherit;
         }
 
-        .btn:hover {
-        background: var(--card-hover);
-        border-color: var(--furnace-color);
-        transform: translateY(-1px);
+        /* ---------- FRANJA DE SEGMENTOS (KPIs grandes) ---------- */
+        .seg-strip { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: calc(var(--u) * .6); }
+        .seg-card {
+            background: var(--card); border: 1px solid var(--border); border-left: 8px solid var(--seg-color);
+            border-radius: 14px; padding: calc(var(--u) * .45) calc(var(--u) * .8); box-shadow: var(--shadow);
+            display: grid; grid-template-columns: auto 1fr; grid-template-areas: "t o" "n n"; align-items: center;
+            column-gap: calc(var(--u) * .6); row-gap: calc(var(--u) * .2); min-width: 0;
         }
+        .seg-card.main { background: linear-gradient(90deg, var(--accent-soft), var(--card) 70%); border-color: var(--seg-color); }
+        .seg-title { grid-area: t; font-size: max(1rem, calc(var(--u) * 1.15)); font-weight: 900; text-transform: uppercase; letter-spacing: .5px; color: var(--seg-color); line-height: 1.1; }
+        .seg-title small { display: block; font-size: max(.8rem, calc(var(--u) * .75)); color: var(--text-faint); font-weight: 700; letter-spacing: .2px; text-transform: none; margin-top: 2px; }
+        .seg-oee { grid-area: o; text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 900; line-height: 1; font-size: calc(var(--u) * 3.4); font-variant-numeric: tabular-nums; }
+        .seg-nums { grid-area: n; display: flex; justify-content: space-between; gap: calc(var(--u) * .5); border-top: 1px solid var(--border-soft); padding-top: calc(var(--u) * .25); }
+        .seg-num { text-align: center; flex: 1; }
+        .seg-num .v { font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: calc(var(--u) * 1.55); line-height: 1.05; font-variant-numeric: tabular-nums; }
+        .seg-num .l { font-size: max(.8rem, calc(var(--u) * .72)); color: var(--text-faint); text-transform: uppercase; font-weight: 800; letter-spacing: .3px; white-space: nowrap; }
 
-        .btn:active {
-        transform: translateY(0);
-        }
-
-        .historical-picker {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        }
-
-        .historical-picker input,
-        .historical-picker select {
-        min-height: 42px;
-        padding: 7px 10px;
-        background: var(--card);
-        color: var(--text);
-        border: 2px solid var(--border);
-        border-radius: 9px;
-        font-family: "Inter", sans-serif;
-        font-size: clamp(0.76rem, 0.84vw, 0.92rem);
-        font-weight: 700;
-        }
-
-        /* =========================
-        ESTRUCTURA PRINCIPAL
-        ========================= */
-
-        .body-grid {
-        min-height: 0;
-        display: grid;
-        /* Más espacio para las líneas de producción */
-        grid-template-columns: minmax(0, 1.65fr) minmax(420px, 0.85fr);
-        gap: clamp(8px, 1vw, 16px);
-        }
-
-        /* =========================
-        TARJETAS
-        ========================= */
-
+        /* ---------- CUERPO ---------- */
+        .body-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr); gap: calc(var(--u) * .6); min-height: 0; }
         .card {
-        min-width: 0;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        padding: clamp(12px, 1.2vw, 20px) clamp(14px, 1.4vw, 24px);
-        background: var(--card);
-        border: 2px solid var(--border);
-        border-top: 5px solid var(--furnace-color);
-        border-radius: 16px;
-        box-shadow: var(--shadow);
+            background: var(--card); border: 1px solid var(--border); border-top: 5px solid var(--furnace-color);
+            border-radius: 16px; padding: calc(var(--u) * .7) calc(var(--u) * .9); box-shadow: var(--shadow);
+            display: flex; flex-direction: column; min-height: 0;
         }
-
         .card h2 {
-        flex: 0 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        margin: 0 0 clamp(9px, 1vh, 14px) 0;
-        color: var(--text-dim);
-        font-size: clamp(1rem, 1.2vw, 1.45rem);
-        font-weight: 900;
-        line-height: 1.1;
-        letter-spacing: 0.65px;
-        text-transform: uppercase;
+            margin: 0 0 calc(var(--u) * .4) 0; font-size: max(1.05rem, calc(var(--u) * 1.15)); font-weight: 900;
+            text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim);
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
         }
+        .count-chip { font-size: max(.9rem, calc(var(--u) * .85)); font-weight: 800; color: var(--text-faint); background: var(--bg); border: 1px solid var(--border); padding: 2px 12px; border-radius: 999px; text-transform: none; letter-spacing: 0; }
 
-        .card h2 .count-chip {
-        padding: 5px 12px;
-        background: var(--bg);
-        color: var(--text-dim);
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        font-size: clamp(0.72rem, 0.82vw, 0.95rem);
-        font-weight: 900;
-        letter-spacing: 0;
-        text-transform: none;
-        white-space: nowrap;
-        }
-
-        /* =========================
-        LISTADO DE LÍNEAS
-        ========================= */
-
-        .lines-list {
-        flex: 1 1 auto;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        gap: clamp(7px, 0.8vh, 12px);
-        padding-right: 4px;
-        overflow-y: auto;
-        overflow-x: hidden;
-        }
-
+        /* ---------- LÍNEAS (la altura de fila y la fuente las ajusta JS para que SIEMPRE quepan) ---------- */
+        .lines-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; --row-font: 1.4rem; }
         .line-row {
-        flex: 1 1 0;
-        min-height: clamp(65px, 7.7vh, 92px);
-        display: grid;
-        /*
-        Nombre de línea | Barra y números | Plan
-        */
-        grid-template-columns: minmax(185px, 0.85fr) minmax(330px, 1.8fr) minmax(125px, 0.45fr);
-        align-items: center;
-        gap: clamp(12px, 1.3vw, 22px);
-        padding: clamp(9px, 1vh, 14px) clamp(12px, 1.2vw, 20px);
-        background: var(--bg);
-        border: 2px solid var(--border-soft);
-        border-radius: 12px;
-        transition: background 0.8s ease, border-color 0.3s ease;
-        }
-
-        .line-row:hover {
-        border-color: var(--border);
-        }
-
-        .line-row.flash {
-        background: var(--flash);
-        border-color: var(--accent);
-        }
-
-        /* Nombre de la línea */
-
-        .line-row .line-name {
-        min-width: 0;
-        color: var(--text);
-        font-size: clamp(1.15rem, 1.55vw, 2rem);
-        font-weight: 900;
-        line-height: 1.08;
-        letter-spacing: -0.2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        }
-
-        .line-link {
-        color: inherit;
-        text-decoration: none;
-        border-bottom: 2px dashed var(--border);
-        }
-
-        .line-link:hover {
-        color: var(--furnace-color);
-        border-bottom-color: var(--furnace-color);
-        }
-
-        /* Área de barra */
-
-        .line-bar-area {
-        min-width: 0;
-        display: flex;
-        align-items: center;
-        gap: clamp(10px, 1vw, 16px);
-        }
-
-        .line-bar-track {
-        position: relative;
-        flex: 1 1 auto;
-        min-width: 0;
-        height: clamp(48px, 5.8vh, 68px);
-        overflow: hidden;
-        background: var(--grid-line);
-        border: 1px solid var(--border-soft);
-        border-radius: 10px;
-        }
-
-        /* Marcador del objetivo de 85% */
-
-        .target-marker {
-        position: absolute;
-        z-index: 3;
-        top: -3px;
-        bottom: -3px;
-        width: 0;
-        border-left: 3px dashed rgba(255, 255, 255, 0.75);
-        }
-
-        /* Barra del OEE */
-
-        .line-bar-fill {
-        height: 100%;
-        display: flex;
-        align-items: center;
-        min-width: 0;
-        padding-left: clamp(8px, 0.8vw, 14px);
-        border-radius: 9px;
-        transition: width 0.5s ease;
-        }
-
-        .line-bar-fill span {
-        position: relative;
-        z-index: 2;
-        color: #ffffff;
-        font-family: "JetBrains Mono", monospace;
-        font-size: clamp(1.35rem, 1.85vw, 2.5rem);
-        font-weight: 900;
-        line-height: 1;
-        letter-spacing: -1px;
-        white-space: nowrap;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 0, 0, 0.35);
-        }
-
-        /* Total / acumulado */
-
-        .line-bar-detail {
-        flex: 0 0 auto;
-        min-width: 135px;
-        color: var(--text);
-        font-family: "JetBrains Mono", monospace;
-        font-size: clamp(1rem, 1.25vw, 1.65rem);
-        font-weight: 900;
-        line-height: 1;
-        letter-spacing: -0.5px;
-        text-align: right;
-        white-space: nowrap;
-        }
-
-        /* Plan por línea */
-
-        .line-row .line-plan {
-        color: var(--text-dim);
-        font-family: "JetBrains Mono", monospace;
-        font-size: clamp(0.9rem, 1.05vw, 1.3rem);
-        font-weight: 900;
-        line-height: 1.1;
-        text-align: right;
-        white-space: nowrap;
-        }
-
-        /* =========================
-        PRODUCCIÓN NO PLANEADA
-        ========================= */
-
-        .line-row.unplanned-line-row {
-        background: rgba(255, 100, 114, 0.09);
-        border-color: var(--bad);
-        }
-
-        .unplanned-badge {
-        flex: 1 1 auto;
-        min-width: 0;
-        height: clamp(48px, 5.8vh, 68px);
-        display: flex;
-        align-items: center;
-        padding: 0 16px;
-        background: rgba(255, 100, 114, 0.16);
-        color: var(--bad);
-        border: 2px dashed var(--bad);
-        border-radius: 10px;
-        font-size: clamp(0.95rem, 1.2vw, 1.5rem);
-        font-weight: 900;
-        line-height: 1.1;
-        letter-spacing: 0.3px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        }
-
-        /* =========================
-        LÍNEAS SIN PRODUCCIÓN
-        ========================= */
-
-        .no-prod-section {
-        flex: 0 0 auto;
-        margin-top: clamp(8px, 1vh, 13px);
-        padding-top: clamp(8px, 1vh, 13px);
-        border-top: 3px dashed var(--border);
-        }
-
-        .no-prod-title {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 9px;
-        color: var(--no-plan-text);
-        font-size: clamp(0.75rem, 0.9vw, 1.05rem);
-        font-weight: 900;
-        line-height: 1.1;
-        letter-spacing: 0.55px;
-        text-transform: uppercase;
-        }
-
-        .no-prod-title .dot {
-        width: 11px;
-        height: 11px;
-        flex: 0 0 auto;
-        background: var(--no-plan-border);
-        border-radius: 50%;
-        box-shadow: 0 0 8px var(--no-plan-border);
-        }
-
-        .no-prod-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 7px;
-        max-height: 84px;
-        overflow-y: auto;
-        }
-
-        .no-prod-chip {
-        display: inline-flex;
-        align-items: center;
-        min-height: 34px;
-        padding: 6px 13px;
-        background: var(--no-plan-bg);
-        color: var(--no-plan-text);
-        border: 1px solid var(--no-plan-border);
-        border-radius: 999px;
-        font-size: clamp(0.78rem, 0.88vw, 1rem);
-        font-weight: 800;
-        line-height: 1;
-        white-space: nowrap;
-        }
-
-        a.no-prod-chip {
-        text-decoration: none;
-        cursor: pointer;
-        }
-
-        a.no-prod-chip:hover {
-        background: var(--no-plan-border);
-        color: #ffffff;
-        }
-
-        /* =========================
-        PANEL DERECHO
-        ========================= */
-
-        .side-stack {
-        min-width: 0;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        gap: clamp(8px, 0.9vw, 13px);
-        }
-
-        /* =========================
-        RESUMEN DEL HORNO
-        ========================= */
-
-        .mini-stats-card {
-        flex: 0 0 auto;
-        padding-top: clamp(14px, 1.5vh, 22px);
-        padding-bottom: clamp(16px, 1.8vh, 26px);
-        }
-
-        .mini-stats-row {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: clamp(8px, 1vw, 18px);
-        }
-
-        .mini-stat {
-        min-width: 0;
-        padding: clamp(8px, 1vh, 14px) 5px;
-        text-align: center;
-        background: var(--bg);
-        border: 1px solid var(--border-soft);
-        border-radius: 12px;
-        }
-
-        /*
-        NÚMEROS MÁS IMPORTANTES DE TODO EL DASHBOARD
-        OEE / PRODUCCIÓN / FALTANTES
-        */
-
-        .mini-stat .v {
-        color: var(--text);
-        font-family: "JetBrains Mono", monospace;
-        font-size: clamp(2.3rem, 3.6vw, 5.1rem);
-        font-weight: 900;
-        line-height: 0.95;
-        letter-spacing: -3px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: clip;
-        }
-
-        .mini-stat .l {
-        margin-top: 11px;
-        color: var(--text-dim);
-        font-size: clamp(0.68rem, 0.82vw, 1rem);
-        font-weight: 900;
-        line-height: 1.1;
-        letter-spacing: 0.45px;
-        text-transform: uppercase;
-        }
-
-        /* =========================
-        GRÁFICA DE TENDENCIA
-        ========================= */
-
-        .trend-mini {
-        flex: 1 1 auto;
-        min-height: 220px;
-        }
-
-        .trend-mini .chart-wrap {
-        position: relative;
-        flex: 1 1 auto;
-        min-width: 0;
-        min-height: 0;
-        overflow: hidden;
-        }
-
-        .trend-mini canvas {
-        width: 100% !important;
-        height: 100% !important;
-        }
-
-        /* =========================
-        INDICADORES INFERIORES
-        ========================= */
-
-        .chips-card {
-        flex: 0 0 auto;
-        }
-
-        .chip-row {
-        min-height: 45px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 14px;
-        padding: clamp(7px, 0.8vh, 11px) 0;
-        border-bottom: 2px solid var(--border-soft);
-        }
-
-        .chip-row:last-child {
-        border-bottom: none;
-        }
-
-        .chip-row .k {
-        color: var(--text-dim);
-        font-size: clamp(0.88rem, 1vw, 1.2rem);
-        font-weight: 800;
-        line-height: 1.1;
-        }
-
-        .chip-row .v {
-        color: var(--text);
-        font-family: "JetBrains Mono", monospace;
-        font-size: clamp(1.15rem, 1.45vw, 1.9rem);
-        font-weight: 900;
-        line-height: 1;
-        text-align: right;
-        white-space: nowrap;
-        }
-
-        /* =========================
-        INDICADOR EN VIVO
-        ========================= */
-
-        .live-dot {
-        width: 13px;
-        height: 13px;
-        flex: 0 0 auto;
-        background: var(--good);
-        border-radius: 50%;
-        box-shadow: 0 0 0 0 rgba(53, 227, 154, 0.65);
-        animation: pulse 1.8s infinite;
-        }
-
-        @@keyframes pulse {
-        0% {
-        box-shadow: 0 0 0 0 rgba(53, 227, 154, 0.65);
-        }
-
-        70% {
-        box-shadow: 0 0 0 12px rgba(53, 227, 154, 0);
-        }
-
-        100% {
-        box-shadow: 0 0 0 0 rgba(53, 227, 154, 0);
-        }
-        }
-
-        /* =========================
-        PANTALLAS FULL HD
-        Especialmente útil para TV 1920x1080
-        ========================= */
-
-       @@media (min-width: 1600px) {
-        header {
-        min-height: 135px;
-        }
-
-        .body-grid {
-        grid-template-columns: minmax(0, 1.7fr) minmax(470px, 0.8fr);
-        }
-
-        .line-row {
-        grid-template-columns: minmax(210px, 0.85fr) minmax(410px, 1.85fr) minmax(145px, 0.45fr);
-        }
-
-        .mini-stat .v {
-        font-size: clamp(3rem, 3.7vw, 5rem);
-        }
-        }
-
-        /* =========================
-        PANTALLAS 4K
-        Evita que todo se vea demasiado pequeño
-        ========================= */
-
-       @@media (min-width: 2500px) {
-        .app {
-        padding: 22px;
-        gap: 18px;
-        }
-
-        header {
-        min-height: 190px;
-        padding: 24px 38px;
-        border-radius: 22px;
-        }
-
-        .brand .logo-dot {
-        width: 110px;
-        height: 110px;
-        font-size: 3rem;
-        border-radius: 22px;
-        }
-
-        .brand-text h1 {
-        font-size: 4rem;
-        }
-
-        .brand-text .subtitle {
-        font-size: 1.5rem;
-        }
-
-        .segment .seg-title {
-        font-size: 1.15rem;
-        }
-
-        .segment .seg-stat .v {
-        font-size: 3.2rem;
-        }
-
-        .segment .seg-stat .l {
-        font-size: 1rem;
-        }
-
-        .body-grid {
-        grid-template-columns: minmax(0, 1.7fr) minmax(700px, 0.8fr);
-        gap: 20px;
-        }
-
-        .card {
-        padding: 24px 30px;
-        border-radius: 22px;
-        }
-
-        .card h2 {
-        font-size: 1.8rem;
-        }
-
-        .line-row {
-        min-height: 105px;
-        grid-template-columns: minmax(320px, 0.85fr) minmax(630px, 1.85fr) minmax(220px, 0.45fr);
-        padding: 16px 24px;
-        }
-
-        .line-row .line-name {
-        font-size: 2.35rem;
-        }
-
-        .line-bar-track,
-        .unplanned-badge {
-        height: 76px;
-        }
-
-        .line-bar-fill span {
-        font-size: 3rem;
-        }
-
-        .line-bar-detail {
-        min-width: 210px;
-        font-size: 2rem;
-        }
-
-        .line-row .line-plan {
-        font-size: 1.7rem;
-        }
-
-        .mini-stat .v {
-        font-size: 6.2rem;
-        }
-
-        .mini-stat .l {
-        font-size: 1.3rem;
-        }
-
-        .chip-row {
-        min-height: 63px;
-        }
-
-        .chip-row .k {
-        font-size: 1.5rem;
-        }
-
-        .chip-row .v {
-        font-size: 2.25rem;
-        }
-        }
-
-        /* =========================
-        PANTALLAS MÁS ANGOSTAS
-        Laptops o ventanas sin maximizar
-        ========================= */
-
-       @@media (max-width: 1350px) {
-        header {
-        gap: 10px;
-        padding-left: 14px;
-        padding-right: 14px;
-        }
-
-        .brand-text h1 {
-        font-size: clamp(1.45rem, 2.2vw, 2.2rem);
-        }
-
-        .segments-row {
-        justify-content: flex-start;
-        }
-
-        .segment {
-        padding-left: 9px;
-        padding-right: 9px;
-        }
-
-        .segment .seg-stats {
-        gap: 10px;
-        }
-
-        .segment .seg-stat .v {
-        font-size: clamp(1.15rem, 1.7vw, 1.8rem);
-        }
-
-        .body-grid {
-        grid-template-columns: minmax(0, 1.5fr) minmax(340px, 0.75fr);
-        }
-
-        .line-row {
-        grid-template-columns: minmax(145px, 0.75fr) minmax(280px, 1.65fr) minmax(105px, 0.4fr);
-        gap: 10px;
-        }
-
-        .line-bar-detail {
-        min-width: 110px;
-        }
-
-        .mini-stat .v {
-        font-size: clamp(1.8rem, 3vw, 3.2rem);
-        letter-spacing: -2px;
-        }
-        }
-
-        /* =========================
-        MODO PRESENTACIÓN
-        Aumenta los datos más importantes
-        ========================= */
-
-        .app.presentation .brand-text h1 {
-        font-size: clamp(2rem, 3vw, 4rem);
-        }
-
-        .app.presentation .segment .seg-stat .v {
-        font-size: clamp(1.65rem, 2.25vw, 3rem);
-        }
-
-        .app.presentation .mini-stat .v {
-        font-size: clamp(2.7rem, 4.15vw, 5.6rem);
-        }
-
-        .app.presentation .line-row .line-name {
-        font-size: clamp(1.25rem, 1.65vw, 2.15rem);
-        }
-
-        .app.presentation .line-bar-fill span {
-        font-size: clamp(1.55rem, 2vw, 2.7rem);
-        }
-
-        .app.presentation .line-bar-detail {
-        font-size: clamp(1.1rem, 1.35vw, 1.8rem);
-        }
-
-        /* =========================
-        MEJORAS DE CONTRASTE
-        ========================= */
-
-        :root[data-theme="light"] .target-marker {
-        border-left-color: rgba(10, 18, 32, 0.65);
-        }
-
-        :root[data-theme="light"] .line-bar-fill span {
-        color: #ffffff;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.75), 0 0 6px rgba(0, 0, 0, 0.3);
-        }
-
-        :root[data-theme="light"] .segment {
-        background: rgba(16, 24, 40, 0.025);
-        }
-
-        /* ============================================================
-        AJUSTE DE ESPACIO
-        Reduce logo, título del horno y líneas sin producción
-        sin disminuir las métricas importantes
-        ============================================================ */
-
-        /* ------------------------------------------------------------
-        HEADER MÁS COMPACTO
-        ------------------------------------------------------------ */
-
-        header {
-        min-height: clamp(82px, 10vh, 115px);
-        gap: clamp(8px, 0.8vw, 14px);
-        padding: clamp(8px, 0.9vh, 12px) clamp(10px, 1vw, 18px);
-        }
-
-        /* El bloque completo del nombre del horno ocupa menos espacio */
-
-        .brand {
-        gap: clamp(7px, 0.6vw, 10px);
-        flex: 0 1 auto;
-        }
-
-        /* Logo mucho más pequeño */
-
-        .brand .logo-dot {
-        width: clamp(38px, 2.5vw, 48px);
-        height: clamp(38px, 2.5vw, 48px);
-        border-radius: 10px;
-        font-size: clamp(0.85rem, 1.1vw, 1.2rem);
-        box-shadow: 0 4px 10px -4px var(--furnace-color);
-        }
-
-        /* Nombre del horno más discreto */
-
-        .brand-text h1 {
-        max-width: clamp(120px, 10vw, 180px);
-        font-size: clamp(1rem, 1.3vw, 1.55rem);
-        line-height: 1;
-        letter-spacing: 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        }
-
-        /* Fecha, turno y hora también más compactos */
-
-        .brand-text .subtitle {
-        gap: 5px;
-        margin-top: 5px;
-        font-size: clamp(0.64rem, 0.72vw, 0.8rem);
-        line-height: 1;
-        }
-
-        /* Badge del turno más pequeño */
-
-        .shift-badge,
-        .historical-badge {
-        min-height: 22px;
-        padding: 2px 8px;
-        font-size: clamp(0.58rem, 0.65vw, 0.72rem);
-        }
-
-        /* Punto de estado en vivo más pequeño */
-
-        .live-dot {
-        width: 8px;
-        height: 8px;
-        }
-
-        /* ------------------------------------------------------------
-        MÁS ESPACIO PARA LOS SEGMENTOS IMPORTANTES
-        ------------------------------------------------------------ */
-
-        .segments-row {
-        flex: 1 1 auto;
-        justify-content: center;
-        gap: clamp(6px, 0.65vw, 12px);
-        }
-
-        /*
-        Los números siguen grandes.
-        Solo reducimos los márgenes alrededor de ellos.
-        */
-
-        .segment {
-        gap: 3px;
-        padding: clamp(3px, 0.4vh, 6px) clamp(8px, 0.75vw, 13px);
-        border-left-width: 4px;
-        }
-
-        .segment .seg-title {
-        margin-bottom: 1px;
-        font-size: clamp(0.62rem, 0.7vw, 0.8rem);
-        }
-
-        .segment .seg-stats {
-        gap: clamp(8px, 0.85vw, 15px);
-        }
-
-        .segment .seg-stat {
-        min-width: 52px;
-        }
-
-        /*
-        IMPORTANTE:
-        No reducimos .segment .seg-stat .v.
-        Los números de OEE, producción, plan y faltantes
-        conservan el tamaño del rediseño anterior.
-        */
-
-        .segment .seg-stat .l {
-        margin-top: 4px;
-        font-size: clamp(0.56rem, 0.64vw, 0.72rem);
-        }
-
-        /* ------------------------------------------------------------
-        BOTONES MÁS COMPACTOS
-        ------------------------------------------------------------ */
-
-        .header-actions {
-        gap: 5px;
-        }
-
-        .btn {
-        min-height: 34px;
-        padding: 6px 9px;
-        border-width: 1px;
-        border-radius: 8px;
-        font-size: clamp(0.68rem, 0.75vw, 0.82rem);
-        }
-
-        .historical-picker {
-        gap: 4px;
-        }
-
-        .historical-picker input,
-        .historical-picker select {
-        min-height: 34px;
-        padding: 5px 7px;
-        border-width: 1px;
-        font-size: clamp(0.66rem, 0.72vw, 0.78rem);
-        }
-
-        /* ------------------------------------------------------------
-        LÍNEAS SIN PRODUCCIÓN MÁS PEQUEÑAS
-        ------------------------------------------------------------ */
-
-        .no-prod-section {
-        margin-top: 5px;
-        padding-top: 5px;
-        border-top-width: 1px;
-        }
-
-        /* Encabezado de la sección más pequeño */
-
-        .no-prod-title {
-        gap: 5px;
-        margin-bottom: 5px;
-        font-size: clamp(0.56rem, 0.64vw, 0.7rem);
-        letter-spacing: 0.3px;
-        }
-
-        /* Punto morado pequeño */
-
-        .no-prod-title .dot {
-        width: 7px;
-        height: 7px;
-        box-shadow: none;
-        }
-
-        /*
-        Los chips se mantienen en una sola línea cuando sea posible.
-        Si hay demasiados, aparece scroll horizontal.
-        */
-
-        .no-prod-chips {
-        flex-wrap: nowrap;
-        gap: 4px;
-        max-height: 30px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 2px;
-        }
-
-        /* Chips compactos */
-
-        .no-prod-chip {
-        min-height: 24px;
-        padding: 4px 8px;
-        border-radius: 7px;
-        font-size: clamp(0.58rem, 0.66vw, 0.74rem);
-        font-weight: 700;
-        }
-
-        /* Scroll horizontal discreto */
-
-        .no-prod-chips::-webkit-scrollbar {
-        height: 3px;
-        }
-
-        .no-prod-chips::-webkit-scrollbar-thumb {
-        background: var(--no-plan-border);
-        }
-
-        /* ------------------------------------------------------------
-        MODO PRESENTACIÓN
-        Evita que las reglas anteriores vuelvan a agrandar el título
-        ------------------------------------------------------------ */
-
-        .app.presentation .brand-text h1 {
-        font-size: clamp(1rem, 1.3vw, 1.55rem);
-        }
-
-        .app.presentation .brand .logo-dot {
-        width: clamp(38px, 2.5vw, 48px);
-        height: clamp(38px, 2.5vw, 48px);
-        font-size: clamp(0.85rem, 1.1vw, 1.2rem);
-        }
-
-        /* En presentación escondemos la fecha para liberar todavía más ancho */
-
-        .app.presentation .brand-text .subtitle #dateLabel {
-        display: none;
-        }
-
-        /* ------------------------------------------------------------
-        AJUSTE ESPECIAL PARA FULL HD
-        ------------------------------------------------------------ */
-
-        @@media (min-width: 1600px) {
-        header {
-        min-height: 95px;
-        }
-
-        .brand .logo-dot {
-        width: 44px;
-        height: 44px;
-        }
-
-        .brand-text h1 {
-        max-width: 160px;
-        font-size: 1.25rem;
-        }
-        }
-
-        /* ------------------------------------------------------------
-        AJUSTE ESPECIAL PARA 4K
-        Sobrescribe el logo y título grandes del bloque anterior
-        ------------------------------------------------------------ */
-
-        @@media (min-width: 2500px) {
-        header {
-        min-height: 135px;
-        padding: 14px 22px;
-        border-radius: 18px;
-        }
-
-        .brand .logo-dot {
-        width: 66px;
-        height: 66px;
-        border-radius: 13px;
-        font-size: 1.5rem;
-        }
-
-        .brand-text h1 {
-        max-width: 240px;
-        font-size: 1.85rem;
-        }
-
-        .brand-text .subtitle {
-        font-size: 1rem;
-        }
-
-        .shift-badge,
-        .historical-badge {
-        min-height: 28px;
-        padding: 3px 10px;
-        font-size: 0.85rem;
-        }
-
-        .no-prod-section {
-        margin-top: 7px;
-        padding-top: 7px;
-        }
-
-        .no-prod-title {
-        margin-bottom: 6px;
-        font-size: 0.85rem;
-        }
-
-        .no-prod-chips {
-        max-height: 38px;
-        }
-
-        .no-prod-chip {
-        min-height: 30px;
-        padding: 5px 11px;
-        font-size: 0.9rem;
-        }
-        }
+            flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.5fr) auto;
+            align-items: center; gap: calc(var(--u) * .7); background: var(--card-2); border: 1px solid var(--border-soft);
+            border-radius: 11px; padding: 0 calc(var(--u) * .8); transition: background .8s ease; font-size: var(--row-font);
+        }
+        .line-row.flash { background: var(--flash); }
+        .line-name { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1em; }
+        .line-link { color: inherit; text-decoration: none; border-bottom: 2px dashed var(--border); }
+        .line-link:hover { color: var(--furnace-color); border-bottom-color: var(--furnace-color); }
+        .line-bar-track { height: 78%; max-height: 2.1em; border-radius: 8px; background: var(--grid-line); overflow: hidden; position: relative; }
+        .target-marker { position: absolute; top: 0; bottom: 0; width: 0; border-left: 3px dashed rgba(255,255,255,.85); z-index: 2; mix-blend-mode: difference; }
+        .line-bar-fill { height: 100%; border-radius: 8px; display: flex; align-items: center; padding-left: 10px; transition: width .5s ease; min-width: 3.4em; }
+        .line-bar-fill span { font-family: 'JetBrains Mono', monospace; font-weight: 900; color: #fff; font-size: .95em; text-shadow: 0 1px 3px rgba(0,0,0,.6); white-space: nowrap; }
+        .line-qty { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: .88em; white-space: nowrap; line-height: 1.1; font-variant-numeric: tabular-nums; }
+        .line-qty small { display: block; font-size: .62em; color: var(--text-faint); font-weight: 700; }
+        .line-row.unplanned-line-row { border-color: var(--bad); background: rgba(255,100,114,0.09); }
+        .unplanned-badge { height: 78%; max-height: 2.1em; border-radius: 8px; display: flex; align-items: center; padding-left: 12px; background: rgba(255,100,114,0.16); border: 2px dashed var(--bad); color: var(--bad); font-weight: 900; font-size: .72em; letter-spacing: .3px; white-space: nowrap; }
+
+        .no-prod-section { flex: 0 0 auto; margin-top: 8px; padding-top: 8px; border-top: 2px dashed var(--border); }
+        .no-prod-title { font-size: max(.95rem, calc(var(--u) * .85)); font-weight: 900; color: var(--no-plan-text); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+        .no-prod-chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: calc(var(--u) * 4.4); overflow: hidden; }
+        .no-prod-chip { background: var(--no-plan-bg); border: 1px solid var(--no-plan-border); color: var(--no-plan-text); padding: 3px 12px; border-radius: 999px; font-size: max(.95rem, calc(var(--u) * .85)); font-weight: 800; white-space: nowrap; text-decoration: none; }
+        a.no-prod-chip:hover { background: var(--no-plan-border); color: #fff; }
+
+        /* ---------- GRÁFICA DE TENDENCIA (protagonista) ---------- */
+        .trend-head { display: flex; align-items: flex-start; justify-content: space-between; gap: calc(var(--u) * .8); margin-bottom: calc(var(--u) * .3); }
+        .trend-title { font-size: max(1.2rem, calc(var(--u) * 1.5)); font-weight: 900; line-height: 1.1; }
+        .trend-title .tag { display: inline-block; background: var(--seg-be); color: #06101f; border-radius: 8px; padding: 0 .45em; margin-right: .4em; letter-spacing: .5px; }
+        .trend-title .sub { display: block; font-size: max(1rem, calc(var(--u) * .95)); color: var(--text-dim); font-weight: 600; margin-top: 4px; }
+        .trend-kpis { display: flex; gap: calc(var(--u) * 1.1); flex-shrink: 0; }
+        .trend-kpi { text-align: right; }
+        .trend-kpi .v { font-family: 'JetBrains Mono', monospace; font-weight: 900; font-size: calc(var(--u) * 2.2); line-height: 1; font-variant-numeric: tabular-nums; }
+        .trend-kpi .l { font-size: max(.85rem, calc(var(--u) * .75)); color: var(--text-faint); text-transform: uppercase; font-weight: 800; margin-top: 3px; }
+        .chart-wrap { flex: 1; min-height: 0; position: relative; }
     </style>
 </head>
 <body>
@@ -1379,11 +178,11 @@
                         <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
                         @if (IsHistorical)
                         {
-                            <span class="historical-badge">📅</span>
+                            <span class="historical-badge">📅 Histórico</span>
                         }
                         else
                         {
-                            <span style="display:flex;align-items:center;gap:6px;">
+                            <span style="display:flex;align-items:center;gap:8px;">
                                 <span class="live-dot"></span>
                                 <span id="lastUpdate">--:--</span>
                             </span>
@@ -1391,8 +190,6 @@
                     </div>
                 </div>
             </div>
-
-            <div class="segments-row" id="segmentsRow"></div>
 
             <div class="header-actions controls-collapsible">
                 @if (IsHistorical)
@@ -1417,37 +214,31 @@
             </div>
         </header>
 
+        <div class="seg-strip" id="segStrip"></div>
+
         <div class="body-grid">
             <div class="card">
                 <h2>Líneas de Producción <span class="count-chip" id="linesCountChip"></span></h2>
                 <div class="lines-list" id="linesList"></div>
                 <div class="no-prod-section" id="noProdSection" style="display:none;">
-                    <div class="no-prod-title"><span class="dot"></span>Líneas sin producción en este turno <span id="noProdCount"></span></div>
+                    <div class="no-prod-title">Sin producción en este turno <span id="noProdCount"></span></div>
                     <div class="no-prod-chips" id="noProdChips"></div>
                 </div>
             </div>
 
-            <div class="side-stack">
-                <div class="card mini-stats-card">
-                    <h2>Resumen del Horno</h2>
-                    <div class="mini-stats-row">
-                        <div class="mini-stat"><div class="v" id="oeeVal">@Model.Oee.ToString("P0")</div><div class="l">OEE Turno</div></div>
-                        <div class="mini-stat"><div class="v" id="prodVal">@Model.TotalProduction.ToString("N0")</div><div class="l">Producción</div></div>
-                        <div class="mini-stat"><div class="v" id="remVal">@Model.RemainingToPlan.ToString("N0")</div><div class="l">Faltan por Plan</div></div>
+            <div class="card">
+                <div class="trend-head">
+                    <div class="trend-title">
+                        <span><span class="tag" id="trendTag">BACK END</span><span id="trendTitleText">Producción por hora</span></span>
+                        <span class="sub" id="trendSub"></span>
+                    </div>
+                    <div class="trend-kpis">
+                        <div class="trend-kpi"><div class="v" id="kAcc" style="color:var(--good)">–</div><div class="l">Acumulado real</div></div>
+                        <div class="trend-kpi"><div class="v" id="kExp" style="color:var(--warn)">–</div><div class="l" id="kExpL">Esperado 85%</div></div>
+                        <div class="trend-kpi"><div class="v" id="kDiff">–</div><div class="l">Diferencia</div></div>
                     </div>
                 </div>
-
-                <div class="card trend-mini">
-                    <h2>Tendencia por Hora</h2>
-                    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-                </div>
-
-                <div class="card chips-card">
-                    <div class="chip-row"><span class="k">Líneas activas</span><span class="v" id="activeLinesVal">-</span></div>
-                    <div class="chip-row"><span class="k">Sin producción</span><span class="v" id="noProdVal">-</span></div>
-                    <div class="chip-row"><span class="k">Mejor línea</span><span class="v" id="bestLineVal">-</span></div>
-                    <div class="chip-row"><span class="k">Línea más baja</span><span class="v" id="worstLineVal">-</span></div>
-                </div>
+                <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
             </div>
         </div>
     </div>
@@ -1457,230 +248,263 @@
         const FURNACE_ID = @Model.FurnaceId;
         const IS_HISTORICAL = @(IsHistorical ? "true" : "false");
         const HIST_QS = IS_HISTORICAL ? `?date=@HistoricalDateStr&shiftId=@HistoricalShiftId` : '';
+        const TARGET = 0.85;   // meta OEE: el "esperado" de la gráfica = Plan x tiempo transcurrido x 85%
         const charts = {};
 
-        function oeeColor(oee) {
-        if (oee >= 0.85) return getCss('--good');
-        if (oee >= 0.70) return getCss('--warn');
-        return getCss('--bad');
-        }
         function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+        function oeeColor(oee) { return oee >= 0.85 ? getCss('--good') : oee >= 0.70 ? getCss('--warn') : getCss('--bad'); }
         function hexToRgba(hex, alpha) {
-        const h = hex.replace('#', '');
-        const bigint = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
-        const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255;
-        return `rgba(${r},${g},${b},${alpha})`;
+            const h = hex.replace('#', '');
+            const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+            return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
         }
         function pct(v) { return (v * 100).toFixed(0) + '%'; }
+        function fmt(n) { return Math.round(n).toLocaleString(); }
 
         document.getElementById('dateLabel').textContent = IS_HISTORICAL
-        ? new Date(snapshot.generatedAt).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-        : new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+            ? new Date(snapshot.generatedAt).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+            : new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
 
         if (IS_HISTORICAL) {
-        const pickerDate = document.getElementById('pickerDate');
-        const pickerShift = document.getElementById('pickerShift');
-        if (pickerDate) pickerDate.value = '@HistoricalDateStr';
-        if (pickerShift) pickerShift.value = '@HistoricalShiftId';
+            const d = document.getElementById('pickerDate'), s = document.getElementById('pickerShift');
+            if (d) d.value = '@HistoricalDateStr';
+            if (s) s.value = '@HistoricalShiftId';
         }
 
-        // ---------------------------------------------------------------
-        // SEGMENTOS DEL HEADER (item 6): Tube Mills (furnaceId=6) solo se ve a sí mismo, sin
-        // split ni SAP. El resto de hornos separan Core Builder / Back End (con SAP%), y
-        // Furnace 1 además agrega el bloque de Clam Shells.
-        // ---------------------------------------------------------------
+        // ---------------- FRANJA DE SEGMENTOS ----------------
+        function segCard(title, sub, color, oee, prod, plan, rem, sap, main) {
+            return `
+            <div class="seg-card ${main ? 'main' : ''}" style="--seg-color:${color}">
+                <div class="seg-title">${title}${sub ? `<small>${sub}</small>` : ''}</div>
+                <div class="seg-oee" style="color:${oeeColor(oee)}">${pct(oee)}</div>
+                <div class="seg-nums">
+                    <div class="seg-num"><div class="v">${fmt(prod)}</div><div class="l">Prod</div></div>
+                    <div class="seg-num"><div class="v">${fmt(plan)}</div><div class="l">Plan</div></div>
+                    <div class="seg-num"><div class="v">${fmt(rem)}</div><div class="l">Faltan</div></div>
+                    ${sap !== null && sap !== undefined ? `<div class="seg-num"><div class="v">${pct(sap)}</div><div class="l">SAP</div></div>` : ''}
+                </div>
+            </div>`;
+        }
+
         function renderSegments() {
-        const el = document.getElementById('segmentsRow');
-        if (FURNACE_ID === 6) {
-        el.innerHTML = segmentHtml('Tube Mills', 'var(--furnace-color)', snapshot.oee, snapshot.totalProduction, snapshot.totalPlanned, snapshot.remainingToPlan, null);
-        return;
-        }
-
-        let html = segmentHtml('Core Builder', 'var(--seg-cb)', snapshot.coreBuilderOee, snapshot.coreBuilderProduction, snapshot.coreBuilderPlanned, snapshot.coreBuilderRemaining, null);
-        html += segmentHtml('Back End', 'var(--seg-be)', snapshot.backEndOee, snapshot.backEndProduction, snapshot.backEndPlanned, snapshot.backEndRemaining, snapshot.backEndSapPercent);
-        if (FURNACE_ID === 1) {
-        html += segmentHtml('Clam Shells', 'var(--seg-cs)', snapshot.clamShellOee, snapshot.clamShellProduction, snapshot.clamShellPlanned, snapshot.clamShellRemaining, null);
-        }
-        el.innerHTML = html;
-        }
-
-        function segmentHtml(title, color, oee, prod, plan, remaining, sapPct) {
-        return `
-        <div class="segment" style="--seg-color:${color}">
-        <div class="seg-title">${title}</div>
-        <div class="seg-stats">
-        <div class="seg-stat"><div class="v" style="color:${oeeColor(oee)}">${pct(oee)}</div><div class="l">OEE</div></div>
-        <div class="seg-stat"><div class="v">${prod.toLocaleString()}</div><div class="l">Prod</div></div>
-        <div class="seg-stat"><div class="v">${plan.toLocaleString()}</div><div class="l">Plan</div></div>
-        <div class="seg-stat"><div class="v">${remaining.toLocaleString()}</div><div class="l">Faltan</div></div>
-        ${sapPct !== null ? `<div class="seg-stat"><div class="v">${pct(sapPct)}</div><div class="l">SAP %</div></div>` : ''}
-        </div>
-        </div>`;
+            const el = document.getElementById('segStrip');
+            if (FURNACE_ID === 6) {
+                el.innerHTML = segCard('Tube Mills', 'OEE del turno', 'var(--furnace-color)', snapshot.oee, snapshot.totalProduction, snapshot.totalPlanned, snapshot.remainingToPlan, null, true);
+                return;
+            }
+            let h = segCard('Horno', 'Total', 'var(--seg-all)', snapshot.oee, snapshot.totalProduction, snapshot.totalPlanned, snapshot.remainingToPlan, null, false);
+            h += segCard('Core Builder', '', 'var(--seg-cb)', snapshot.coreBuilderOee, snapshot.coreBuilderProduction, snapshot.coreBuilderPlanned, snapshot.coreBuilderRemaining, null, false);
+            h += segCard('Back End', 'con SAP', 'var(--seg-be)', snapshot.backEndOee, snapshot.backEndProduction, snapshot.backEndPlanned, snapshot.backEndRemaining, snapshot.backEndSapPercent, true);
+            if (FURNACE_ID === 1) {
+                h += segCard('Clam Shells', '', 'var(--seg-cs)', snapshot.clamShellOee, snapshot.clamShellProduction, snapshot.clamShellPlanned, snapshot.clamShellRemaining, null, false);
+            }
+            el.innerHTML = h;
         }
 
         function render(isLiveUpdate) {
-        document.getElementById('oeeVal').textContent = pct(snapshot.oee);
-        document.getElementById('oeeVal').style.color = oeeColor(snapshot.oee);
-        document.getElementById('prodVal').textContent = snapshot.totalProduction.toLocaleString();
-        document.getElementById('remVal').textContent = snapshot.remainingToPlan.toLocaleString();
-        document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
-        if (!IS_HISTORICAL) {
-        document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-        }
-        document.getElementById('linesCountChip').textContent = snapshot.lines.length + ' líneas';
-        document.getElementById('activeLinesVal').textContent = snapshot.linesWithProduction + ' / ' + snapshot.lines.length;
-        document.getElementById('noProdVal').textContent = snapshot.linesWithoutProduction;
-
-        const bestEl = document.getElementById('bestLineVal');
-        const worstEl = document.getElementById('worstLineVal');
-        bestEl.textContent = snapshot.bestLine ? pct(snapshot.bestLine.oeeShift) : '—';
-        bestEl.style.color = snapshot.bestLine ? oeeColor(snapshot.bestLine.oeeShift) : '';
-        worstEl.textContent = snapshot.worstLine ? pct(snapshot.worstLine.oeeShift) : '—';
-        worstEl.style.color = snapshot.worstLine ? oeeColor(snapshot.worstLine.oeeShift) : '';
-
-        renderSegments();
-        renderLinesList(isLiveUpdate);
-        renderTrend();
+            document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
+            if (!IS_HISTORICAL) {
+                document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+            }
+            document.getElementById('linesCountChip').textContent = snapshot.lines.length + ' líneas';
+            renderSegments();
+            renderLinesList(isLiveUpdate);
+            fitRows();
+            renderTrend();
         }
 
-        // Los links a /Line/{id} cargan la fecha/turno histórico actual (HIST_QS), así se
-        // navega manteniendo el mismo día/turno en vez de caer siempre a "en vivo".
+        // ---------------- LÍNEAS ----------------
+        function lineLink(l) {
+            return l.productListId > 0
+                ? `<a href="/Line/${l.productListId}${HIST_QS}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>`
+                : l.productDesc;
+        }
+
         function renderLinesList(isLiveUpdate) {
-        const active = snapshot.lines.filter(l => l.total > 0 && !l.isUnplannedProduction).sort((a, b) => a.productOrder - b.productOrder);
-        const unplanned = snapshot.lines.filter(l => l.isUnplannedProduction).sort((a, b) => a.productOrder - b.productOrder);
-        const inactive = snapshot.lines.filter(l => l.total === 0 && !l.isUnplannedProduction).sort((a, b) => a.productOrder - b.productOrder);
+            const byOrder = (a, b) => a.productOrder - b.productOrder;
+            const active = snapshot.lines.filter(l => l.total > 0 && !l.isUnplannedProduction).sort(byOrder);
+            const unplanned = snapshot.lines.filter(l => l.isUnplannedProduction).sort(byOrder);
+            const inactive = snapshot.lines.filter(l => l.total === 0 && !l.isUnplannedProduction).sort(byOrder);
 
-        const container = document.getElementById('linesList');
-        const prevTotalByDesc = {};
-        container.querySelectorAll('.line-row').forEach(el => prevTotalByDesc[el.dataset.desc] = el.dataset.total);
+            const container = document.getElementById('linesList');
+            const prev = {};
+            container.querySelectorAll('.line-row').forEach(el => prev[el.dataset.desc] = el.dataset.total);
+            const changed = l => isLiveUpdate && prev[l.productDesc] !== undefined && prev[l.productDesc] !== String(l.total);
 
-        const activeRows = active.map(l => {
-        const changed = isLiveUpdate && prevTotalByDesc[l.productDesc] !== undefined && prevTotalByDesc[l.productDesc] !== String(l.total);
-        return `
-        <div class="line-row ${changed ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
-        <div class="line-name" title="${l.productDesc}">${l.productListId > 0 ? `<a href="/Line/${l.productListId}${HIST_QS}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>` : l.productDesc}</div>
-        <div class="line-bar-area">
-        <div class="line-bar-track">
-        <div class="target-marker" style="left:85%"></div>
-        <div class="line-bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}">
-        <span>${pct(l.oeeShift)}</span>
-        </div>
-        </div>
-        <span class="line-bar-detail">${l.total.toLocaleString()}/${l.accumulatedRate.toLocaleString()}</span>
-        </div>
-        <div class="line-plan">Plan ${l.plannedShift.toLocaleString()}</div>
-        </div>`;
-        }).join('');
+            const activeRows = active.map(l => `
+                <div class="line-row ${changed(l) ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
+                    <div class="line-name" title="${l.productDesc}">${lineLink(l)}</div>
+                    <div class="line-bar-track">
+                        <div class="target-marker" style="left:85%"></div>
+                        <div class="line-bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}"><span>${pct(l.oeeShift)}</span></div>
+                    </div>
+                    <div class="line-qty">${fmt(l.total)} / ${fmt(l.accumulatedRate)}<small>Plan ${fmt(l.plannedShift)}</small></div>
+                </div>`).join('');
 
-        const unplannedRows = unplanned.map(l => {
-        const changed = isLiveUpdate && prevTotalByDesc[l.productDesc] !== undefined && prevTotalByDesc[l.productDesc] !== String(l.total);
-        return `
-        <div class="line-row unplanned-line-row ${changed ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
-        <div class="line-name" title="${l.productDesc}">${l.productListId > 0 ? `<a href="/Line/${l.productListId}${HIST_QS}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>` : l.productDesc}</div>
-        <div class="line-bar-area">
-        <div class="unplanned-badge">⚠ PRODUCCIÓN NO PLANEADA</div>
-        <span class="line-bar-detail">${l.total.toLocaleString()} piezas</span>
-        </div>
-        <div class="line-plan">&nbsp;</div>
-        </div>`;
-        }).join('');
+            const unplannedRows = unplanned.map(l => `
+                <div class="line-row unplanned-line-row ${changed(l) ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
+                    <div class="line-name" title="${l.productDesc}">${lineLink(l)}</div>
+                    <div class="unplanned-badge">⚠ PRODUCCIÓN NO PLANEADA</div>
+                    <div class="line-qty">${fmt(l.total)}<small>piezas</small></div>
+                </div>`).join('');
 
-        container.innerHTML = activeRows + unplannedRows;
+            container.innerHTML = activeRows + unplannedRows;
+            if (isLiveUpdate) setTimeout(() => container.querySelectorAll('.line-row.flash').forEach(el => el.classList.remove('flash')), 900);
 
-        if (isLiveUpdate) {
-        setTimeout(() => container.querySelectorAll('.line-row.flash').forEach(el => el.classList.remove('flash')), 900);
+            const section = document.getElementById('noProdSection');
+            if (inactive.length === 0) {
+                section.style.display = 'none';
+            } else {
+                section.style.display = '';
+                document.getElementById('noProdCount').textContent = `(${inactive.length})`;
+                document.getElementById('noProdChips').innerHTML = inactive
+                    .map(l => l.productListId > 0
+                        ? `<a href="/Line/${l.productListId}${HIST_QS}" class="no-prod-chip">${l.productDesc}</a>`
+                        : `<span class="no-prod-chip">${l.productDesc}</span>`).join('');
+            }
         }
 
-        const section = document.getElementById('noProdSection');
-        if (inactive.length === 0) {
-        section.style.display = 'none';
-        } else {
-        section.style.display = '';
-        document.getElementById('noProdCount').textContent = `(${inactive.length})`;
-        document.getElementById('noProdChips').innerHTML = inactive
-        .map(l => l.productListId > 0
-        ? `<a href="/Line/${l.productListId}${HIST_QS}" class="no-prod-chip" title="Ver TV de esta línea">${l.productDesc}</a>`
-        : `<span class="no-prod-chip" title="SIN PRODUCCIÓN EN EL TURNO">${l.productDesc}</span>`)
-        .join('');
+        // Ajusta la fuente de las filas según el espacio real: con pocas líneas se ve ENORME,
+        // con muchas se reduce lo justo para que TODAS quepan sin scroll (mínimo 15px).
+        function fitRows() {
+            const list = document.getElementById('linesList');
+            const n = list.children.length;
+            if (!n) return;
+            const rowH = (list.clientHeight - (n - 1) * 6) / n;
+            const px = Math.max(15, Math.min(34, rowH * 0.46));
+            list.style.setProperty('--row-font', px + 'px');
         }
+        window.addEventListener('resize', () => { fitRows(); Object.values(charts).forEach(c => c && c.resize()); });
+
+        // ---------------- TENDENCIA (SOLO BACK END) ----------------
+        // Fuente: snapshot.backEndHourlyTrend (servidor, solo líneas Back End que cuentan).
+        // Tube Mills no tiene split, usa su propia tendencia completa.
+        // Esperado = expectedCumulative del servidor (Plan Back End x tiempo transcurrido) x 85%.
+        function trendSource() {
+            if (FURNACE_ID === 6) return { pts: snapshot.hourlyTrend, label: 'TUBE MILLS', plan: snapshot.totalPlanned, ok: true };
+            if (snapshot.backEndHourlyTrend && snapshot.backEndHourlyTrend.length)
+                return { pts: snapshot.backEndHourlyTrend, label: 'BACK END', plan: snapshot.backEndPlanned, ok: true };
+            return { pts: snapshot.hourlyTrend, label: 'HORNO (falta parche servidor)', plan: snapshot.totalPlanned, ok: false };
+        }
+        function trendSeries(src) {
+            let run = 0;
+            return {
+                labels: src.pts.map(h => h.hour),
+                perHour: src.pts.map(h => h.production),
+                acc: src.pts.map(h => (run += h.production)),
+                exp: src.pts.map(h => h.expectedCumulative * TARGET)
+            };
         }
 
-        function cumulativeSeries() {
-        let running = 0;
-        return snapshot.hourlyTrend.map(h => (running += h.production));
-        }
+        const barValuesPlugin = {
+            id: 'barValues',
+            afterDatasetsDraw(chart) {
+                const ds = chart.data.datasets[0], meta = chart.getDatasetMeta(0), ctx = chart.ctx;
+                ctx.save();
+                ctx.font = '800 17px "JetBrains Mono", monospace';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                ctx.fillStyle = getCss('--text');
+                meta.data.forEach((bar, i) => { const v = ds.data[i]; if (v > 0) ctx.fillText(fmt(v), bar.x, bar.y - 4); });
+                ctx.restore();
+            }
+        };
 
         function renderTrend() {
-        if (charts.trend) {
-        charts.trend.data.labels = snapshot.hourlyTrend.map(h => h.hour);
-        charts.trend.data.datasets[0].data = snapshot.hourlyTrend.map(h => h.production);
-        charts.trend.data.datasets[1].data = cumulativeSeries();
-        charts.trend.data.datasets[2].data = snapshot.hourlyTrend.map(h => h.expectedCumulative);
-        charts.trend.update('none');
-        return;
-        }
-        charts.trend = new Chart(document.getElementById('trendChart'), {
-        data: {
-        labels: snapshot.hourlyTrend.map(h => h.hour),
-        datasets: [
-        { type: 'bar', label: 'Producción / hora', data: snapshot.hourlyTrend.map(h => h.production), backgroundColor: hexToRgba(getCss('--accent'), .55), borderRadius: 6, maxBarThickness: 40, yAxisID: 'y', order: 2 },
-        { type: 'line', label: 'Acumulado', data: cumulativeSeries(), borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .12), fill: true, tension: .35, pointRadius: 4, yAxisID: 'y1', order: 1 },
-        { type: 'line', label: 'Acumulado esperado', data: snapshot.hourlyTrend.map(h => h.expectedCumulative), borderColor: getCss('--warn'), backgroundColor: 'transparent', borderDash: [6, 4], tension: .35, pointRadius: 4, pointBackgroundColor: getCss('--warn'), fill: false, yAxisID: 'y1', order: 0 }
-        ]
-        },
-        options: {
-        responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { labels: { color: getCss('--text-dim'), font: { size: 14, weight: '600' }, boxWidth: 13 } } },
-        scales: {
-        x: { ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
-        y: { position: 'left', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
-        y1: { position: 'right', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { display: false } }
-        }
-        }
-        });
+            const src = trendSource();
+            const s = trendSeries(src);
+
+            document.getElementById('trendTag').textContent = src.label;
+            document.getElementById('trendTag').style.background = src.ok ? '' : 'var(--warn)';
+            document.getElementById('trendTitleText').textContent = 'Producción por hora';
+            document.getElementById('trendSub').textContent = src.ok
+                ? (FURNACE_ID === 6 ? 'Solo Tube Mills' : 'Solo líneas Back End · no incluye Core Builder ni Clam Shells')
+                : 'Mostrando todo el horno: aplica el parche del servidor para ver solo Back End';
+
+            const lastAcc = s.acc.length ? s.acc[s.acc.length - 1] : 0;
+            const lastExp = s.exp.length ? s.exp[s.exp.length - 1] : 0;
+            // En vivo se compara contra la última hora con producción; en histórico, contra el cierre del turno.
+            let idx = s.exp.length - 1;
+            if (!IS_HISTORICAL) { for (let i = s.exp.length - 1; i >= 0; i--) { if (src.pts[i].production > 0) { idx = i; break; } } }
+            const nowAcc = s.acc[idx] ?? 0, nowExp = s.exp[idx] ?? 0, diff = nowAcc - nowExp;
+            document.getElementById('kAcc').textContent = fmt(lastAcc);
+            document.getElementById('kExp').textContent = fmt(nowExp);
+            document.getElementById('kExpL').textContent = 'Esperado 85%';
+            const kd = document.getElementById('kDiff');
+            kd.textContent = (diff >= 0 ? '+' : '') + fmt(diff);
+            kd.style.color = diff >= 0 ? getCss('--good') : getCss('--bad');
+
+            if (charts.trend) {
+                const c = charts.trend;
+                c.data.labels = s.labels;
+                c.data.datasets[0].data = s.perHour;
+                c.data.datasets[1].data = s.acc;
+                c.data.datasets[2].data = s.exp;
+                c.options.scales.y.title.text = `Piezas por hora (${src.label === 'BACK END' ? 'Back End' : src.label})`;
+                c.options.scales.y1.title.text = 'Acumulado del turno (piezas)';
+                c.update('none');
+                return;
+            }
+
+            const tick = { color: getCss('--text-dim'), font: { size: 17, weight: '700' } };
+            const axisTitle = (text, color) => ({ display: true, text, color: color || getCss('--text'), font: { size: 18, weight: '800' }, padding: 8 });
+            charts.trend = new Chart(document.getElementById('trendChart'), {
+                data: {
+                    labels: s.labels,
+                    datasets: [
+                        { type: 'bar', label: 'Producción por hora (barras, eje izq.)', data: s.perHour, backgroundColor: getCss('--bar-fill'), borderRadius: 6, maxBarThickness: 70, yAxisID: 'y', order: 3 },
+                        { type: 'line', label: 'Acumulado real (eje der.)', data: s.acc, borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .14), fill: true, borderWidth: 4, tension: .3, pointRadius: 5, yAxisID: 'y1', order: 2 },
+                        { type: 'line', label: 'Esperado al 85% del plan (eje der.)', data: s.exp, borderColor: getCss('--warn'), backgroundColor: 'transparent', borderDash: [10, 6], borderWidth: 4, tension: .3, pointRadius: 5, pointBackgroundColor: getCss('--warn'), fill: false, yAxisID: 'y1', order: 1 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    layout: { padding: { top: 6, right: 4 } },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: getCss('--text'), font: { size: 17, weight: '700' }, boxWidth: 26, boxHeight: 6, padding: 16 } },
+                        tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } }
+                    },
+                    scales: {
+                        x: { title: axisTitle('Hora del turno'), ticks: tick, grid: { color: getCss('--grid-line') } },
+                        y: { position: 'left', beginAtZero: true, title: axisTitle(`Piezas por hora (${src.label === 'BACK END' ? 'Back End' : src.label})`, getCss('--accent')), ticks: tick, grid: { color: getCss('--grid-line') } },
+                        y1: { position: 'right', beginAtZero: true, title: axisTitle('Acumulado del turno (piezas)', getCss('--good')), ticks: tick, grid: { display: false } }
+                    }
+                },
+                plugins: [barValuesPlugin]
+            });
         }
 
+        // ---------------- CONTROLES ----------------
         document.getElementById('toggleTheme').onclick = () => {
-        const html = document.documentElement;
-        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        html.setAttribute('data-theme', next);
-        localStorage.setItem('pm-theme', next);
-        Object.values(charts).forEach(c => c && c.destroy());
-        charts.trend = null;
-        render(false);
+            const html = document.documentElement;
+            const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            try { localStorage.setItem('pm-theme', next); } catch (e) { }
+            Object.values(charts).forEach(c => c && c.destroy());
+            charts.trend = null;
+            render(false);
         };
-        const savedTheme = localStorage.getItem('pm-theme');
-        if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+        try { const t = localStorage.getItem('pm-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) { }
 
         document.getElementById('togglePresentation').onclick = () => {
-        document.getElementById('app').classList.toggle('presentation');
-        if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen?.().catch(() => {});
-        } else {
-        document.exitFullscreen?.().catch(() => {});
-        }
-        setTimeout(() => Object.values(charts).forEach(c => c && c.resize()), 260);
+            document.getElementById('app').classList.toggle('presentation');
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => { });
+            else document.exitFullscreen?.().catch(() => { });
+            setTimeout(() => { fitRows(); Object.values(charts).forEach(c => c && c.resize()); }, 300);
         };
 
         if (!IS_HISTORICAL) {
-        const connection = new signalR.HubConnectionBuilder()
-        .withUrl('/hubs/metrics')
-        .withAutomaticReconnect()
-        .build();
-
-        connection.on('FurnaceSnapshotUpdated', (payload) => {
-        if (payload.furnaceId !== FURNACE_ID) return;
-        snapshot = payload;
-        render(true);
-        });
-
-        connection.start()
-        .then(() => connection.invoke('JoinFurnace', FURNACE_ID))
-        .catch(err => console.error('SignalR error:', err));
+            const connection = new signalR.HubConnectionBuilder().withUrl('/hubs/metrics').withAutomaticReconnect().build();
+            connection.on('FurnaceSnapshotUpdated', (payload) => {
+                if (payload.furnaceId !== FURNACE_ID) return;
+                snapshot = payload;
+                render(true);
+            });
+            connection.start().then(() => connection.invoke('JoinFurnace', FURNACE_ID)).catch(err => console.error('SignalR error:', err));
         }
 
         render(false);
+        document.fonts && document.fonts.ready.then(fitRows);
     </script>
 </body>
 </html>
