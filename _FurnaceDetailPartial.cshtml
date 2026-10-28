@@ -65,22 +65,28 @@
         header {
             display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 1.2);
             background: var(--card); border: 1px solid var(--border); border-top: 6px solid var(--furnace-color);
-            border-radius: 16px; padding: calc(var(--u) * .55) calc(var(--u) * 1.2); box-shadow: var(--shadow);
+            border-radius: 16px; padding: calc(var(--u) * .3) calc(var(--u) * 1.2); box-shadow: var(--shadow);
         }
         .brand { display: flex; align-items: center; gap: calc(var(--u) * 1); }
         .logo-dot {
-            width: calc(var(--u) * 3.6); height: calc(var(--u) * 3.6); border-radius: 14px; background: var(--furnace-color);
+            width: calc(var(--u) * 3); height: calc(var(--u) * 3); border-radius: 12px; background: var(--furnace-color);
             display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: calc(var(--u) * 1.8);
             color: #06101f; box-shadow: 0 6px 16px -4px var(--furnace-color); flex-shrink: 0;
         }
-        .brand-text h1 { margin: 0; font-size: calc(var(--u) * 2.6); font-weight: 900; line-height: 1.05; letter-spacing: .2px; }
-        .subtitle { display: flex; align-items: center; gap: calc(var(--u) * .7); margin-top: 4px; color: var(--text-dim); font-size: max(1rem, calc(var(--u) * 1.05)); font-weight: 600; }
-        #dateLabel { text-transform: capitalize; }
+        .brand-text h1 { margin: 0; font-size: calc(var(--u) * 2.8); font-weight: 900; line-height: 1.05; letter-spacing: .2px; }
+        .hdr-right { display: flex; align-items: center; gap: calc(var(--u) * 1.2); }
+        .hdr-info { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; line-height: 1.1; }
+        .hdr-date { color: var(--text-dim); font-weight: 700; font-size: calc(var(--u) * 1.25); text-transform: capitalize; }
+        .hdr-line { display: flex; align-items: center; gap: calc(var(--u) * .8); }
         .shift-badge, .historical-badge {
             background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border);
-            padding: 2px calc(var(--u) * .8); border-radius: 999px; font-weight: 800; font-size: max(1rem, calc(var(--u) * 1.05));
+            padding: 0 calc(var(--u) * .8); border-radius: 999px; font-weight: 900; font-size: calc(var(--u) * 1.7);
         }
-        .live-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--good); animation: pulse 1.8s infinite; }
+        .hdr-time { display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 900; font-size: calc(var(--u) * 2.1); font-variant-numeric: tabular-nums; }
+        .app.presentation .hdr-date { font-size: calc(var(--u) * 1.5); }
+        .app.presentation .shift-badge, .app.presentation .historical-badge { font-size: calc(var(--u) * 2.2); }
+        .app.presentation .hdr-time { font-size: calc(var(--u) * 2.7); }
+        .live-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--good); animation: pulse 1.8s infinite; }
         @@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(53,227,154,.55); } 70% { box-shadow: 0 0 0 10px rgba(53,227,154,0); } 100% { box-shadow: 0 0 0 0 rgba(53,227,154,0); } }
 
         .header-actions { display: flex; align-items: center; gap: calc(var(--u) * .5); }
@@ -105,16 +111,17 @@
             column-gap: calc(var(--u) * .6); row-gap: calc(var(--u) * .2); min-width: 0;
         }
         .seg-card.main { background: linear-gradient(90deg, var(--accent-soft), var(--card) 70%); border-color: var(--seg-color); }
-        .seg-title { grid-area: t; font-size: max(1rem, calc(var(--u) * 1.15)); font-weight: 900; text-transform: uppercase; letter-spacing: .5px; color: var(--seg-color); line-height: 1.1; }
+        .seg-title { grid-area: t; font-size: max(1.1rem, calc(var(--u) * 1.4)); font-weight: 900; text-transform: uppercase; letter-spacing: .5px; color: var(--seg-color); line-height: 1.1; }
         .seg-title small { display: block; font-size: max(.8rem, calc(var(--u) * .75)); color: var(--text-faint); font-weight: 700; letter-spacing: .2px; text-transform: none; margin-top: 2px; }
-        .seg-oee { grid-area: o; text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 900; line-height: 1; font-size: calc(var(--u) * 3.4); font-variant-numeric: tabular-nums; }
+        .seg-oee { grid-area: o; text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 900; line-height: 1; font-size: calc(var(--u) * 4.4); font-variant-numeric: tabular-nums; }
         .seg-nums { grid-area: n; display: flex; justify-content: space-between; gap: calc(var(--u) * .5); border-top: 1px solid var(--border-soft); padding-top: calc(var(--u) * .25); }
         .seg-num { text-align: center; flex: 1; }
-        .seg-num .v { font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: calc(var(--u) * 1.55); line-height: 1.05; font-variant-numeric: tabular-nums; }
-        .seg-num .l { font-size: max(.8rem, calc(var(--u) * .72)); color: var(--text-faint); text-transform: uppercase; font-weight: 800; letter-spacing: .3px; white-space: nowrap; }
+        .seg-num .v { font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: calc(var(--u) * 2.3); line-height: 1.05; font-variant-numeric: tabular-nums; }
+        .seg-card.n4 .seg-num .v { font-size: calc(var(--u) * 1.75); }
+        .seg-num .l { font-size: max(.9rem, calc(var(--u) * .85)); color: var(--text-faint); text-transform: uppercase; font-weight: 800; letter-spacing: .3px; white-space: nowrap; }
 
         /* ---------- CUERPO ---------- */
-        .body-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr); gap: calc(var(--u) * .6); min-height: 0; }
+        .body-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: calc(var(--u) * .6); min-height: 0; }
         .card {
             background: var(--card); border: 1px solid var(--border); border-top: 5px solid var(--furnace-color);
             border-radius: 16px; padding: calc(var(--u) * .7) calc(var(--u) * .9); box-shadow: var(--shadow);
@@ -130,7 +137,7 @@
         /* ---------- LÍNEAS (la altura de fila y la fuente las ajusta JS para que SIEMPRE quepan) ---------- */
         .lines-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; --row-font: 1.4rem; }
         .line-row {
-            flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.5fr) auto;
+            flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, .62fr) minmax(0, 1.9fr) auto;
             align-items: center; gap: calc(var(--u) * .7); background: var(--card-2); border: 1px solid var(--border-soft);
             border-radius: 11px; padding: 0 calc(var(--u) * .8); transition: background .8s ease; font-size: var(--row-font);
         }
@@ -173,8 +180,13 @@
                 <div class="logo-dot">@(Model.FurnaceId == 6 ? "TM" : Model.FurnaceId.ToString())</div>
                 <div class="brand-text">
                     <h1>@Model.FurnaceName</h1>
-                    <div class="subtitle">
-                        <span id="dateLabel"></span>
+                </div>
+            </div>
+
+            <div class="hdr-right">
+                <div class="hdr-info">
+                    <div class="hdr-date" id="dateLabel"></div>
+                    <div class="hdr-line">
                         <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
                         @if (IsHistorical)
                         {
@@ -182,14 +194,10 @@
                         }
                         else
                         {
-                            <span style="display:flex;align-items:center;gap:8px;">
-                                <span class="live-dot"></span>
-                                <span id="lastUpdate">--:--</span>
-                            </span>
+                            <span class="hdr-time"><span class="live-dot"></span><span id="lastUpdate">--:--</span></span>
                         }
                     </div>
                 </div>
-            </div>
 
             <div class="header-actions controls-collapsible">
                 @if (IsHistorical)
@@ -211,6 +219,7 @@
                 }
                 <button class="btn" id="toggleTheme">🌗</button>
                 <button class="btn" id="togglePresentation">🖥️</button>
+            </div>
             </div>
         </header>
 
@@ -274,7 +283,7 @@
         // ---------------- FRANJA DE SEGMENTOS ----------------
         function segCard(title, sub, color, oee, prod, plan, rem, sap, main) {
             return `
-            <div class="seg-card ${main ? 'main' : ''}" style="--seg-color:${color}">
+            <div class="seg-card ${main ? 'main' : ''} ${sap !== null && sap !== undefined ? 'n4' : ''}" style="--seg-color:${color}">
                 <div class="seg-title">${title}${sub ? `<small>${sub}</small>` : ''}</div>
                 <div class="seg-oee" style="color:${oeeColor(oee)}">${pct(oee)}</div>
                 <div class="seg-nums">
@@ -314,10 +323,12 @@
         }
 
         // ---------------- LÍNEAS ----------------
+        // Todas las líneas empiezan con "PTC ": se quita para ganar espacio (el title conserva el nombre completo).
+        function shortName(d) { return (d || '').replace(/^PTC[\s_-]+/i, ''); }
         function lineLink(l) {
             return l.productListId > 0
-                ? `<a href="/Line/${l.productListId}${HIST_QS}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>`
-                : l.productDesc;
+                ? `<a href="/Line/${l.productListId}${HIST_QS}" class="line-link" title="${l.productDesc}">${shortName(l.productDesc)}</a>`
+                : shortName(l.productDesc);
         }
 
         function renderLinesList(isLiveUpdate) {
@@ -359,8 +370,8 @@
                 document.getElementById('noProdCount').textContent = `(${inactive.length})`;
                 document.getElementById('noProdChips').innerHTML = inactive
                     .map(l => l.productListId > 0
-                        ? `<a href="/Line/${l.productListId}${HIST_QS}" class="no-prod-chip">${l.productDesc}</a>`
-                        : `<span class="no-prod-chip">${l.productDesc}</span>`).join('');
+                        ? `<a href="/Line/${l.productListId}${HIST_QS}" class="no-prod-chip" title="${l.productDesc}">${shortName(l.productDesc)}</a>`
+                        : `<span class="no-prod-chip" title="${l.productDesc}">${shortName(l.productDesc)}</span>`).join('');
             }
         }
 
