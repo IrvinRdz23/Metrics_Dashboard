@@ -169,6 +169,23 @@ public class FurnaceDetailService : IFurnaceDetailService
             hourlyTotals.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList(), shiftDesc);
         ShiftTimeHelper.ApplyExpectedCumulative(snapshot.HourlyTrend, shiftDesc, snapshot.ShiftDurationHours, snapshot.TotalPlanned, isLiveToday);
 
+        // ---------- Tendencia por hora SOLO Back End ----------
+        // Misma lógica que arriba, pero solo líneas Back End que cuentan (excluye Core Builder,
+        // Clam Shells y producción no planeada). El esperado se calcula al 100% del plan Back End
+        // (BackEndPlanned = el "Plan" de la tarjeta Back End); la vista aplica el 85% una sola vez.
+        // Tube Mills (furnaceId=6) no tiene split: la vista usa HourlyTrend completo.
+        var backEndHourly = new Dictionary<string, int>();
+        foreach (var r in rows.Where(r => r.ReportGroup == 2 && groupIds.Contains(r.GroupId) && !string.IsNullOrWhiteSpace(r.Hour) && r.Hour != "-"))
+        {
+            if (!linesIndex.TryGetValue(r.Desc, out var line) || !line.CountsForStats || line.Segment != LineSegment.BackEnd) continue;
+            backEndHourly.TryGetValue(r.Hour, out var acc);
+            backEndHourly[r.Hour] = acc + r.Total;
+        }
+
+        snapshot.BackEndHourlyTrend = ShiftTimeHelper.SortByShiftElapsed(
+            backEndHourly.Select(kv => new HourlyPoint { Hour = kv.Key, Production = kv.Value }).ToList(), shiftDesc);
+        ShiftTimeHelper.ApplyExpectedCumulative(snapshot.BackEndHourlyTrend, shiftDesc, snapshot.ShiftDurationHours, snapshot.BackEndPlanned, isLiveToday);
+
         return snapshot;
     }
 
@@ -178,6 +195,7 @@ public class FurnaceDetailService : IFurnaceDetailService
         FurnaceName = FurnaceCatalog.Map.TryGetValue(furnaceId, out var info) ? info.Name : $"Furnace {furnaceId}",
         ShiftDesc = string.Empty,
         Lines = new List<ProductLineMetric>(),
-        HourlyTrend = new List<HourlyPoint>()
+        HourlyTrend = new List<HourlyPoint>(),
+        BackEndHourlyTrend = new List<HourlyPoint>()
     };
 }
