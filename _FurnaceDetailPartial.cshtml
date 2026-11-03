@@ -10,7 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
     <script src="~/lib/signalr/signalr.min.js"></script>
     <script src="~/lib/chartjs/chart.umd.min.js"></script>
-    <script src="~/js/tv-refresh.js"></script>
     <style>
         /* ============================================================
            VISTA POR HORNO - DISEÑO PARA TV (legible a ~5 m, sin scroll)
@@ -143,7 +142,33 @@
             border-radius: 11px; padding: 0 calc(var(--u) * .8); transition: background .8s ease; font-size: var(--row-font);
         }
         .line-row.flash { background: var(--flash); }
-        .line-name { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1em; }
+
+        .line-name {
+        position: relative;
+        overflow: hidden;
+        white-space: nowrap;
+        font-weight: 800;
+        font-size: 1em;
+        }
+
+        .line-name-text {
+        display: inline-block;
+        white-space: nowrap;
+        }
+
+        .line-name.scroll .line-name-text {
+        animation: lineScroll 8s linear infinite;
+        }
+
+        @@keyframes lineScroll {
+        0%, 15% {
+        transform: translateX(0);
+        }
+
+        85%, 100% {
+        transform: translateX(calc(-100% + var(--visible-width)));
+        }
+        }
         .line-link { color: inherit; text-decoration: none; border-bottom: 2px dashed var(--border); }
         .line-link:hover { color: var(--furnace-color); border-bottom-color: var(--furnace-color); }
         .line-bar-track { height: 78%; max-height: 2.1em; border-radius: 8px; background: var(--grid-line); overflow: hidden; position: relative; }
@@ -228,10 +253,10 @@
 
         <div class="body-grid">
             <div class="card">
-                <h2>Líneas de Producción <span class="count-chip" id="linesCountChip"></span></h2>
+                <h2>Production Lines <span class="count-chip" id="linesCountChip"></span></h2>
                 <div class="lines-list" id="linesList"></div>
                 <div class="no-prod-section" id="noProdSection" style="display:none;">
-                    <div class="no-prod-title">Sin producción en este turno <span id="noProdCount"></span></div>
+                    <div class="no-prod-title">No Production in this Shift <span id="noProdCount"></span></div>
                     <div class="no-prod-chips" id="noProdChips"></div>
                 </div>
             </div>
@@ -239,13 +264,13 @@
             <div class="card">
                 <div class="trend-head">
                     <div class="trend-title">
-                        <span><span class="tag" id="trendTag">BACK END</span><span id="trendTitleText">Producción por hora</span></span>
+                        <span><span class="tag" id="trendTag">BACK END</span><span id="trendTitleText">Production / Hour</span></span>
                         <span class="sub" id="trendSub"></span>
                     </div>
                     <div class="trend-kpis">
-                        <div class="trend-kpi"><div class="v" id="kAcc" style="color:var(--good)">–</div><div class="l">Acumulado real</div></div>
-                        <div class="trend-kpi"><div class="v" id="kExp" style="color:var(--warn)">–</div><div class="l" id="kExpL">Esperado 85%</div></div>
-                        <div class="trend-kpi"><div class="v" id="kDiff">–</div><div class="l">Diferencia</div></div>
+                        <div class="trend-kpi"><div class="v" id="kAcc" style="color:var(--good)">–</div><div class="l">ACCUMULATED</div></div>
+                        <div class="trend-kpi"><div class="v" id="kExp" style="color:var(--warn)">–</div><div class="l" id="kExpL">GOAL 85%</div></div>
+                        <div class="trend-kpi"><div class="v" id="kDiff">–</div><div class="l">DIFFERENCE</div></div>
                     </div>
                 </div>
                 <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
@@ -271,9 +296,24 @@
         function pct(v) { return (v * 100).toFixed(0) + '%'; }
         function fmt(n) { return Math.round(n).toLocaleString(); }
 
-        document.getElementById('dateLabel').textContent = IS_HISTORICAL
-            ? new Date(snapshot.generatedAt).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-            : new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+        function formatEnglishDate(date) {
+            const d = new Date(date);
+
+            const day = d.getDate();
+            const suffix =
+            day % 10 === 1 && day !== 11 ? 'st' :
+            day % 10 === 2 && day !== 12 ? 'nd' :
+            day % 10 === 3 && day !== 13 ? 'rd' : 'th';
+
+            const weekday = d.toLocaleDateString('en-US', { weekday: 'long' });
+            const month = d.toLocaleDateString('en-US', { month: 'long' });
+
+            return `${weekday} ${month} ${day}${suffix}`;
+            }
+
+            document.getElementById('dateLabel').textContent = IS_HISTORICAL
+            ? formatEnglishDate(snapshot.generatedAt)
+            : formatEnglishDate(new Date());
 
         if (IS_HISTORICAL) {
             const d = document.getElementById('pickerDate'), s = document.getElementById('pickerShift');
@@ -290,7 +330,6 @@
                 <div class="seg-nums">
                     <div class="seg-num"><div class="v">${fmt(prod)}</div><div class="l">Prod</div></div>
                     <div class="seg-num"><div class="v">${fmt(plan)}</div><div class="l">Plan</div></div>
-                    <div class="seg-num"><div class="v">${fmt(rem)}</div><div class="l">Faltan</div></div>
                     ${sap !== null && sap !== undefined ? `<div class="seg-num"><div class="v">${pct(sap)}</div><div class="l">SAP</div></div>` : ''}
                 </div>
             </div>`;
@@ -302,9 +341,9 @@
                 el.innerHTML = segCard('Tube Mills', 'OEE del turno', 'var(--furnace-color)', snapshot.oee, snapshot.totalProduction, snapshot.totalPlanned, snapshot.remainingToPlan, null, true);
                 return;
             }
-            let h = segCard('Horno', 'Total', 'var(--seg-all)', snapshot.oee, snapshot.totalProduction, snapshot.totalPlanned, snapshot.remainingToPlan, null, false);
+            let h = segCard('Furnace', 'Total', 'var(--seg-all)', snapshot.oee, snapshot.totalProduction, snapshot.totalPlanned, snapshot.remainingToPlan, null, false);
             h += segCard('Core Builder', '', 'var(--seg-cb)', snapshot.coreBuilderOee, snapshot.coreBuilderProduction, snapshot.coreBuilderPlanned, snapshot.coreBuilderRemaining, null, false);
-            h += segCard('Back End', 'con SAP', 'var(--seg-be)', snapshot.backEndOee, snapshot.backEndProduction, snapshot.backEndPlanned, snapshot.backEndRemaining, snapshot.backEndSapPercent, true);
+            h += segCard('Back End', 'with SAP', 'var(--seg-be)', snapshot.backEndOee, snapshot.backEndProduction, snapshot.backEndPlanned, snapshot.backEndRemaining, snapshot.backEndSapPercent, true);
             if (FURNACE_ID === 1) {
                 h += segCard('Clam Shells', '', 'var(--seg-cs)', snapshot.clamShellOee, snapshot.clamShellProduction, snapshot.clamShellPlanned, snapshot.clamShellRemaining, null, false);
             }
@@ -316,7 +355,7 @@
             if (!IS_HISTORICAL) {
                 document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
             }
-            document.getElementById('linesCountChip').textContent = snapshot.lines.length + ' líneas';
+            document.getElementById('linesCountChip').textContent = snapshot.lines.length + ' lines';
             renderSegments();
             renderLinesList(isLiveUpdate);
             fitRows();
@@ -345,7 +384,11 @@
 
             const activeRows = active.map(l => `
                 <div class="line-row ${changed(l) ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
-                    <div class="line-name" title="${l.productDesc}">${lineLink(l)}</div>
+                    <div class="line-name" title="${l.productDesc}">
+                        <span class="line-name-text">
+                        ${lineLink(l)}
+                        </span>
+                    </div>
                     <div class="line-bar-track">
                         <div class="target-marker" style="left:85%"></div>
                         <div class="line-bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}"><span>${pct(l.oeeShift)}</span></div>
@@ -356,11 +399,12 @@
             const unplannedRows = unplanned.map(l => `
                 <div class="line-row unplanned-line-row ${changed(l) ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
                     <div class="line-name" title="${l.productDesc}">${lineLink(l)}</div>
-                    <div class="unplanned-badge">⚠ PRODUCCIÓN NO PLANEADA</div>
+                    <div class="unplanned-badge">⚠ NON PLANNED PRODUCTION</div>
                     <div class="line-qty">${fmt(l.total)}<small>piezas</small></div>
                 </div>`).join('');
 
             container.innerHTML = activeRows + unplannedRows;
+        setTimeout(enableLineMarquee, 50);
             if (isLiveUpdate) setTimeout(() => container.querySelectorAll('.line-row.flash').forEach(el => el.classList.remove('flash')), 900);
 
             const section = document.getElementById('noProdSection');
@@ -379,13 +423,18 @@
         // Ajusta la fuente de las filas según el espacio real: con pocas líneas se ve ENORME,
         // con muchas se reduce lo justo para que TODAS quepan sin scroll (mínimo 15px).
         function fitRows() {
-            const list = document.getElementById('linesList');
-            const n = list.children.length;
-            if (!n) return;
-            const rowH = (list.clientHeight - (n - 1) * 6) / n;
-            const px = Math.max(15, Math.min(34, rowH * 0.46));
-            list.style.setProperty('--row-font', px + 'px');
+        const list = document.getElementById('linesList');
+        const n = list.children.length;
+        if (!n) return;
+
+        const rowH = (list.clientHeight - (n - 1) * 6) / n;
+        const px = Math.max(15, Math.min(34, rowH * 0.46));
+
+        list.style.setProperty('--row-font', px + 'px');
+
+        enableLineMarquee();
         }
+
         window.addEventListener('resize', () => { fitRows(); Object.values(charts).forEach(c => c && c.resize()); });
 
         // ---------------- TENDENCIA (SOLO BACK END) ----------------
@@ -396,7 +445,7 @@
             if (FURNACE_ID === 6) return { pts: snapshot.hourlyTrend, label: 'TUBE MILLS', plan: snapshot.totalPlanned, ok: true };
             if (snapshot.backEndHourlyTrend && snapshot.backEndHourlyTrend.length)
                 return { pts: snapshot.backEndHourlyTrend, label: 'BACK END', plan: snapshot.backEndPlanned, ok: true };
-            return { pts: snapshot.hourlyTrend, label: 'HORNO (falta parche servidor)', plan: snapshot.totalPlanned, ok: false };
+            return { pts: snapshot.hourlyTrend, label: 'NO PRODUCTION', plan: snapshot.totalPlanned, ok: false };
         }
         function trendSeries(src) {
             let run = 0;
@@ -421,16 +470,30 @@
             }
         };
 
+        function enableLineMarquee() {
+    document.querySelectorAll('.line-name').forEach(el => {
+        const text = el.querySelector('.line-name-text');
+        if (!text) return;
+
+        el.classList.remove('scroll');
+
+        if (text.scrollWidth > el.clientWidth) {
+            el.style.setProperty('--visible-width', `${el.clientWidth}px`);
+            el.classList.add('scroll');
+        }
+    });
+}
+
         function renderTrend() {
             const src = trendSource();
             const s = trendSeries(src);
 
             document.getElementById('trendTag').textContent = src.label;
             document.getElementById('trendTag').style.background = src.ok ? '' : 'var(--warn)';
-            document.getElementById('trendTitleText').textContent = 'Producción por hora';
+            document.getElementById('trendTitleText').textContent = 'Production / Hour';
             document.getElementById('trendSub').textContent = src.ok
-                ? (FURNACE_ID === 6 ? 'Solo Tube Mills' : 'Solo líneas Back End · no incluye Core Builder ni Clam Shells')
-                : 'Mostrando todo el horno: aplica el parche del servidor para ver solo Back End';
+                ? (FURNACE_ID === 6 ? 'Only Tube Mills' : 'Only Back End')
+                : 'Only Back End';
 
             const lastAcc = s.acc.length ? s.acc[s.acc.length - 1] : 0;
             const lastExp = s.exp.length ? s.exp[s.exp.length - 1] : 0;
@@ -440,7 +503,7 @@
             const nowAcc = s.acc[idx] ?? 0, nowExp = s.exp[idx] ?? 0, diff = nowAcc - nowExp;
             document.getElementById('kAcc').textContent = fmt(lastAcc);
             document.getElementById('kExp').textContent = fmt(nowExp);
-            document.getElementById('kExpL').textContent = 'Esperado 85%';
+            document.getElementById('kExpL').textContent = 'Goal 85%';
             const kd = document.getElementById('kDiff');
             kd.textContent = (diff >= 0 ? '+' : '') + fmt(diff);
             kd.style.color = diff >= 0 ? getCss('--good') : getCss('--bad');
@@ -451,8 +514,8 @@
                 c.data.datasets[0].data = s.perHour;
                 c.data.datasets[1].data = s.acc;
                 c.data.datasets[2].data = s.exp;
-                c.options.scales.y.title.text = `Piezas por hora (${src.label === 'BACK END' ? 'Back End' : src.label})`;
-                c.options.scales.y1.title.text = 'Acumulado del turno (piezas)';
+                c.options.scales.y.title.text = `Pieces / hour (${src.label === 'BACK END' ? 'Back End' : src.label})`;
+                c.options.scales.y1.title.text = 'Shift Accumulated (pieces)';
                 c.update('none');
                 return;
             }
@@ -463,9 +526,9 @@
                 data: {
                     labels: s.labels,
                     datasets: [
-                        { type: 'bar', label: 'Producción por hora (barras, eje izq.)', data: s.perHour, backgroundColor: getCss('--bar-fill'), borderRadius: 6, maxBarThickness: 70, yAxisID: 'y', order: 3 },
-                        { type: 'line', label: 'Acumulado real (eje der.)', data: s.acc, borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .14), fill: true, borderWidth: 4, tension: .3, pointRadius: 5, yAxisID: 'y1', order: 2 },
-                        { type: 'line', label: 'Esperado al 85% del plan (eje der.)', data: s.exp, borderColor: getCss('--warn'), backgroundColor: 'transparent', borderDash: [10, 6], borderWidth: 4, tension: .3, pointRadius: 5, pointBackgroundColor: getCss('--warn'), fill: false, yAxisID: 'y1', order: 1 }
+                        { type: 'bar', label: 'Production / hour (bars)', data: s.perHour, backgroundColor: getCss('--bar-fill'), borderRadius: 6, maxBarThickness: 70, yAxisID: 'y', order: 3 },
+                        { type: 'line', label: 'Real Accumulated (right axis)', data: s.acc, borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .14), fill: true, borderWidth: 4, tension: .3, pointRadius: 5, yAxisID: 'y1', order: 2 },
+                        { type: 'line', label: '85% Goal Plan (right axis)', data: s.exp, borderColor: getCss('--warn'), backgroundColor: 'transparent', borderDash: [10, 6], borderWidth: 4, tension: .3, pointRadius: 5, pointBackgroundColor: getCss('--warn'), fill: false, yAxisID: 'y1', order: 1 }
                     ]
                 },
                 options: {
@@ -477,9 +540,9 @@
                         tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } }
                     },
                     scales: {
-                        x: { title: axisTitle('Hora del turno'), ticks: tick, grid: { color: getCss('--grid-line') } },
-                        y: { position: 'left', beginAtZero: true, title: axisTitle(`Piezas por hora (${src.label === 'BACK END' ? 'Back End' : src.label})`, getCss('--accent')), ticks: tick, grid: { color: getCss('--grid-line') } },
-                        y1: { position: 'right', beginAtZero: true, title: axisTitle('Acumulado del turno (piezas)', getCss('--good')), ticks: tick, grid: { display: false } }
+                        x: { title: axisTitle('Shift Hour'), ticks: tick, grid: { color: getCss('--grid-line') } },
+                        y: { position: 'left', beginAtZero: true, title: axisTitle(`Pieces / hour (${src.label === 'BACK END' ? 'Back End' : src.label})`, getCss('--accent')), ticks: tick, grid: { color: getCss('--grid-line') } },
+                        y1: { position: 'right', beginAtZero: true, title: axisTitle('Shift Accumulated (pieces)', getCss('--good')), ticks: tick, grid: { display: false } }
                     }
                 },
                 plugins: [barValuesPlugin]
@@ -506,18 +569,13 @@
         };
 
         if (!IS_HISTORICAL) {
-            PM.startHub({
-                url: '/hubs/metrics',
-                handlers: {
-                    FurnaceSnapshotUpdated: (payload) => {
-                        if (payload.furnaceId !== FURNACE_ID) return;
-                        snapshot = payload;
-                        render(true);
-                    }
-                },
-                onConnected: (conn) => conn.invoke('JoinFurnace', FURNACE_ID)   // también se re-ejecuta tras cada reconexión
+            const connection = new signalR.HubConnectionBuilder().withUrl('/hubs/metrics').withAutomaticReconnect().build();
+            connection.on('FurnaceSnapshotUpdated', (payload) => {
+                if (payload.furnaceId !== FURNACE_ID) return;
+                snapshot = payload;
+                render(true);
             });
-            PM.scheduleRefresh();   // recarga a las 00:00, 06:00, 12:00 y 18:00
+            connection.start().then(() => connection.invoke('JoinFurnace', FURNACE_ID)).catch(err => console.error('SignalR error:', err));
         }
 
         render(false);
