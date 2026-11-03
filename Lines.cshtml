@@ -3,7 +3,7 @@
     Layout = null;
 }
 <!DOCTYPE html>
-<html lang="es" data-theme="dark">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -15,614 +15,160 @@
     <script src="~/lib/chartjs/chart.umd.min.js"></script>
     <script src="~/js/tv-refresh.js"></script>
     <style>
+        /* ============================================================
+           LINE VIEW - TV DESIGN (readable from ~5 m, no scroll)
+           Everything scales with --u (1u = 1% of width, min 14px => 19.2px at 1920).
+           Same sizing system as the Furnace view.
+           ============================================================ */
+        :root { --u: max(14px, 1vw); }
+
         :root[data-theme="dark"] {
-        --bg: #0a0e15;
-        --card: #131a28;
-        --card-hover: #1a2338;
-        --border: #263652;
-        --border-soft: rgba(255,255,255,0.07);
-        --text: #f2f5fb;
-        --text-dim: #93a4c2;
-        --text-faint: #62729a;
-        --accent: #55acff;
-        --accent-soft: rgba(85,172,255,0.16);
-        --good: #3ddb98;
-        --warn: #f5c15c;
-        --bad: #ff6b78;
-        --no-plan-bg: rgba(172,138,255,0.14);
-        --no-plan-border: #ac8aff;
-        --no-plan-text: #d1bfff;
-        --grid-line: rgba(255,255,255,0.06);
-        --shadow: 0 10px 26px -12px rgba(0,0,0,0.55);
-        --pill-text: #061018;
-        --track-bg: rgba(255,255,255,0.06);
+            --bg: #070b12; --card: #111a28; --card-2: #0b121d; --card-hover: #192438;
+            --border: #31415e; --border-soft: rgba(255,255,255,0.10);
+            --text: #ffffff; --text-dim: #c3cde0; --text-faint: #8e9cb8;
+            --accent: #55acff; --accent-soft: rgba(85,172,255,0.18);
+            --good: #35e39a; --warn: #ffc557; --bad: #ff6472;
+            --no-plan-bg: rgba(172,138,255,0.18); --no-plan-border: #b799ff; --no-plan-text: #dccfff;
+            --grid-line: rgba(255,255,255,0.10); --shadow: 0 12px 30px -12px rgba(0,0,0,0.65);
+            --pill-text: #061018; --track-bg: rgba(255,255,255,0.08);
+            --goal: #3aa0ff;            /* all GOAL lines: solid blue */
+            --bar: rgba(167,139,250,0.85); /* hourly bars (purple, so they never mix with the blue goal) */
+            --avg: #d08bff;             /* cycle-time average: its own color */
         }
-
         :root[data-theme="light"] {
-        --bg: #e7ebf3;
-        --card: #ffffff;
-        --card-hover: #eef2fa;
-        --border: #c3ccdc;
-        --border-soft: rgba(16,24,40,0.08);
-        --text: #0c1526;
-        --text-dim: #46536b;
-        --text-faint: #707f9c;
-        --accent: #1957c2;
-        --accent-soft: rgba(25,87,194,0.11);
-        --good: #0e8f57;
-        --warn: #96650a;
-        --bad: #c22e3e;
-        --no-plan-bg: rgba(109,40,217,0.09);
-        --no-plan-border: #6d28d9;
-        --no-plan-text: #5b21b6;
-        --grid-line: rgba(16,24,40,0.08);
-        --shadow: 0 12px 28px -14px rgba(20,30,60,0.22);
-        --pill-text: #ffffff;
-        --track-bg: rgba(16,24,40,0.07);
+            --bg: #dfe5ef; --card: #ffffff; --card-2: #f1f4f9; --card-hover: #edf2fa;
+            --border: #adb9cd; --border-soft: rgba(16,24,40,0.13);
+            --text: #0a1220; --text-dim: #2f3d56; --text-faint: #5b6882;
+            --accent: #124faa; --accent-soft: rgba(18,79,170,0.13);
+            --good: #087d4c; --warn: #8a5900; --bad: #bd2637;
+            --no-plan-bg: rgba(109,40,217,0.11); --no-plan-border: #6d28d9; --no-plan-text: #521aa8;
+            --grid-line: rgba(16,24,40,0.13); --shadow: 0 12px 28px -14px rgba(20,30,60,0.28);
+            --pill-text: #ffffff; --track-bg: rgba(16,24,40,0.09);
+            --goal: #0b5bd3;
+            --bar: rgba(109,40,217,0.80);
+            --avg: #9333ea;
         }
 
-        * {
-        box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        overflow: hidden;
-        background: var(--bg);
-        color: var(--text);
-        font-family: 'Inter', 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-        -webkit-font-smoothing: antialiased;
+            margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+            font-family: 'Inter', 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased;
         }
 
         .app {
-        height: 100vh;
-        width: 100vw;
-        display: grid;
-        grid-template-rows: auto 1fr;
-        gap: clamp(10px, 1.1vh, 16px);
-        padding: clamp(12px, 1.2vh, 18px);
+            height: 100vh; width: 100vw; display: grid; grid-template-rows: auto minmax(0, 1fr);
+            gap: calc(var(--u) * .6); padding: calc(var(--u) * .7); background: var(--bg);
         }
+        .app.presentation .controls-collapsible { display: none; }
 
+        /* ---------- HEADER ---------- */
         header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: clamp(14px, 1.6vw, 26px);
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: clamp(12px, 1.5vh, 20px) clamp(20px, 2vw, 32px);
-        border-top: 5px solid var(--furnace-color);
-        box-shadow: var(--shadow);
+            display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 1.2);
+            background: var(--card); border: 1px solid var(--border); border-top: 6px solid var(--furnace-color);
+            border-radius: 16px; padding: calc(var(--u) * .3) calc(var(--u) * 1.2); box-shadow: var(--shadow);
         }
-
-        .app.presentation .controls-collapsible {
-        display: none;
-        }
-
-        .brand {
-        display: flex;
-        align-items: center;
-        gap: clamp(12px, 1.2vw, 18px);
-        min-width: 0;
-        }
-
-        .furnace-tag {
-        flex-shrink: 0;
-        background: var(--furnace-color);
-        color: #06101f;
-        font-weight: 900;
-        font-size: clamp(.85rem, 1vw, 1.05rem);
-        padding: clamp(8px, 1vh, 12px) clamp(12px, 1.2vw, 16px);
-        border-radius: 12px;
-        text-decoration: none;
-        }
-        /* Logo del cliente (Honda/BMW/Tesla/etc.) en vez del número de horno — chip blanco para
-        que el logo se lea bien sin importar el color del horno ni el tema claro/oscuro. */
+        .brand { display: flex; align-items: center; gap: calc(var(--u) * 1); min-width: 0; }
         .furnace-tag.logo-tag {
-        background: transparent;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: clamp(6px, .8vh, 10px) clamp(10px, 1vw, 14px);
-        box-shadow: 0 2px 8px rgba(0,0,0,.15);
+            flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none;
+            padding: calc(var(--u) * .25) calc(var(--u) * .6); border-radius: 12px; background: transparent;
         }
+        .furnace-tag.logo-tag img { height: calc(var(--u) * 3.4); width: auto; object-fit: contain; display: block; }
+        .brand-text { min-width: 0; }
+        .brand-text h1 { margin: 0; font-size: calc(var(--u) * 2.8); font-weight: 900; line-height: 1.05; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .brand-text .furnace-name { color: var(--text-dim); font-weight: 700; font-size: calc(var(--u) * 1.1); }
 
-        .furnace-tag.logo-tag img {
-        height: clamp(30px, 3.6vh, 46px);
-        width: auto;
-        min-height: 70px;
-        object-fit: contain;
-        display: block;
+        .hdr-right { display: flex; align-items: center; gap: calc(var(--u) * 1.2); flex-shrink: 0; }
+        .hdr-info { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; line-height: 1.1; }
+        .hdr-date { color: var(--text-dim); font-weight: 700; font-size: calc(var(--u) * 1.25); }
+        .hdr-line { display: flex; align-items: center; gap: calc(var(--u) * .8); }
+        .shift-badge, .historical-badge {
+            background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border);
+            padding: 0 calc(var(--u) * .8); border-radius: 999px; font-weight: 900; font-size: calc(var(--u) * 1.7);
         }
+        .historical-badge { background: var(--no-plan-bg); color: var(--no-plan-text); border-color: var(--no-plan-border); }
+        .hdr-time { display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 900; font-size: calc(var(--u) * 2.1); font-variant-numeric: tabular-nums; }
+        .app.presentation .hdr-date { font-size: calc(var(--u) * 1.5); }
+        .app.presentation .shift-badge, .app.presentation .historical-badge { font-size: calc(var(--u) * 2.2); }
+        .app.presentation .hdr-time { font-size: calc(var(--u) * 2.7); }
+        .live-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--good); animation: pulse 1.8s infinite; }
+        @@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(53,227,154,.55); } 70% { box-shadow: 0 0 0 10px rgba(53,227,154,0); } 100% { box-shadow: 0 0 0 0 rgba(53,227,154,0); } }
 
-
-        .brand-text {
-        min-width: 0;
-        }
-
-        .brand-text h1 {
-        font-size: clamp(1.4rem, 2.3vw, 2.5rem);
-        margin: 0;
-        font-weight: 900;
-        letter-spacing: .2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        }
-
-        .brand-text .subtitle {
-        color: var(--text-dim);
-        font-size: clamp(.85rem, 1vw, 1.05rem);
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-top: 4px;
-        font-weight: 600;
-        }
-
-        .shift-badge {
-        background: var(--accent-soft);
-        color: var(--accent);
-        border: 1px solid var(--border);
-        padding: 3px 12px;
-        border-radius: 999px;
-        font-size: clamp(.72rem, .85vw, .9rem);
-        font-weight: 700;
-        letter-spacing: .3px;
-        }
-
-        .historical-badge {
-        background: var(--no-plan-bg);
-        color: var(--no-plan-text);
-        border: 1px solid var(--no-plan-border);
-        padding: 3px 12px;
-        border-radius: 999px;
-        font-size: clamp(.72rem, .85vw, .9rem);
-        font-weight: 800;
-        letter-spacing: .3px;
-        }
-
-        .header-right {
-        display: flex;
-        align-items: center;
-        gap: clamp(16px, 2vw, 30px);
-        flex-shrink: 0;
-        }
-
-        .live-block {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        }
-
-        .live-dot {
-        width: 11px;
-        height: 11px;
-        border-radius: 50%;
-        background: var(--good);
-        box-shadow: 0 0 0 0 rgba(61,219,152,.6);
-        animation: pulse 1.8s infinite;
-        }
-
-        @@keyframes pulse {
-        0% {
-        box-shadow: 0 0 0 0 rgba(61,219,152,.55);
-        }
-
-        70% {
-        box-shadow: 0 0 0 10px rgba(61,219,152,0);
-        }
-
-        100% {
-        box-shadow: 0 0 0 0 rgba(61,219,152,0);
-        }
-        }
-
-        .live-block .value {
-        font-size: clamp(1rem, 1.3vw, 1.4rem);
-        font-weight: 800;
-        font-family: 'JetBrains Mono', monospace;
-        }
-
-        .live-block .label {
-        font-size: clamp(.6rem, .72vw, .78rem);
-        color: var(--text-faint);
-        text-transform: uppercase;
-        letter-spacing: .5px;
-        font-weight: 700;
-        }
-
-        .header-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        }
-
+        .header-actions { display: flex; align-items: center; gap: calc(var(--u) * .5); }
         .btn {
-        background: var(--card);
-        border: 1px solid var(--border);
-        color: var(--text);
-        border-radius: 10px;
-        padding: 10px 16px;
-        font-size: clamp(.8rem, .95vw, 1rem);
-        font-weight: 700;
-        cursor: pointer;
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        transition: background .15s, border-color .15s;
+            background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 10px;
+            padding: calc(var(--u) * .5) calc(var(--u) * .9); font-size: max(1rem, calc(var(--u) * 1)); font-weight: 700;
+            cursor: pointer; text-decoration: none; display: flex; align-items: center; gap: 6px;
         }
-
-        .btn:hover {
-        background: var(--card-hover);
-        border-color: var(--furnace-color);
-        }
-
-        .historical-picker {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        }
-
+        .btn:hover { background: var(--card-hover); border-color: var(--furnace-color); }
+        .historical-picker { display: flex; align-items: center; gap: 6px; margin: 0; }
         .historical-picker input, .historical-picker select {
-        background: var(--card);
-        border: 1px solid var(--border);
-        color: var(--text);
-        border-radius: 8px;
-        padding: 8px 10px;
-        font-size: clamp(.78rem, .9vw, .95rem);
-        font-weight: 600;
-        font-family: 'Inter', sans-serif;
+            background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+            padding: 6px 8px; font-size: max(1rem, calc(var(--u) * .95)); font-family: inherit;
         }
 
-        /* ---------- BODY ---------- */
-        .body-grid {
-        display: grid;
-        grid-template-rows: 1.15fr auto 1fr;
-        gap: clamp(10px, 1.1vh, 16px);
-        min-height: 0;
+        /* ---------- BODY: metrics strip -> shift progress (compact) -> BIG charts ---------- */
+        .body-grid { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: calc(var(--u) * .6); min-height: 0; }
+
+        .card { background: var(--card); border: 1px solid var(--border); border-top: 5px solid var(--furnace-color); border-radius: 16px; box-shadow: var(--shadow); }
+
+        /* Metrics strip (4 cards, big numbers) */
+        .metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--u) * .6); }
+        .metric-card { padding: calc(var(--u) * .45) calc(var(--u) * .8); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .metric-card .mv { font-size: calc(var(--u) * 3.9); font-weight: 900; font-family: 'JetBrains Mono', monospace; line-height: 1; font-variant-numeric: tabular-nums; }
+        .metric-card .ml { font-size: max(.95rem, calc(var(--u) * .95)); color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; font-weight: 800; margin-top: calc(var(--u) * .2); }
+
+        /* Shift progress (compact) */
+        .hero-panel { display: flex; flex-direction: column; gap: calc(var(--u) * .35); padding: calc(var(--u) * .5) calc(var(--u) * .9) calc(var(--u) * .6); }
+        .hero-top { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * .8); }
+        .hero-title { font-size: max(1.05rem, calc(var(--u) * 1.3)); font-weight: 900; text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim); white-space: nowrap; }
+        .hero-badges { display: flex; align-items: center; gap: calc(var(--u) * .8); }
+        .metric-badge { display: flex; align-items: center; gap: calc(var(--u) * .45); }
+        .badge-label { font-size: max(.9rem, calc(var(--u) * .85)); color: var(--text-faint); text-transform: uppercase; letter-spacing: .4px; font-weight: 800; line-height: 1.05; text-align: right; }
+        .badge-pill { font-size: calc(var(--u) * 1.9); font-weight: 900; font-family: 'JetBrains Mono', monospace; padding: 0 calc(var(--u) * .7); border-radius: 999px; line-height: 1.25; }
+        .badge-pill.solid { color: var(--pill-text); text-shadow: 0 1px 3px rgba(0,0,0,.25); }
+        .badge-pill.outline { background: transparent; border: 3px solid var(--accent); color: var(--accent); }
+        .pace-badge { padding: 0 calc(var(--u) * .9); border-radius: 999px; font-size: calc(var(--u) * 1.15); font-weight: 800; display: flex; align-items: center; gap: 8px; border: 2px solid transparent; line-height: 1.5; white-space: nowrap; }
+        .pace-badge.ahead { background: rgba(53,227,154,.14); color: var(--good); border-color: var(--good); }
+        .pace-badge.behind { background: rgba(255,100,114,.14); color: var(--bad); border-color: var(--bad); }
+
+        .race-wrap { position: relative; padding-top: calc(var(--u) * 1.5); }
+        .race-track { position: relative; height: calc(var(--u) * 2.9); border-radius: 14px; background: var(--track-bg); border: 2px solid var(--border-soft); overflow: hidden; }
+        .race-fill { position: relative; height: 100%; border-radius: 12px 0 0 12px; transition: width .8s cubic-bezier(.22,1,.36,1); overflow: hidden; min-width: 2px; }
+        .race-fill.full { border-radius: 12px; }
+        .race-shine { position: absolute; top: 0; bottom: 0; width: 55%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.32), transparent); animation: shine 3.4s ease-in-out infinite; }
+        @@keyframes shine { 0% { transform: translateX(-140%); } 100% { transform: translateX(240%); } }
+        .race-fill-label { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); font-size: calc(var(--u) * 1.9); font-weight: 900; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.55); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+        .race-endcap { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); text-align: right; font-size: calc(var(--u) * 1.1); color: var(--text-dim); font-weight: 800; z-index: 1; pointer-events: none; }
+
+        /* GOAL marker: solid blue line + blue chip on top */
+        .race-marker-line { position: absolute; top: calc(var(--u) * 1.3); bottom: -4px; width: 0; border-left: 5px solid var(--goal); z-index: 3; box-shadow: 0 0 10px var(--goal); transform: translateX(-50%); }
+        .race-marker-chip {
+            position: absolute; top: 0; z-index: 4; transform: translateX(-50%); background: var(--goal); color: #fff; font-weight: 900;
+            font-size: calc(var(--u) * 1); padding: 0 calc(var(--u) * .6); border-radius: 8px; white-space: nowrap; line-height: 1.35;
         }
 
-        .card {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 20px;
-        box-shadow: var(--shadow);
-        border-top: 5px solid var(--furnace-color);
-        }
+        /* Charts (the stars) */
+        .lower-row { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * .6); min-height: 0; }
+        .trend-card { padding: calc(var(--u) * .6) calc(var(--u) * .9); display: flex; flex-direction: column; min-height: 0; }
+        .trend-head { display: flex; align-items: flex-start; justify-content: space-between; gap: calc(var(--u) * .8); margin-bottom: calc(var(--u) * .2); }
+        .trend-card h2 { font-size: max(1.15rem, calc(var(--u) * 1.4)); margin: 0; font-weight: 900; text-transform: uppercase; letter-spacing: .4px; line-height: 1.1; }
+        .trend-card .subtitle-note { font-size: max(.95rem, calc(var(--u) * .9)); color: var(--text-dim); font-weight: 600; margin-top: 3px; }
+        .trend-kpis { display: flex; gap: calc(var(--u) * 1); flex-shrink: 0; }
+        .trend-kpi { text-align: right; }
+        .trend-kpi .v { font-family: 'JetBrains Mono', monospace; font-weight: 900; font-size: calc(var(--u) * 2.1); line-height: 1; font-variant-numeric: tabular-nums; }
+        .trend-kpi .l { font-size: max(.85rem, calc(var(--u) * .75)); color: var(--text-faint); text-transform: uppercase; font-weight: 800; margin-top: 3px; }
+        .chart-wrap { flex: 1; min-height: 0; position: relative; }
 
-        /* ---------- HERO: AVANCE DEL TURNO (tipo carrera hacia la meta) ---------- */
-        .hero-panel {
-        display: flex;
-        flex-direction: column;
-        gap: clamp(14px, 1.8vh, 24px);
-        min-height: 0;
-        padding: clamp(18px, 2.2vh, 30px) clamp(22px, 2.2vw, 34px);
-        }
-
-        .hero-top {
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 16px;
-        flex-wrap: wrap;
-        }
-
-        .hero-title {
-        font-size: clamp(1.05rem, 1.3vw, 1.4rem);
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: .6px;
-        color: var(--text-dim);
-        }
-
-        /* Dos porcentajes distintos, a propósito con estilos distintos para no confundirlos:
-        OEE = pastilla SÓLIDA con semáforo (ritmo vs lo esperado a esta hora).
-        Avance vs Plan = pastilla de CONTORNO en acento (progreso vs el plan completo). */
-        .hero-badges {
-        display: flex;
-        align-items: flex-end;
-        gap: clamp(14px, 1.6vw, 26px);
-        }
-
-        .metric-badge {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 6px;
-        }
-
-        .badge-label {
-        font-size: clamp(.62rem, .72vw, .78rem);
-        color: var(--text-faint);
-        text-transform: uppercase;
-        letter-spacing: .5px;
-        font-weight: 800;
-        }
-
-        .badge-pill {
-        font-size: clamp(1.4rem, 2vw, 2.1rem);
-        font-weight: 900;
-        font-family: 'JetBrains Mono', monospace;
-        padding: 7px 20px;
-        border-radius: 999px;
-        line-height: 1.1;
-        transition: background .3s ease, color .3s ease;
-        }
-
-        .badge-pill.solid {
-        color: var(--pill-text);
-        text-shadow: 0 1px 3px rgba(0,0,0,.25);
-        }
-
-        .badge-pill.outline {
-        background: transparent;
-        border: 2.5px solid var(--accent);
-        color: var(--accent);
-        }
-
-        .race-track {
-        position: relative;
-        height: clamp(64px, 10vh, 110px);
-        border-radius: 18px;
-        background: var(--track-bg);
-        border: 2px solid var(--border-soft);
-        overflow: hidden;
-        }
-
-        .race-fill {
-        position: relative;
-        height: 100%;
-        border-radius: 18px 0 0 18px;
-        transition: width .8s cubic-bezier(.22,1,.36,1);
-        overflow: hidden;
-        min-width: 2px;
-        }
-
-        .race-fill.full {
-        border-radius: 18px;
-        }
-
-        .race-shine {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 55%;
-        background: linear-gradient(100deg, transparent, rgba(255,255,255,.32), transparent);
-        animation: shine 3.4s ease-in-out infinite;
-        }
-
-        @@keyframes shine {
-        0% {
-        transform: translateX(-140%);
-        }
-
-        100% {
-        transform: translateX(240%);
-        }
-        }
-
-        .race-fill-label {
-        position: absolute;
-        top: 50%;
-        right: 16px;
-        transform: translateY(-50%);
-        font-size: clamp(1.2rem, 1.9vw, 2rem);
-        font-weight: 900;
-        color: #fff;
-        text-shadow: 0 2px 6px rgba(0,0,0,.5);
-        font-family: 'JetBrains Mono', monospace;
-        white-space: nowrap;
-        }
-
-        .race-icon {
-        position: absolute;
-        top: 50%;
-        right: 6px;
-        transform: translate(50%, -50%);
-        font-size: clamp(1.5rem, 2.3vw, 2.3rem);
-        animation: bob 1.6s ease-in-out infinite;
-        filter: drop-shadow(0 2px 5px rgba(0,0,0,.4));
-        }
-
-        @@keyframes bob {
-        0%, 100% {
-        transform: translate(50%, -58%);
-        }
-
-        50% {
-        transform: translate(50%, -42%);
-        }
-        }
-
-        .race-marker {
-        position: absolute;
-        top: -3px;
-        bottom: -3px;
-        width: 0;
-        z-index: 3;
-        }
-
-        .race-marker-line {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        border-left: 3px dashed rgba(255,255,255,.9);
-        }
-
-        .race-marker-flag {
-        position: absolute;
-        top: -30px;
-        left: 0;
-        transform: translateX(-50%);
-        font-size: clamp(1.1rem, 1.5vw, 1.5rem);
-        }
-
-        .race-marker-label {
-        position: absolute;
-        bottom: -32px;
-        left: 0;
-        transform: translateX(-50%);
-        font-size: clamp(.6rem, .72vw, .78rem);
-        font-weight: 800;
-        color: var(--text-dim);
-        background: var(--card);
-        padding: 3px 9px;
-        border-radius: 6px;
-        white-space: nowrap;
-        border: 1px solid var(--border);
-        }
-
-        .race-endcap {
-        position: absolute;
-        top: 50%;
-        right: 14px;
-        transform: translateY(-50%);
-        text-align: right;
-        font-size: clamp(.68rem, .82vw, .92rem);
-        color: var(--text-faint);
-        font-weight: 800;
-        z-index: 1;
-        pointer-events: none;
-        }
-
-        .pace-badge {
-        align-self: flex-start;
-        padding: 9px 20px;
-        border-radius: 999px;
-        font-size: clamp(.88rem, 1.05vw, 1.15rem);
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        border: 1.5px solid transparent;
-        }
-
-        .pace-badge.ahead {
-        background: rgba(61,219,152,.14);
-        color: var(--good);
-        border-color: var(--good);
-        }
-
-        .pace-badge.behind {
-        background: rgba(255,107,120,.14);
-        color: var(--bad);
-        border-color: var(--bad);
-        }
-
-        /* ---------- FILA DE MÉTRICOS (su propio carril, en cards) ---------- */
-        .metrics-row {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: clamp(10px, 1vw, 16px);
-        }
-
-        .metric-card {
-        padding: clamp(14px, 1.8vh, 22px) clamp(12px, 1.4vw, 18px);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        transition: transform .12s ease;
-        }
-
-        .metric-card:hover {
-        transform: translateY(-2px);
-        }
-
-        .metric-card .mv {
-        font-size: clamp(1.9rem, 2.8vw, 3.2rem);
-        font-weight: 900;
-        font-family: 'JetBrains Mono', monospace;
-        line-height: 1;
-        }
-
-        .metric-card .ml {
-        font-size: clamp(.66rem, .8vw, .88rem);
-        color: var(--text-faint);
-        text-transform: uppercase;
-        letter-spacing: .5px;
-        font-weight: 700;
-        margin-top: clamp(6px, 1vh, 10px);
-        }
-
-        /* ---------- TENDENCIA (2 columnas: producción por hora + tiempo de ciclo) ---------- */
-        .lower-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: clamp(10px, 1.1vh, 16px);
-        min-height: 0;
-        }
-
-        .trend-card {
-        padding: clamp(16px, 1.8vh, 26px) clamp(18px, 1.8vw, 26px);
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        }
-
-        .trend-card h2 {
-        font-size: clamp(1rem, 1.2vw, 1.3rem);
-        margin: 0;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: .5px;
-        color: var(--text-dim);
-        }
-
-        .trend-card .subtitle-note {
-        font-size: clamp(.66rem, .78vw, .82rem);
-        color: var(--text-faint);
-        font-weight: 600;
-        margin: 3px 0 clamp(8px, 1vh, 12px) 0;
-        text-transform: none;
-        letter-spacing: 0;
-        }
-
-        .trend-card .chart-wrap {
-        flex: 1;
-        min-height: 0;
-        }
-
-        /* ---------- ESTADO SIN PRODUCCIÓN ---------- */
+        /* No production / unplanned states */
         .no-plan-hero {
-        grid-row: 1 / -1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background: var(--no-plan-bg);
-        border: 3px dashed var(--no-plan-border);
-        border-radius: 22px;
-        color: var(--no-plan-text);
-        text-align: center;
-        gap: 14px;
-        height: 100%;
+            grid-row: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: var(--no-plan-bg); border: 3px dashed var(--no-plan-border); border-radius: 22px; color: var(--no-plan-text);
+            text-align: center; gap: 14px; height: 100%; padding: 0 calc(var(--u) * 3);
         }
-
-        .no-plan-hero .big {
-        font-size: clamp(2rem, 4vw, 4rem);
-        font-weight: 900;
-        letter-spacing: .5px;
-        }
-
-        .no-plan-hero .small {
-        font-size: clamp(1rem, 1.3vw, 1.4rem);
-        font-weight: 700;
-        opacity: .85;
-        }
-
-        .no-plan-hero.unplanned-hero {
-        background: rgba(255,107,120,0.1);
-        border-color: var(--bad);
-        color: var(--bad);
-        }
+        .no-plan-hero .big { font-size: calc(var(--u) * 4); font-weight: 900; letter-spacing: .5px; }
+        .no-plan-hero .small { font-size: calc(var(--u) * 1.6); font-weight: 700; opacity: .9; }
+        .no-plan-hero.unplanned-hero { background: rgba(255,100,114,0.1); border-color: var(--bad); color: var(--bad); }
     </style>
 </head>
 <body>
@@ -630,49 +176,47 @@
 
         <header>
             <div class="brand">
-                <a class="furnace-tag logo-tag" href="@FurnaceHref(Model.FurnaceId)" title="Ver @Model.FurnaceName completo">
+                <a class="furnace-tag logo-tag" href="@FurnaceHref(Model.FurnaceId)" title="View full @Model.FurnaceName">
                     <img src="~/images/@(GetClientLogo(Model.ProductDesc).LogoFile)" alt="@(GetClientLogo(Model.ProductDesc).AltText)" />
                 </a>
                 <div class="brand-text">
                     <h1 id="lineTitle">@Model.ProductDesc</h1>
-                    <div class="subtitle">
-                        <span>@Model.FurnaceName</span>
-                        <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
-                        @if (IsHistorical)
-                        {
-                            <span class="historical-badge">📅 Histórico</span>
-                        }
-                    </div>
+                    <div class="furnace-name">@Model.FurnaceName</div>
                 </div>
             </div>
 
-            <div class="header-right">
-                @if (!IsHistorical)
-                {
-                    <div class="live-block">
-                        <span class="live-dot"></span>
-                        <div>
-                            <div class="value" id="lastUpdate">--:--</div>
-                            <div class="label">Actualizado</div>
-                        </div>
+            <div class="hdr-right">
+                <div class="hdr-info">
+                    <div class="hdr-date" id="dateLabel"></div>
+                    <div class="hdr-line">
+                        <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
+                        @if (IsHistorical)
+                        {
+                            <span class="historical-badge">📅 Historical</span>
+                        }
+                        else
+                        {
+                            <span class="hdr-time"><span class="live-dot"></span><span id="lastUpdate">--:--</span></span>
+                        }
                     </div>
-                }
+                </div>
+
                 <div class="header-actions controls-collapsible">
                     @if (IsHistorical)
                     {
                         <form class="historical-picker" id="historicalPicker" method="get" action="@Context.Request.Path">
                             <input type="date" id="pickerDate" name="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" value="@HistoricalDateStr" />
                             <select id="pickerShift" name="shiftId">
-                                <option value="1">Turno 1</option>
-                                <option value="2">Turno 2</option>
-                                <option value="3">Turno 3</option>
+                                <option value="1">Shift 1</option>
+                                <option value="2">Shift 2</option>
+                                <option value="3">Shift 3</option>
                             </select>
-                            <button type="submit" class="btn">Ver</button>
+                            <button type="submit" class="btn">Go</button>
                         </form>
                     }
-                    <a class="btn" href="@FurnaceHref(Model.FurnaceId)@(IsHistorical ? $"?date={HistoricalDateStr}&shiftId={HistoricalShiftId}" : "")" title="Volver al horno">📊 @Model.FurnaceName</a>
-                    <button class="btn" id="toggleTheme">🌗 Tema</button>
-                    <button class="btn" id="togglePresentation">🖥️ Presentación</button>
+                    <a class="btn" href="@FurnaceHref(Model.FurnaceId)@(IsHistorical ? $"?date={HistoricalDateStr}&shiftId={HistoricalShiftId}" : "")" title="Back to furnace">📊 @Model.FurnaceName</a>
+                    <button class="btn" id="toggleTheme">🌗</button>
+                    <button class="btn" id="togglePresentation">🖥️</button>
                 </div>
             </div>
         </header>
@@ -684,323 +228,366 @@
         let snapshot = @Html.Raw(Json.Serialize(Model));
         const LINE_ID = @Model.ProductListId;
         const IS_HISTORICAL = @(IsHistorical ? "true" : "false");
+        const TARGET = 0.85;   // OEE goal: the trend GOAL line = expected cumulative x 85%
         const charts = {};
 
-        function oeeColor(oee) {
-        if (oee >= 0.85) return getCss('--good');
-        if (oee >= 0.70) return getCss('--warn');
-        return getCss('--bad');
-        }
         function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+        function oeeColor(oee) { return oee >= 0.85 ? getCss('--good') : oee >= 0.70 ? getCss('--warn') : getCss('--bad'); }
         function hexToRgba(hex, alpha) {
-        const h = hex.replace('#', '');
-        const bigint = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
-        const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255;
-        return `rgba(${r},${g},${b},${alpha})`;
+            const h = hex.replace('#', '');
+            const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+            return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
         }
         function pct(v) { return (v * 100).toFixed(0) + '%'; }
+        function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
+
+        function formatEnglishDate(date) {
+            const d = new Date(date);
+            const day = d.getDate();
+            const suffix = day % 10 === 1 && day !== 11 ? 'st' : day % 10 === 2 && day !== 12 ? 'nd' : day % 10 === 3 && day !== 13 ? 'rd' : 'th';
+            return `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${d.toLocaleDateString('en-US', { month: 'long' })} ${day}${suffix}`;
+        }
+        document.getElementById('dateLabel').textContent = formatEnglishDate(IS_HISTORICAL ? snapshot.generatedAt : new Date());
 
         function render() {
-        document.getElementById('lineTitle').textContent = snapshot.productDesc;
-        document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
-        if (!IS_HISTORICAL) {
-        document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('lineTitle').textContent = snapshot.productDesc;
+            document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
+            if (!IS_HISTORICAL) {
+                document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            const grid = document.getElementById('bodyGrid');
+
+            if (!snapshot.hasPlan) {
+                if (snapshot.total > 0) {
+                    grid.innerHTML = `
+                    <div class="no-plan-hero unplanned-hero">
+                        <div class="big">⚠ NON PLANNED PRODUCTION</div>
+                        <div class="small">Heijunka shows this line had no plan this shift, but it produced ${snapshot.total.toLocaleString('en-US')} piece(s) — it does not count toward OEE.</div>
+                    </div>`;
+                    return;
+                }
+                grid.innerHTML = `
+                <div class="no-plan-hero">
+                    <div class="big">NO PRODUCTION THIS SHIFT</div>
+                    <div class="small">This line has no plan assigned for the current shift</div>
+                </div>`;
+                return;
+            }
+
+            const wasEmpty = !document.getElementById('oeeBadge');
+            if (wasEmpty) {
+                grid.innerHTML = `
+                <div class="metrics-row">
+                    <div class="card metric-card"><div class="mv" id="prodVal">-</div><div class="ml">Production</div></div>
+                    <div class="card metric-card"><div class="mv" id="expVal" style="color:var(--goal)">-</div><div class="ml">Expected by Now</div></div>
+                    <div class="card metric-card"><div class="mv" id="remVal">-</div><div class="ml">Remaining to Plan</div></div>
+                    <div class="card metric-card"><div class="mv" id="sapVal">-</div><div class="ml">SAP</div></div>
+                </div>
+
+                <div class="card hero-panel">
+                    <div class="hero-top">
+                        <div class="hero-title">Shift Progress</div>
+                        <div class="hero-badges">
+                            <div class="pace-badge" id="paceBadge"></div>
+                            <div class="metric-badge"><div class="badge-label">Shift<br>OEE</div><div class="badge-pill solid" id="oeeBadge">-</div></div>
+                            <div class="metric-badge"><div class="badge-label">Progress<br>vs Plan</div><div class="badge-pill outline" id="progressBadge">-</div></div>
+                        </div>
+                    </div>
+                    <div class="race-wrap">
+                        <div class="race-marker-chip" id="raceMarkerChip"></div>
+                        <div class="race-marker-line" id="raceMarkerLine"></div>
+                        <div class="race-track" id="raceTrack">
+                            <div class="race-fill" id="raceFill">
+                                <div class="race-shine"></div>
+                                <div class="race-fill-label" id="raceFillLabel"></div>
+                            </div>
+                            <div class="race-endcap"><span id="racePlanVal"></span> plan</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lower-row">
+                    <div class="card trend-card">
+                        <div class="trend-head">
+                            <div>
+                                <h2>Hourly Trend</h2>
+                                <div class="subtitle-note">Pieces produced per hour &amp; shift accumulated</div>
+                            </div>
+                            <div class="trend-kpis">
+                                <div class="trend-kpi"><div class="v" id="kAcc" style="color:var(--good)">–</div><div class="l">Accumulated</div></div>
+                                <div class="trend-kpi"><div class="v" id="kGoal" style="color:var(--goal)">–</div><div class="l">Goal 85%</div></div>
+                                <div class="trend-kpi"><div class="v" id="kDiff">–</div><div class="l">Difference</div></div>
+                            </div>
+                        </div>
+                        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+                    </div>
+                    <div class="card trend-card">
+                        <div class="trend-head">
+                            <div>
+                                <h2>Cycle Time: Real vs. Theoretical</h2>
+                                <div class="subtitle-note">Approx. per hour (sec / piece)</div>
+                            </div>
+                            <div class="trend-kpis">
+                                <div class="trend-kpi"><div class="v" id="kAvg" style="color:var(--avg)">–</div><div class="l">Shift Avg</div></div>
+                                <div class="trend-kpi"><div class="v" id="kTheo" style="color:var(--goal)">–</div><div class="l">Theoretical</div></div>
+                            </div>
+                        </div>
+                        <div class="chart-wrap"><canvas id="cycleTimeChart"></canvas></div>
+                    </div>
+                </div>`;
+            }
+
+            const color = oeeColor(snapshot.oeeShift);
+            const oeeBadge = document.getElementById('oeeBadge');
+            oeeBadge.textContent = pct(snapshot.oeeShift);
+            oeeBadge.style.background = color;
+
+            const plan = snapshot.plannedShift;
+            const actualPct = plan > 0 ? Math.min(100, (snapshot.total / plan) * 100) : 0;
+            const expectedPct = plan > 0 ? Math.min(100, (snapshot.accumulatedRate / plan) * 100) : 0;
+            document.getElementById('progressBadge').textContent = Math.round(actualPct) + '%';
+
+            const fill = document.getElementById('raceFill');
+            fill.style.width = actualPct + '%';
+            fill.style.background = `linear-gradient(90deg, ${hexToRgba(color, .8)}, ${color})`;
+            fill.classList.toggle('full', actualPct >= 99.5);
+            document.getElementById('raceFillLabel').textContent = fmt(snapshot.total);
+
+            // GOAL marker (solid blue). The chip is clamped so it never spills out of the card.
+            document.getElementById('raceMarkerLine').style.left = expectedPct + '%';
+            const chip = document.getElementById('raceMarkerChip');
+            chip.style.left = `clamp(9%, ${expectedPct}%, 91%)`;
+            chip.textContent = `Should be at ${fmt(snapshot.accumulatedRate)}`;
+            document.getElementById('racePlanVal').textContent = fmt(plan);
+
+            document.getElementById('prodVal').textContent = fmt(snapshot.total);
+            document.getElementById('expVal').textContent = fmt(snapshot.accumulatedRate);
+            document.getElementById('remVal').textContent = fmt(Math.max(0, plan - snapshot.total));
+            document.getElementById('sapVal').textContent = snapshot.excludedFromSap ? '—' : fmt(snapshot.totalSap);
+
+            const paceBadge = document.getElementById('paceBadge');
+            const diff = snapshot.total - snapshot.accumulatedRate;
+            if (plan > 0 && snapshot.total >= plan) {
+                paceBadge.className = 'pace-badge ahead';
+                paceBadge.innerHTML = `🏆 Plan complete! ${fmt(snapshot.total)} pcs`;
+            } else if (diff >= 0) {
+                paceBadge.className = 'pace-badge ahead';
+                paceBadge.innerHTML = `🔥 Ahead of pace +${fmt(diff)} pcs`;
+            } else {
+                paceBadge.className = 'pace-badge behind';
+                paceBadge.innerHTML = `⚠️ Behind pace ${fmt(Math.abs(diff))} pcs`;
+            }
+
+            renderTrend();
+            renderCycleTimeChart();
         }
 
-        const grid = document.getElementById('bodyGrid');
+        // ---------------- shared chart helpers ----------------
+        const tickStyle = () => ({ color: getCss('--text-dim'), font: { size: 17, weight: '700' } });
+        const axisTitle = (text, color) => ({ display: true, text, color: color || getCss('--text'), font: { size: 18, weight: '800' }, padding: 8 });
+        const legendStyle = () => ({ position: 'bottom', labels: { color: getCss('--text'), font: { size: 17, weight: '700' }, boxWidth: 26, boxHeight: 6, padding: 14 } });
 
-        if (!snapshot.hasPlan) {
-        if (snapshot.total > 0) {
-        grid.innerHTML = `
-        <div class="no-plan-hero unplanned-hero">
-        <div class="big">⚠ PRODUCCIÓN NO PLANEADA</div>
-        <div class="small">Heijunka indica que esta línea no tenía plan este turno, pero produjo ${snapshot.total.toLocaleString()} pieza(s) — no cuenta para el OEE.</div>
-        </div>`;
-        return;
-        }
-        grid.innerHTML = `
-        <div class="no-plan-hero">
-        <div class="big">SIN PRODUCCIÓN EN EL TURNO ACTUAL</div>
-        <div class="small">Esta línea no tiene plan asignado para el turno vigente</div>
-        </div>`;
-        return;
-        }
-
-        const wasEmpty = !document.getElementById('oeeBadge');
-        if (wasEmpty) {
-        grid.innerHTML = `
-        <div class="card hero-panel">
-        <div class="hero-top">
-        <div class="hero-title">Avance del Turno</div>
-        <div class="hero-badges">
-        <div class="metric-badge">
-        <div class="badge-pill solid" id="oeeBadge">-</div>
-        <div class="badge-label">OEE de Turno</div>
-        </div>
-        <div class="metric-badge">
-        <div class="badge-pill outline" id="progressBadge">-</div>
-        <div class="badge-label">Avance vs Plan</div>
-        </div>
-        </div>
-        </div>
-
-        <div class="race-track" id="raceTrack">
-        <div class="race-fill" id="raceFill">
-        <div class="race-shine"></div>
-        <div class="race-icon">🚀</div>
-        <div class="race-fill-label" id="raceFillLabel"></div>
-        </div>
-        <div class="race-marker" id="raceMarker">
-        <div class="race-marker-line"></div>
-        <div class="race-marker-flag">🚩</div>
-        <div class="race-marker-label">Deberías ir en<br><span id="raceMarkerVal"></span></div>
-        </div>
-        <div class="race-endcap"><span id="racePlanVal"></span> plan</div>
-        </div>
-
-        <div class="pace-badge" id="paceBadge"></div>
-        </div>
-
-        <div class="metrics-row">
-        <div class="card metric-card"><div class="mv" id="prodVal">-</div><div class="ml">Producción</div></div>
-        <div class="card metric-card"><div class="mv" id="expVal">-</div><div class="ml">Esperado a esta hora</div></div>
-        <div class="card metric-card"><div class="mv" id="remVal">-</div><div class="ml">Faltan por Plan</div></div>
-        <div class="card metric-card"><div class="mv" id="sapVal">-</div><div class="ml">SAP</div></div>
-        </div>
-
-        <div class="lower-row">
-        <div class="card trend-card">
-        <h2>Tendencia por Hora de esta Línea</h2>
-        <div class="subtitle-note">Piezas producidas por hora</div>
-        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-        </div>
-        <div class="card trend-card">
-        <h2>Tiempo de Ciclo: Real vs. Teórico</h2>
-        <div class="subtitle-note">Aproximado por hora (seg/pieza) · línea punteada gris = tu promedio real del turno</div>
-        <div class="chart-wrap"><canvas id="cycleTimeChart"></canvas></div>
-        </div>
-        </div>`;
+        // Values above the first dataset's bars.
+        function barValuesPlugin(decimals, suffix) {
+            return {
+                id: 'barValues',
+                afterDatasetsDraw(chart) {
+                    const ds = chart.data.datasets[0], meta = chart.getDatasetMeta(0), ctx = chart.ctx;
+                    ctx.save();
+                    ctx.font = '800 17px "JetBrains Mono", monospace';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                    ctx.fillStyle = getCss('--text');
+                    meta.data.forEach((bar, i) => {
+                        const v = ds.data[i];
+                        if (v != null && v > 0) ctx.fillText(Number(v).toFixed(decimals) + suffix, bar.x, bar.y - 4);
+                    });
+                    ctx.restore();
+                }
+            };
         }
 
-        const color = oeeColor(snapshot.oeeShift);
-        const oeeBadge = document.getElementById('oeeBadge');
-        oeeBadge.textContent = pct(snapshot.oeeShift);
-        oeeBadge.style.background = color;
+        // Soft glow on every dataset flagged isGoal (blue solid GOAL lines).
+        const goalGlowPlugin = {
+            id: 'goalGlow',
+            beforeDatasetDraw(chart, args) {
+                if (!chart.data.datasets[args.index].isGoal) return;
+                chart.ctx.save();
+                chart.ctx.shadowColor = getCss('--goal');
+                chart.ctx.shadowBlur = 12;
+            },
+            afterDatasetDraw(chart, args) {
+                if (!chart.data.datasets[args.index].isGoal) return;
+                chart.ctx.restore();
+            }
+        };
 
-        const plan = snapshot.plannedShift;
-        const actualPct = plan > 0 ? Math.min(100, (snapshot.total / plan) * 100) : 0;
-        const expectedPct = plan > 0 ? Math.min(100, (snapshot.accumulatedRate / plan) * 100) : 0;
-        document.getElementById('progressBadge').textContent = Math.round(actualPct) + '%';
-
-        const fill = document.getElementById('raceFill');
-        fill.style.width = actualPct + '%';
-        fill.style.background = `linear-gradient(90deg, ${hexToRgba(color, .8)}, ${color})`;
-        fill.classList.toggle('full', actualPct >= 99.5);
-        document.getElementById('raceFillLabel').textContent = snapshot.total.toLocaleString();
-
-        const marker = document.getElementById('raceMarker');
-        marker.style.left = expectedPct + '%';
-        document.getElementById('raceMarkerVal').textContent = snapshot.accumulatedRate.toLocaleString();
-        document.getElementById('racePlanVal').textContent = plan.toLocaleString();
-
-        document.getElementById('prodVal').textContent = snapshot.total.toLocaleString();
-        document.getElementById('expVal').textContent = snapshot.accumulatedRate.toLocaleString();
-        document.getElementById('remVal').textContent = Math.max(0, plan - snapshot.total).toLocaleString();
-        document.getElementById('sapVal').textContent = snapshot.excludedFromSap ? '—' : snapshot.totalSap.toLocaleString();
-
-        const paceBadge = document.getElementById('paceBadge');
-        const diff = snapshot.total - snapshot.accumulatedRate;
-        if (plan > 0 && snapshot.total >= plan) {
-        paceBadge.className = 'pace-badge ahead';
-        paceBadge.innerHTML = `🏆 &nbsp;¡Plan cumplido! ${snapshot.total.toLocaleString()} piezas`;
-        } else if (diff >= 0) {
-        paceBadge.className = 'pace-badge ahead';
-        paceBadge.innerHTML = `🔥 &nbsp;¡Vas adelante! +${diff.toLocaleString()} piezas sobre el ritmo`;
-        } else {
-        paceBadge.className = 'pace-badge behind';
-        paceBadge.innerHTML = `⚠️ &nbsp;Vas ${Math.abs(diff).toLocaleString()} piezas atrás del ritmo`;
-        }
-
-        renderTrend();
-        renderCycleTimeChart();
-        }
-
-        function cumulativeSeries() {
-        let running = 0;
-        return snapshot.hourlyTrend.map(h => (running += h.production));
+        // ---------------- HOURLY TREND ----------------
+        function trendSeries() {
+            const pts = snapshot.hourlyTrend || [];
+            let run = 0;
+            return {
+                labels: pts.map(h => h.hour),
+                perHour: pts.map(h => h.production),
+                acc: pts.map(h => (run += h.production)),
+                goal: pts.map(h => h.expectedCumulative * TARGET),
+                pts
+            };
         }
 
         function renderTrend() {
-        const canvas = document.getElementById('trendChart');
-        if (!canvas) return;
-        if (charts.trend) {
-        charts.trend.data.labels = snapshot.hourlyTrend.map(h => h.hour);
-        charts.trend.data.datasets[0].data = snapshot.hourlyTrend.map(h => h.production);
-        charts.trend.data.datasets[1].data = cumulativeSeries();
-        charts.trend.data.datasets[2].data = snapshot.hourlyTrend.map(h => h.expectedCumulative);
-        charts.trend.update('none');
-        return;
-        }
-        charts.trend = new Chart(canvas, {
-        data: {
-        labels: snapshot.hourlyTrend.map(h => h.hour),
-        datasets: [
-        {
-        type: 'bar', label: 'Producción / hora',
-        data: snapshot.hourlyTrend.map(h => h.production),
-        backgroundColor: hexToRgba(getCss('--accent'), .6),
-        borderRadius: 8, maxBarThickness: 56, yAxisID: 'y', order: 2
-        },
-        {
-        type: 'line', label: 'Acumulado del turno',
-        data: cumulativeSeries(),
-        borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .12),
-        fill: true, tension: .35, pointRadius: 5, pointBackgroundColor: getCss('--good'),
-        pointBorderColor: getCss('--card'), pointBorderWidth: 2, borderWidth: 3,
-        yAxisID: 'y1', order: 1
-        },
-        {
-        type: 'line', label: 'Acumulado esperado a esta hora',
-        data: snapshot.hourlyTrend.map(h => h.expectedCumulative),
-        borderColor: getCss('--warn'), backgroundColor: 'transparent',
-        borderDash: [6, 4], tension: .35, pointRadius: 4, pointBackgroundColor: getCss('--warn'),
-        pointBorderColor: getCss('--card'), pointBorderWidth: 2, borderWidth: 2.5,
-        fill: false, yAxisID: 'y1', order: 0
-        }
-        ]
-        },
-        options: {
-        responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { labels: { color: getCss('--text-dim'), font: { size: 14, weight: '600' }, boxWidth: 14 } } },
-        scales: {
-        x: { ticks: { color: getCss('--text-dim'), font: { size: 14 } }, grid: { color: getCss('--grid-line') } },
-        y: { position: 'left', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
-        y1: { position: 'right', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { display: false } }
-        }
-        }
-        });
+            const canvas = document.getElementById('trendChart');
+            if (!canvas) return;
+            const s = trendSeries();
+
+            // KPIs: accumulated at close vs goal at the last hour with production (live) / end of shift (historical)
+            let idx = s.goal.length - 1;
+            if (!IS_HISTORICAL) { for (let i = s.pts.length - 1; i >= 0; i--) { if (s.pts[i].production > 0) { idx = i; break; } } }
+            const accNow = s.acc[idx] ?? 0, goalNow = s.goal[idx] ?? 0, diff = accNow - goalNow;
+            document.getElementById('kAcc').textContent = fmt(s.acc.length ? s.acc[s.acc.length - 1] : 0);
+            document.getElementById('kGoal').textContent = fmt(goalNow);
+            const kd = document.getElementById('kDiff');
+            kd.textContent = (diff >= 0 ? '+' : '') + fmt(diff);
+            kd.style.color = diff >= 0 ? getCss('--good') : getCss('--bad');
+
+            if (charts.trend) {
+                const c = charts.trend;
+                c.data.labels = s.labels;
+                c.data.datasets[0].data = s.perHour;
+                c.data.datasets[1].data = s.acc;
+                c.data.datasets[2].data = s.goal;
+                c.update('none');
+                return;
+            }
+            charts.trend = new Chart(canvas, {
+                data: {
+                    labels: s.labels,
+                    datasets: [
+                        { type: 'bar', label: 'Pieces / hour (bars, left axis)', data: s.perHour, backgroundColor: getCss('--bar'), borderRadius: 6, maxBarThickness: 70, yAxisID: 'y', order: 3 },
+                        { type: 'line', label: 'Real accumulated (right axis)', data: s.acc, borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .14), fill: true, borderWidth: 4, tension: .3, pointRadius: 5, pointBackgroundColor: getCss('--good'), pointBorderColor: getCss('--card'), pointBorderWidth: 2, yAxisID: 'y1', order: 2 },
+                        { type: 'line', label: 'GOAL 85% (right axis)', data: s.goal, isGoal: true, borderColor: getCss('--goal'), backgroundColor: 'transparent', borderWidth: 5, tension: .3, pointRadius: 6, pointBackgroundColor: getCss('--goal'), pointBorderColor: getCss('--card'), pointBorderWidth: 2, fill: false, yAxisID: 'y1', order: 1 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    layout: { padding: { top: 6, right: 4 } },
+                    plugins: { legend: legendStyle(), tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } } },
+                    scales: {
+                        x: { title: axisTitle('Shift hour'), ticks: tickStyle(), grid: { color: getCss('--grid-line') } },
+                        y: { position: 'left', beginAtZero: true, grace: '12%', title: axisTitle('Pieces / hour', getCss('--bar')), ticks: tickStyle(), grid: { color: getCss('--grid-line') } },
+                        y1: { position: 'right', beginAtZero: true, title: axisTitle('Shift accumulated (pieces)', getCss('--good')), ticks: tickStyle(), grid: { display: false } }
+                    }
+                },
+                plugins: [barValuesPlugin(0, ''), goalGlowPlugin]
+            });
         }
 
+        // ---------------- CYCLE TIME ----------------
         function renderCycleTimeChart() {
-        const canvas = document.getElementById('cycleTimeChart');
-        if (!canvas) return;
+            const canvas = document.getElementById('cycleTimeChart');
+            if (!canvas) return;
 
-        const points = snapshot.cycleTimeTrend || [];
-        const labels = points.map(p => p.hour);
-        const actual = points.map(p => p.actualCycleTimeSecs);
-        const theoretical = labels.map(() => snapshot.cycleTimeSecs);
-        const mean = snapshot.actualCycleTimeMean;
-        const meanLine = mean != null ? labels.map(() => mean) : labels.map(() => null);
+            const points = snapshot.cycleTimeTrend || [];
+            const labels = points.map(p => p.hour);
+            const actual = points.map(p => p.actualCycleTimeSecs);
+            const theoretical = labels.map(() => snapshot.cycleTimeSecs);
+            const mean = snapshot.actualCycleTimeMean;
+            const meanLine = labels.map(() => mean != null ? mean : null);
 
-        const barColor = (v) => {
-        if (v == null) return 'transparent';
-        if (v <= snapshot.cycleTimeSecs * 1.05) return hexToRgba(getCss('--good'), .75);
-        if (v <= snapshot.cycleTimeSecs * 1.2) return hexToRgba(getCss('--warn'), .75);
-        return hexToRgba(getCss('--bad'), .75);
-        };
+            document.getElementById('kAvg').textContent = mean != null ? Number(mean).toFixed(1) + 's' : '—';
+            document.getElementById('kTheo').textContent = Number(snapshot.cycleTimeSecs).toFixed(1) + 's';
 
-        if (charts.cycleTime) {
-        const ds = charts.cycleTime.data.datasets;
-        charts.cycleTime.data.labels = labels;
-        ds[0].data = actual; ds[0].backgroundColor = actual.map(barColor);
-        ds[1].data = theoretical;
-        ds[2].data = meanLine;
-        charts.cycleTime.update('none');
-        return;
-        }
+            const barColor = (v) => {
+                if (v == null) return 'transparent';
+                if (v <= snapshot.cycleTimeSecs * 1.05) return hexToRgba(getCss('--good'), .8);
+                if (v <= snapshot.cycleTimeSecs * 1.2) return hexToRgba(getCss('--warn'), .8);
+                return hexToRgba(getCss('--bad'), .8);
+            };
 
-        const datasets = [
-        {
-        type: 'bar', label: 'Tiempo de ciclo real (seg)',
-        data: actual, backgroundColor: actual.map(barColor),
-        borderRadius: 6, maxBarThickness: 44, order: 1
-        },
-        {
-        type: 'line', label: 'Tiempo de ciclo teórico (seg)', data: theoretical,
-        borderColor: getCss('--text-dim'), borderDash: [7, 5], borderWidth: 2.5,
-        pointRadius: 0, fill: false, order: 0
-        },
-        {
-        type: 'line', label: 'Tu promedio de hoy (seg)', data: meanLine,
-        borderColor: getCss('--accent'), borderDash: [2, 3], borderWidth: 2,
-        pointRadius: 0, fill: false, order: 0, spanGaps: true
-        }
-        ];
+            if (charts.cycleTime) {
+                const ds = charts.cycleTime.data.datasets;
+                charts.cycleTime.data.labels = labels;
+                ds[0].data = actual; ds[0].backgroundColor = actual.map(barColor);
+                ds[1].data = theoretical;
+                ds[2].data = meanLine;
+                charts.cycleTime.update('none');
+                return;
+            }
 
-        charts.cycleTime = new Chart(canvas, {
-        data: { labels, datasets },
-        options: {
-        responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-        legend: { labels: { color: getCss('--text-dim'), font: { size: 13, weight: '600' }, boxWidth: 14 } },
-        tooltip: {
-        callbacks: {
-        label: (c) => {
-        if (c.raw == null) return `${c.dataset.label}: sin producción esa hora`;
-        return `${c.dataset.label}: ${Number(c.raw).toFixed(1)}s`;
-        },
-        afterBody: (items) => {
-        const idx = items[0]?.dataIndex;
-        const p = points[idx];
-        if (!p) return [];
-        const notes = [];
-        notes.push(`Piezas esa hora: ${p.production}`);
-        if (p.availableSeconds) notes.push(`Segundos disponibles usados: ${p.availableSeconds}s`);
-        if (p.isInProgress) notes.push('⏳ Esta hora sigue en curso — el número es parcial, no definitivo.');
-        return notes;
-        }
-        }
-        }
-        },
-        scales: {
-        x: { ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
-        y: {
-        beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') },
-        title: { display: true, text: 'Segundos / pieza', color: getCss('--text-faint'), font: { size: 12, weight: '600' } }
-        }
-        }
-        }
-        });
+            charts.cycleTime = new Chart(canvas, {
+                data: {
+                    labels,
+                    datasets: [
+                        { type: 'bar', label: 'Real cycle time (sec)', data: actual, backgroundColor: actual.map(barColor), borderRadius: 6, maxBarThickness: 60, order: 2 },
+                        { type: 'line', label: 'GOAL: theoretical cycle time (sec)', data: theoretical, isGoal: true, borderColor: getCss('--goal'), borderWidth: 5, pointRadius: 0, fill: false, order: 0 },
+                        { type: 'line', label: 'Shift average (sec)', data: meanLine, borderColor: getCss('--avg'), borderWidth: 4, borderDash: [3, 6], borderCapStyle: 'round', pointRadius: 0, fill: false, order: 1, spanGaps: true }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    layout: { padding: { top: 6, right: 4 } },
+                    plugins: {
+                        legend: legendStyle(),
+                        tooltip: {
+                            titleFont: { size: 16 }, bodyFont: { size: 16 },
+                            callbacks: {
+                                label: (c) => c.raw == null ? `${c.dataset.label}: no production that hour` : `${c.dataset.label}: ${Number(c.raw).toFixed(1)}s`,
+                                afterBody: (items) => {
+                                    const p = points[items[0]?.dataIndex];
+                                    if (!p) return [];
+                                    const notes = [`Pieces that hour: ${p.production}`];
+                                    if (p.availableSeconds) notes.push(`Available seconds used: ${p.availableSeconds}s`);
+                                    if (p.isInProgress) notes.push('⏳ This hour is still in progress — the number is partial.');
+                                    return notes;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { title: axisTitle('Shift hour'), ticks: tickStyle(), grid: { color: getCss('--grid-line') } },
+                        y: { beginAtZero: true, grace: '12%', title: axisTitle('Seconds / piece'), ticks: tickStyle(), grid: { color: getCss('--grid-line') } }
+                    }
+                },
+                plugins: [barValuesPlugin(1, 's'), goalGlowPlugin]
+            });
         }
 
+        // ---------------- CONTROLS ----------------
         document.getElementById('toggleTheme').onclick = () => {
-        const html = document.documentElement;
-        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        html.setAttribute('data-theme', next);
-        localStorage.setItem('pm-theme', next);
-        if (charts.trend) { charts.trend.destroy(); charts.trend = null; }
-        if (charts.cycleTime) { charts.cycleTime.destroy(); charts.cycleTime = null; }
-        document.getElementById('bodyGrid').innerHTML = '';
-        render();
+            const html = document.documentElement;
+            const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            try { localStorage.setItem('pm-theme', next); } catch (e) { }
+            if (charts.trend) { charts.trend.destroy(); charts.trend = null; }
+            if (charts.cycleTime) { charts.cycleTime.destroy(); charts.cycleTime = null; }
+            document.getElementById('bodyGrid').innerHTML = '';
+            render();
         };
-        const savedTheme = localStorage.getItem('pm-theme');
-        if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+        try { const t = localStorage.getItem('pm-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) { }
 
         document.getElementById('togglePresentation').onclick = () => {
-        document.getElementById('app').classList.toggle('presentation');
-        if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen?.().catch(() => {});
-        } else {
-        document.exitFullscreen?.().catch(() => {});
-        }
-        setTimeout(() => Object.values(charts).forEach(c => c && c.resize()), 260);
+            document.getElementById('app').classList.toggle('presentation');
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => { });
+            else document.exitFullscreen?.().catch(() => { });
+            setTimeout(() => Object.values(charts).forEach(c => c && c.resize()), 300);
         };
+        window.addEventListener('resize', () => Object.values(charts).forEach(c => c && c.resize()));
 
         if (!IS_HISTORICAL) {
-        PM.startHub({
-        url: '/hubs/metrics',
-        handlers: {
-        LineSnapshotUpdated: (payload) => {
-        if (payload.productListId !== LINE_ID) return;
-        snapshot = payload;
-        render();
-        }
-        },
-        onConnected: (conn) => conn.invoke('JoinLine', LINE_ID)   // se re-ejecuta tras cada reconexión
-        });
-        PM.scheduleRefresh();   // recarga 00:00 / 06:00 / 12:00 / 18:00
+            PM.startHub({
+                url: '/hubs/metrics',
+                handlers: {
+                    LineSnapshotUpdated: (payload) => {
+                        if (payload.productListId !== LINE_ID) return;
+                        snapshot = payload;
+                        render();
+                    }
+                },
+                onConnected: (conn) => conn.invoke('JoinLine', LINE_ID)   // re-runs after every reconnect
+            });
+            PM.scheduleRefresh();   // reload at 00:00 / 06:00 / 12:00 / 18:00
         }
 
         render();
@@ -1054,4 +641,4 @@
         }
         return ("default-car.png", "Cliente");
     }
-}
+}
