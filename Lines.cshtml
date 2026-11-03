@@ -13,6 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
     <script src="~/lib/signalr/signalr.min.js"></script>
     <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script src="~/js/tv-refresh.js"></script>
     <style>
         :root[data-theme="dark"] {
         --bg: #0a0e15;
@@ -988,20 +989,18 @@
         };
 
         if (!IS_HISTORICAL) {
-        const connection = new signalR.HubConnectionBuilder()
-        .withUrl('/hubs/metrics')
-        .withAutomaticReconnect()
-        .build();
-
-        connection.on('LineSnapshotUpdated', (payload) => {
+        PM.startHub({
+        url: '/hubs/metrics',
+        handlers: {
+        LineSnapshotUpdated: (payload) => {
         if (payload.productListId !== LINE_ID) return;
         snapshot = payload;
         render();
+        }
+        },
+        onConnected: (conn) => conn.invoke('JoinLine', LINE_ID)   // se re-ejecuta tras cada reconexión
         });
-
-        connection.start()
-        .then(() => connection.invoke('JoinLine', LINE_ID))
-        .catch(err => console.error('SignalR error:', err));
+        PM.scheduleRefresh();   // recarga 00:00 / 06:00 / 12:00 / 18:00
         }
 
         render();
@@ -1055,4 +1054,4 @@
         }
         return ("default-car.png", "Cliente");
     }
-}
+}

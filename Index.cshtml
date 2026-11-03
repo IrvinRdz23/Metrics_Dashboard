@@ -13,6 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <script src="~/lib/signalr/signalr.min.js"></script>
     <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script src="~/js/tv-refresh.js"></script>
     <style>
         :root[data-theme="dark"] {
         --bg: #0a0e15;
@@ -1707,21 +1708,20 @@
         restartAutoCarousels();
         });
 
-        const connection = new signalR.HubConnectionBuilder()
-        .withUrl('/hubs/metrics')
-        .withAutomaticReconnect()
-        .build();
-
-        connection.on('SnapshotUpdated', (newSnapshot) => {
+        PM.startHub({
+        url: '/hubs/metrics',
+        handlers: {
+        SnapshotUpdated: (newSnapshot) => {
         snapshot = newSnapshot;
         render(true);
+        }
+        }
         });
-
-        connection.start().catch(err => console.error('SignalR error:', err));
+        PM.scheduleRefresh();   // recarga 00:00 / 06:00 / 12:00 / 18:00
 
         render(false);
         applyModeUI();
         restartAutoCarousels();
     </script>
 </body>
-</html>
+</html>
