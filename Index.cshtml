@@ -11,8 +11,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="~/lib/signalr/signalr.min.js"></script>
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
     <style>
         :root[data-theme="dark"] {
         --bg: #0a0e15;
@@ -36,6 +36,8 @@
         --shadow: 0 10px 26px -12px rgba(0,0,0,0.55);
         --flash: rgba(85,172,255,0.38);
         --pill-text: #061018;
+        --seg-cb: #f2b84b;
+        --seg-be: #55acff;
         }
 
         :root[data-theme="light"] {
@@ -60,6 +62,8 @@
         --shadow: 0 12px 28px -14px rgba(20,30,60,0.22);
         --flash: rgba(25,87,194,0.16);
         --pill-text: #ffffff;
+        --seg-cb: #96650a;
+        --seg-be: #1957c2;
         }
 
         * {
@@ -86,7 +90,6 @@
         padding: clamp(12px, 1.2vh, 20px);
         }
 
-        /* ---------- HEADER ---------- */
         header {
         display: flex;
         align-items: center;
@@ -155,16 +158,14 @@
         gap: clamp(18px, 2.2vw, 34px);
         }
 
-        /* Badge del carrusel Core Builders / End of Line / Tube Mills, debajo de los
-           métricos. La franja de relleno avanza durante los 15s hasta el próximo cambio;
-           formal y visible, sin robarle protagonismo a los números de arriba. */
         .kpi-group-badge {
         position: relative;
         overflow: hidden;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: clamp(6px, .8vh, 9px) clamp(20px, 2vw, 30px);
+        gap: 6px;
+        padding: clamp(6px, .8vh, 9px) clamp(14px, 1.4vw, 22px);
         border-radius: 999px;
         border: 1.5px solid var(--accent);
         background: var(--card);
@@ -186,8 +187,13 @@
         }
 
         @@keyframes badgeFill {
-        from { width: 0%; }
-        to { width: 100%; }
+        from {
+        width: 0%;
+        }
+
+        to {
+        width: 100%;
+        }
         }
 
         .kpi-group-badge .label-text {
@@ -230,6 +236,13 @@
         background: var(--border);
         }
 
+        .header-actions-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+        }
+
         .header-actions {
         display: flex;
         align-items: center;
@@ -256,32 +269,184 @@
         border-color: var(--accent);
         }
 
-        .date-picker {
-        display: none;
-        align-items: center;
-        gap: 6px;
-        }
-
-        .date-picker.open {
+        .mode-switch {
         display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: .72rem;
+        font-weight: 800;
+        color: var(--text-faint);
+        text-transform: uppercase;
+        letter-spacing: .4px;
         }
 
-        .date-picker input {
-        background: var(--card);
-        border: 1px solid var(--border);
-        color: var(--text);
-        border-radius: 8px;
-        padding: 8px 12px;
-        font-size: .95rem;
+        .mode-label.active {
+        color: var(--accent);
         }
 
-        /* ---------- GRID DE HORNOS (proporcional siempre, también en presentación) ---------- */
+        .mode-toggle {
+        position: relative;
+        width: 36px;
+        height: 19px;
+        display: inline-block;
+        flex-shrink: 0;
+        }
+
+        .mode-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        }
+
+        .mode-slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: var(--border);
+        border-radius: 999px;
+        transition: background .2s;
+        }
+
+        .mode-slider::before {
+        content: '';
+        position: absolute;
+        height: 13px;
+        width: 13px;
+        left: 3px;
+        top: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform .2s;
+        }
+
+        .mode-toggle input:checked + .mode-slider {
+        background: var(--accent);
+        }
+
+        .mode-toggle input:checked + .mode-slider::before {
+        transform: translateX(17px);
+        }
+
+        .carousel-arrow {
+        display: none;
+        background: transparent;
+        border: none;
+        color: var(--text-faint);
+        cursor: pointer;
+        font-size: .8rem;
+        padding: 2px 4px;
+        line-height: 1;
+        flex-shrink: 0;
+        }
+
+        .carousel-arrow:hover {
+        color: var(--accent);
+        }
+
+        .app.manual-mode .carousel-arrow {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        }
+
+        .kpi-arrow {
+        position: relative;
+        z-index: 1;
+        color: var(--accent);
+        }
+
+        /* ---------- PANTALLAS: dashboard principal <-> tendencias por categoría ---------- */
+        .screens-viewport {
+        position: relative;
+        overflow: hidden;
+        min-height: 0;
+        border-radius: 4px;
+        }
+
+        .screens-track {
+        display: flex;
+        width: 200%;
+        height: 100%;
+        transition: transform .5s cubic-bezier(.22, 1, .36, 1);
+        }
+
+        .screen {
+        width: 50%;
+        flex-shrink: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        }
+
         .grid-main {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         grid-template-rows: repeat(2, 1fr);
         gap: clamp(10px, 1vw, 16px);
         min-height: 0;
+        flex: 1;
+        }
+
+        .trends-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: clamp(10px, 1vw, 16px);
+        min-height: 0;
+        flex: 1;
+        }
+
+        /* Flechas fantasma en los bordes: invisibles hasta que pasas el cursor por su franja,
+        se difuminan con un degradado suave. Derecha en la pantalla principal -> tendencias;
+        izquierda en tendencias -> regresa. Nunca se mueven solas. */
+        .edge-arrow {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        width: 68px;
+        z-index: 45;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity .3s ease;
+        }
+
+        .edge-arrow:hover {
+        opacity: 1;
+        }
+
+        .edge-arrow.right-arrow {
+        right: 0;
+        background: linear-gradient(to left, rgba(0,0,0,.3), transparent 80%);
+        }
+
+        .edge-arrow.left-arrow {
+        left: 0;
+        background: linear-gradient(to right, rgba(0,0,0,.3), transparent 80%);
+        }
+
+        :root[data-theme="light"] .edge-arrow.right-arrow {
+        background: linear-gradient(to left, rgba(20,30,60,.16), transparent 80%);
+        }
+
+        :root[data-theme="light"] .edge-arrow.left-arrow {
+        background: linear-gradient(to right, rgba(20,30,60,.16), transparent 80%);
+        }
+
+        .edge-arrow .arrow-icon {
+        font-size: 2.6rem;
+        font-weight: 300;
+        color: var(--text-dim);
+        opacity: .55;
+        user-select: none;
+        filter: blur(.2px);
+        }
+
+        .edge-arrow:hover .arrow-icon {
+        opacity: 1;
+        color: var(--accent);
         }
 
         .card {
@@ -428,24 +593,40 @@
 
         .furnace-card .numbers {
         display: flex;
-        gap: clamp(16px, 2vw, 30px);
+        gap: clamp(12px, 1.6vw, 24px);
         margin-top: clamp(10px, 1.2vh, 16px);
         }
 
         .furnace-card .numbers .n .v {
-        font-size: clamp(1.5rem, 2vw, 2.3rem);
+        font-size: clamp(1.15rem, 1.5vw, 1.85rem);
         font-weight: 800;
         font-family: 'JetBrains Mono', monospace;
         font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        }
+
+        .furnace-card .numbers .n .v .sep {
+        color: var(--text-faint);
+        margin: 0 4px;
+        font-weight: 500;
+        }
+
+        .furnace-card .numbers .n .v .seg-cb {
+        color: var(--seg-cb);
+        }
+
+        .furnace-card .numbers .n .v .seg-be {
+        color: var(--seg-be);
         }
 
         .furnace-card .numbers .n .l {
-        font-size: clamp(.62rem, .72vw, .78rem);
+        font-size: clamp(.6rem, .68vw, .74rem);
         color: var(--text-faint);
         text-transform: uppercase;
-        letter-spacing: .5px;
+        letter-spacing: .4px;
         font-weight: 700;
         margin-top: 3px;
+        white-space: nowrap;
         }
 
         .furnace-card .chart-wrap {
@@ -495,18 +676,20 @@
         }
 
         .trend-card h2 {
-        font-size: clamp(1.15rem, 1.4vw, 1.55rem);
+        font-size: clamp(1rem, 1.25vw, 1.35rem);
         margin: 0 0 10px 0;
         font-weight: 800;
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        gap: 10px;
         }
 
         .trend-card h2 .hint {
-        font-size: clamp(.68rem, .8vw, .85rem);
+        font-size: clamp(.62rem, .74vw, .8rem);
         font-weight: 600;
         color: var(--text-faint);
+        text-transform: none;
+        letter-spacing: 0;
         }
 
         .trend-card .chart-wrap {
@@ -514,7 +697,6 @@
         min-height: 0;
         }
 
-        /* ---------- PANEL DE DRILL-DOWN (cross-filter) ---------- */
         .drilldown-overlay {
         position: fixed;
         inset: 0;
@@ -615,11 +797,21 @@
         border-radius: 4px;
         background: var(--grid-line);
         overflow: hidden;
+        position: relative;
         }
 
         .bar-fill {
         height: 100%;
         border-radius: 4px;
+        }
+
+        .target-marker {
+        position: absolute;
+        top: -2px;
+        bottom: -2px;
+        width: 0;
+        border-left: 2px dashed rgba(255,255,255,.55);
+        z-index: 2;
         }
 
         .close-btn {
@@ -640,6 +832,28 @@
         font-weight: 700;
         letter-spacing: .3px;
         display: inline-block;
+        }
+
+        tr.unplanned-row td {
+        color: var(--bad);
+        }
+
+        .unplanned-tag {
+        background: rgba(255,107,120,0.14);
+        border: 1px solid var(--bad);
+        color: var(--bad);
+        padding: 4px 11px;
+        border-radius: 6px;
+        font-size: .74rem;
+        font-weight: 700;
+        letter-spacing: .3px;
+        display: inline-block;
+        }
+
+        .chip-unplanned {
+        background: rgba(255,107,120,0.14);
+        border-color: var(--bad);
+        color: var(--bad);
         }
 
         .sap-excluded {
@@ -728,6 +942,16 @@
         box-shadow: 0 0 0 0 rgba(61,219,152,0);
         }
         }
+
+        @@media (max-width: 900px) {
+        .furnace-card .numbers .n .v {
+        font-size: 1rem;
+        }
+
+        .furnace-card .numbers {
+        gap: 10px;
+        }
+        }
     </style>
 </head>
 <body>
@@ -737,7 +961,7 @@
             <div class="brand">
                 <img src="~/images/m2s.png" style="width: 60px;" />
                 <div class="brand-text">
-                    <h1><img src="~/images/MAHLE-Logo.png" style="width: 80px; margin:20px,0,0,0" /> · Planta 1</h1>
+                    <h1><img src="~/images/MahleOriginal.png" style="width: 80px; margin:20px,0,0,0" /> · Planta 1</h1>
                     <div class="subtitle">
                         <span id="dateLabel"></span>
                         <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
@@ -764,8 +988,10 @@
                         </div>
                     </div>
                     <div class="kpi-group-badge" id="kpiGroupBadge">
+                        <button class="carousel-arrow kpi-arrow" id="kpiArrowPrev" title="Grupo anterior">◀</button>
                         <div class="fill" id="kpiGroupFill"></div>
                         <span class="label-text" id="kpiGroupName">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].Label : "")</span>
+                        <button class="carousel-arrow kpi-arrow" id="kpiArrowNext" title="Siguiente grupo">▶</button>
                     </div>
                 </div>
                 <div class="kpi-divider"></div>
@@ -778,17 +1004,57 @@
                 </div>
             </div>
 
-            <div class="header-actions controls-collapsible">
-                <div class="date-picker" id="datePicker">
-                    <input type="date" id="dateInput" />
+            <div class="header-actions-wrap controls-collapsible">
+                <div class="header-actions">
+                    <a class="btn" href="/Dashboard/Historical" title="Ver histórico">📅</a>
+                    <button class="btn" id="toggleTheme">🌗</button>
+                    <button class="btn" id="togglePresentation">🖥️</button>
                 </div>
-                <button class="btn" id="toggleDate">📅</button>
-                <button class="btn" id="toggleTheme">🌗</button>
-                <button class="btn" id="togglePresentation">🖥️</button>
+                <div class="mode-switch">
+                    <span class="mode-label" id="modeLabelAuto">Automático</span>
+                    <label class="mode-toggle">
+                        <input type="checkbox" id="modeCheckbox" />
+                        <span class="mode-slider"></span>
+                    </label>
+                    <span class="mode-label" id="modeLabelManual">Manual</span>
+                </div>
             </div>
         </header>
 
-        <div class="grid-main" id="grid"></div>
+        <div class="screens-viewport">
+            <div class="screens-track" id="screensTrack">
+                <div class="screen screen-main">
+                    <div class="grid-main" id="grid"></div>
+                </div>
+                <div class="screen screen-trends">
+                    <div class="trends-grid" id="trendsGrid">
+                        <div class="card trend-card">
+                            <h2>Core Builders</h2>
+                            <div class="chart-wrap"><canvas id="chart-cb"></canvas></div>
+                        </div>
+                        <div class="card trend-card">
+                            <h2>Back End</h2>
+                            <div class="chart-wrap"><canvas id="chart-be"></canvas></div>
+                        </div>
+                        <div class="card trend-card">
+                            <h2>Clam Shells</h2>
+                            <div class="chart-wrap"><canvas id="chart-cs"></canvas></div>
+                        </div>
+                        <div class="card trend-card">
+                            <h2>Tube Mills</h2>
+                            <div class="chart-wrap"><canvas id="chart-tm"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="edge-arrow right-arrow" id="rightArrow" title="Ver tendencias por categoría">
+        <span class="arrow-icon">›</span>
+    </div>
+    <div class="edge-arrow left-arrow" id="leftArrow" title="Volver al dashboard" style="display:none;">
+        <span class="arrow-icon">‹</span>
     </div>
 
     <div class="drilldown-overlay" id="drilldownOverlay">
@@ -810,26 +1076,25 @@
     </div>
 
     <script>
-        // ---------------------------------------------------------------
-        // Estado inicial servido por el servidor (primer render, sin esperar SignalR)
-        // ---------------------------------------------------------------
         let snapshot = @Html.Raw(Json.Serialize(Model));
         let selectedFurnaceId = null;
         const charts = {};
-        const furnacePage = {}; // furnaceId -> índice de página actual (carrusel de 5 en 5, cada 15s)
+        const furnacePage = {};
         const PAGE_SIZE = 5;
         const PAGE_ROTATE_MS = 15000;
         const KPI_ROTATE_MS = 15000;
         let kpiGroupIndex = 0;
-        const FURNACE_COLORS = ['#4da3ff', '#35d68f', '#f2b84b', '#c084fc', '#ff8a5c'];
+        const FURNACE_COLORS = ['#4da3ff', '#35d68f', '#f2b84b', '#c084fc', '#ff8a5c', '#64748b'];
+        const isSmallScreen = window.innerWidth < 900;
 
-        // Semáforo de OEE: >=85% verde, 70-85% amarillo, <70% rojo. Aplica a plantas, hornos y líneas.
         function oeeColor(oee) {
         if (oee >= 0.85) return getCss('--good');
         if (oee >= 0.70) return getCss('--warn');
         return getCss('--bad');
         }
-        function furnaceColor(id) { return FURNACE_COLORS[(id - 1) % FURNACE_COLORS.length]; }
+        function furnaceColor(id) { return id === 7 ? '#c084fc' : FURNACE_COLORS[(id - 1) % FURNACE_COLORS.length]; }
+        function fnumLabel(id) { return id === 6 ? 'TM' : (id === 7 ? 'CS' : id); }
+        function detailHref(id) { return id === 6 ? '/TubeMills' : (id === 7 ? '/Furnace1' : '/Furnace' + id); }
         function getCss(varName) { return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); }
         function hexToRgba(hex, alpha) {
         const h = hex.replace('#', '');
@@ -839,59 +1104,90 @@
         }
         function pct(v) { return (v * 100).toFixed(0) + '%'; }
 
-        // Solo las líneas CON plan cuentan para el mini-chart de cada card (las líneas sin
-        // plan solo se muestran en el detalle/modal, no aquí — ver countedLines()).
-        function countedLines(f) { return f.lines.filter(l => l.plannedShift > 0); }
+        function countedLines(f) { return f.lines.filter(l => l.countsForStats); }
 
-        // Carrusel tipo pantalla de aeropuerto: pagina las líneas de 5 en 5, ordenadas por Product_Order.
-        function furnaceLinesPage(f) {
-        const sorted = [...countedLines(f)].sort((a, b) => a.productOrder - b.productOrder);
-        const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-        const idx = (furnacePage[f.furnaceId] || 0) % totalPages;
-        return { page: sorted.slice(idx * PAGE_SIZE, idx * PAGE_SIZE + PAGE_SIZE), totalPages, idx };
+        function furnaceCarouselPages(f) {
+        const lines = countedLines(f);
+        const clamShell = lines.filter(l => l.groupId === 6).sort((a, b) => a.productOrder - b.productOrder);
+        const regular = lines.filter(l => l.groupId !== 6).sort((a, b) => a.productOrder - b.productOrder);
+        const pages = [];
+        const pushPages = (arr, type) => {
+        const total = Math.max(1, Math.ceil(arr.length / PAGE_SIZE));
+        for (let i = 0; i < total && arr.length > 0; i++) {
+        pages.push({ type, lines: arr.slice(i * PAGE_SIZE, i * PAGE_SIZE + PAGE_SIZE) });
+        }
+        };
+        pushPages(regular, 'regular');
+        pushPages(clamShell, 'clamshell');
+        if (pages.length === 0) pages.push({ type: 'regular', lines: [] });
+        return pages;
         }
 
-        // Helper genérico de anillo de progreso (lo usan tanto las cards de horno como el
-        // indicador de categoría del header): se llena en 15s y al completar coincide con el cambio.
+        function furnaceLinesPage(f) {
+        const pages = furnaceCarouselPages(f);
+        const idx = (furnacePage[f.furnaceId] || 0) % pages.length;
+        return { page: pages[idx].lines, pageType: pages[idx].type, totalPages: pages.length, idx };
+        }
+
+        function cardNumbersHtml(f, pageType) {
+        if (f.furnaceId === 6) {
+        return `
+        <div class="n"><div class="v">${f.totalProduction.toLocaleString()}</div><div class="l">Producción</div></div>
+        <div class="n"><div class="v">${f.totalPlanned.toLocaleString()}</div><div class="l">Plan Turno</div></div>
+        <div class="n"><div class="v">—</div><div class="l">SAP % (N/A)</div></div>
+        `;
+        }
+        if (pageType === 'clamshell') {
+        return `
+        <div class="n"><div class="v">${f.clamShellProduction.toLocaleString()}</div><div class="l">Producción Clam Shells</div></div>
+        <div class="n"><div class="v">${f.clamShellPlanned.toLocaleString()}</div><div class="l">Plan Clam Shells</div></div>
+        <div class="n"><div class="v">—</div><div class="l">SAP % (N/A)</div></div>
+        `;
+        }
+        return `
+        <div class="n"><div class="v"><span class="seg-cb">${f.coreBuilderProduction.toLocaleString()}</span><span class="sep">|</span><span class="seg-be">${f.backEndProduction.toLocaleString()}</span></div><div class="l">Producción (CB | BE)</div></div>
+        <div class="n"><div class="v"><span class="seg-cb">${f.coreBuilderPlanned.toLocaleString()}</span><span class="sep">|</span><span class="seg-be">${f.backEndPlanned.toLocaleString()}</span></div><div class="l">Plan Turno (CB | BE)</div></div>
+        <div class="n"><div class="v">${pct(f.backEndSapPercent)}</div><div class="l">SAP % (BE)</div></div>
+        `;
+        }
+
         function restartRing(ring) {
         ring.classList.remove('animating');
-        void ring.getBoundingClientRect(); // fuerza reflow para poder reiniciar la animación
+        void ring.getBoundingClientRect();
         ring.classList.add('animating');
         }
 
-        function ensureRing(containerId, ringIdPrefix) {
+        function ensureRing(containerId, ringIdPrefix, furnaceId) {
         const container = document.getElementById(containerId);
         let ring = document.getElementById(ringIdPrefix + '-fill');
         if (!ring) {
         container.innerHTML = `
+        <button class="carousel-arrow" title="Página anterior" onclick="event.stopPropagation(); stepFurnacePage(${furnaceId}, -1)">◀</button>
         <svg class="page-ring-svg" viewBox="0 0 16 16">
         <circle class="ring-bg" cx="8" cy="8" r="7"></circle>
         <circle class="ring-fill" id="${ringIdPrefix}-fill" cx="8" cy="8" r="7"></circle>
         </svg>
         <span class="page-ring-label" id="${ringIdPrefix}-label"></span>
+        <button class="carousel-arrow" title="Página siguiente" onclick="event.stopPropagation(); stepFurnacePage(${furnaceId}, 1)">▶</button>
         `;
         ring = document.getElementById(ringIdPrefix + '-fill');
         }
         return ring;
         }
 
-        // Anillo de progreso de las cards de horno: se llena en 15s y al completar la vuelta coincide con el cambio de página.
         function renderPageRing(f) {
         const container = document.getElementById('pagering-' + f.furnaceId);
         if (!container) return;
         const { totalPages, idx } = furnaceLinesPage(f);
         if (totalPages <= 1) { container.innerHTML = ''; return; }
 
-        const ring = ensureRing('pagering-' + f.furnaceId, 'ring-' + f.furnaceId);
+        const ring = ensureRing('pagering-' + f.furnaceId, 'ring-' + f.furnaceId, f.furnaceId);
         document.getElementById('ring-' + f.furnaceId + '-label').textContent = `${idx + 1}/${totalPages}`;
         restartRing(ring);
         }
 
         document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
 
-        // ---------------------------------------------------------------
-        // RENDER
-        // ---------------------------------------------------------------
         function render(isLiveUpdate) {
         renderKpiGroup(isLiveUpdate);
 
@@ -903,21 +1199,22 @@
 
         if (isFirstRender) {
         grid.innerHTML = '';
-        snapshot.furnaces.forEach(f => grid.appendChild(buildFurnaceCard(f)));
-        grid.appendChild(buildTrendCard());
+        // Ahora se agregan las 6 cards directas (Furnace 1-5 + Tube Mills) — Tube Mills ya
+        // no alterna con nada, es una card fija más del grid.
+        // Orden fijo del grid: arriba Furnace 1, 2, 3 — abajo Furnace 5, Clam Shells (su
+        // propia card, id 7), Tube Mills. Furnace 4 se queda oculto a propósito.
+        const CARD_ORDER = [1, 2, 3, 5, 7, 6];
+        CARD_ORDER
+        .map(id => snapshot.furnaces.find(f => f.furnaceId === id))
+        .filter(Boolean)
+        .forEach(f => grid.appendChild(buildFurnaceCard(f)));
         } else {
         snapshot.furnaces.forEach(f => updateFurnaceCard(f, isLiveUpdate));
-        updateTrendChart();
         }
+        if (currentScreen === 'trends') renderTrendsScreen();
         applySelection();
         }
 
-        // ---------------------------------------------------------------
-        // CARRUSEL DE LA BARRA SUPERIOR: Core Builders / End of Line / Tube Mills,
-        // rota cada 15s con una badge que se va rellenando (independiente del refresh
-        // de datos, igual que el carrusel de líneas por horno — el índice no se
-        // reinicia con cada snapshot, solo cuando de verdad toca cambiar de grupo).
-        // ---------------------------------------------------------------
         function renderKpiGroup(isLiveUpdate) {
         const groups = snapshot.topKpiGroups || [];
         if (groups.length === 0) return;
@@ -935,17 +1232,27 @@
         if (!isLiveUpdate) {
         const fill = document.getElementById('kpiGroupFill');
         fill.classList.remove('animating');
-        void fill.getBoundingClientRect(); // fuerza reflow para reiniciar la animación
-        fill.classList.add('animating');
+        void fill.getBoundingClientRect();
+        if (carouselMode === 'auto') fill.classList.add('animating');
         }
         }
 
-        setInterval(() => {
+        function advanceKpiGroup() {
         const groups = snapshot.topKpiGroups || [];
         if (groups.length === 0) return;
         kpiGroupIndex = (kpiGroupIndex + 1) % groups.length;
         renderKpiGroup(false);
-        }, KPI_ROTATE_MS);
+        }
+
+        function stepKpiGroup(delta) {
+        const groups = snapshot.topKpiGroups || [];
+        if (groups.length === 0) return;
+        kpiGroupIndex = (kpiGroupIndex + delta + groups.length) % groups.length;
+        renderKpiGroup(false);
+        }
+
+        document.getElementById('kpiArrowPrev').onclick = () => stepKpiGroup(-1);
+        document.getElementById('kpiArrowNext').onclick = () => stepKpiGroup(1);
 
         function buildFurnaceCard(f) {
         const div = document.createElement('div');
@@ -955,12 +1262,14 @@
         div.onclick = () => selectFurnace(f.furnaceId);
 
         const hasProduction = countedLines(f).length > 0;
+        const { pageType } = furnaceLinesPage(f);
+        div.dataset.lastProd = f.totalProduction;
 
         div.innerHTML = `
         <div class="card-top">
         <h2>
-        <span class="fnum">${f.furnaceId}</span><span class="fname">${f.furnaceName}</span>
-        <a class="detail-link" href="/Furnace${f.furnaceId}" onclick="event.stopPropagation()" title="Ver detalle de ${f.furnaceName}">
+        <span class="fnum">${fnumLabel(f.furnaceId)}</span><span class="fname">${f.furnaceName}</span>
+        <a class="detail-link" href="${detailHref(f.furnaceId)}" onclick="event.stopPropagation()" title="Ver detalle de ${f.furnaceName}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
         </a>
         </h2>
@@ -970,11 +1279,7 @@
         <span class="oee-caption">OEE de Turno</span>
         </div>
         </div>
-        <div class="numbers">
-        <div class="n"><div class="v" id="prod-${f.furnaceId}">${f.totalProduction.toLocaleString()}</div><div class="l">Producción</div></div>
-        <div class="n"><div class="v" id="plan-${f.furnaceId}">${f.totalPlanned.toLocaleString()}</div><div class="l">Plan Turno</div></div>
-        <div class="n"><div class="v" id="sap-${f.furnaceId}">${pct(f.sapPercent)}</div><div class="l">SAP %</div></div>
-        </div>
+        <div class="numbers" id="numbers-${f.furnaceId}">${cardNumbersHtml(f, pageType)}</div>
         <div class="chart-wrap" id="chartwrap-${f.furnaceId}">
         ${hasProduction ? `<canvas id="chart-${f.furnaceId}"></canvas>` : `<div class="no-plan-box">SIN PRODUCCIÓN<br>EN EL TURNO ACTUAL</div>`}
         </div>
@@ -991,9 +1296,6 @@
         return div;
         }
 
-        // Plugin ligero (sin librerías extra) que dibuja, sobre cada barra:
-        // - el % de OEE "dentro" de la barra (con contorno para leerse en cualquier color/tema)
-        // - Producción/Esperado a esta hora pegado a la derecha de la barra
         const barLabelsPlugin = {
         id: 'lineBarLabels',
         afterDatasetsDraw(chart) {
@@ -1010,6 +1312,7 @@
         const barRight = Math.max(bar.x, bar.base);
         const y = bar.y;
 
+        if (line.total > 0) {
         const oeeLabel = Math.round(line.oeeShift * 100) + '%';
         ctx.font = '800 15px Inter, sans-serif';
         ctx.textBaseline = 'middle';
@@ -1019,11 +1322,33 @@
         ctx.strokeText(oeeLabel, barLeft + 8, y);
         ctx.fillStyle = '#ffffff';
         ctx.fillText(oeeLabel, barLeft + 8, y);
+        }
 
         ctx.font = '700 13px "JetBrains Mono", monospace';
         ctx.fillStyle = getCss('--text-dim');
         ctx.fillText(`${line.total}/${line.accumulatedRate}`, barRight + 8, y);
         });
+        ctx.restore();
+        }
+        };
+
+        const OEE_TARGET = 85;
+
+        const targetLinePlugin = {
+        id: 'targetLine',
+        afterDatasetsDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        if (!chartArea || !scales.x) return;
+        const xPix = scales.x.getPixelForValue(OEE_TARGET);
+        if (xPix < chartArea.left || xPix > chartArea.right) return;
+        ctx.save();
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = getCss('--text-faint');
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(xPix, chartArea.top);
+        ctx.lineTo(xPix, chartArea.bottom);
+        ctx.stroke();
         ctx.restore();
         }
         };
@@ -1042,17 +1367,20 @@
         linesRef: top
         }]
         },
-        plugins: [barLabelsPlugin],
+        plugins: [barLabelsPlugin, targetLinePlugin],
         options: {
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 500 },
-        layout: { padding: { right: 78 } },
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toFixed(0) + '% OEE de turno' } } },
+        layout: { padding: { right: isSmallScreen ? 52 : 78 } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toFixed(0) + '% OEE de turno (objetivo 85%)' } } },
         scales: {
         x: { min: 0, suggestedMax: 100, ticks: { display: false }, grid: { color: getCss('--grid-line') } },
-        y: { ticks: { color: getCss('--text-dim'), font: { size: 15, weight: '600' } }, grid: { display: false } }
+        y: {
+        ticks: { autoSkip: false, color: getCss('--text-dim'), font: { size: isSmallScreen ? 11 : 15, weight: '600' } },
+        grid: { display: false }
+        }
         }
         }
         };
@@ -1074,14 +1402,16 @@
         if (!card || !pill) return;
 
         const hasProduction = countedLines(f).length > 0;
-        const prodChanged = document.getElementById('prod-' + f.furnaceId).textContent !== f.totalProduction.toLocaleString();
+        const prodChanged = card.dataset.lastProd !== String(f.totalProduction);
+        card.dataset.lastProd = f.totalProduction;
 
         pill.textContent = hasProduction ? pct(f.oee) : '—';
         pill.style.background = hasProduction ? oeeColor(f.oee) : 'var(--neutral)';
         pill.classList.toggle('neutral', !hasProduction);
-        document.getElementById('prod-' + f.furnaceId).textContent = f.totalProduction.toLocaleString();
-        document.getElementById('plan-' + f.furnaceId).textContent = f.totalPlanned.toLocaleString();
-        document.getElementById('sap-' + f.furnaceId).textContent = pct(f.sapPercent);
+
+        const { pageType } = furnaceLinesPage(f);
+        const numbersEl = document.getElementById('numbers-' + f.furnaceId);
+        if (numbersEl) numbersEl.innerHTML = cardNumbersHtml(f, pageType);
         renderWorstLine(f);
 
         const wrap = document.getElementById('chartwrap-' + f.furnaceId);
@@ -1090,15 +1420,13 @@
         if (hasProduction && !hasCanvas) {
         wrap.innerHTML = `<canvas id="chart-${f.furnaceId}"></canvas>`;
         charts['f' + f.furnaceId] = new Chart(document.getElementById('chart-' + f.furnaceId), lineBarConfig(f));
-        renderPageRing(f); // primera vez que aparece la gráfica -> arranca el anillo
+        renderPageRing(f);
         } else if (!hasProduction && hasCanvas) {
         charts['f' + f.furnaceId]?.destroy();
         delete charts['f' + f.furnaceId];
         wrap.innerHTML = `<div class="no-plan-box">SIN PRODUCCIÓN<br>EN EL TURNO ACTUAL</div>`;
         document.getElementById('pagering-' + f.furnaceId).innerHTML = '';
         } else if (hasProduction && hasCanvas) {
-        // Solo se actualizan los datos de la barra; el anillo NO se reinicia aquí,
-        // así el conteo de 15s sigue su curso normal aunque llegue un refresh de datos.
         const chart = charts['f' + f.furnaceId];
         const cfg = lineBarConfig(f);
         chart.data = cfg.data;
@@ -1116,73 +1444,117 @@
         if (selectedFurnaceId === f.furnaceId) renderDrilldown(f);
         }
 
-        function buildTrendCard() {
-        const div = document.createElement('div');
-        div.className = 'card trend-card';
-        div.innerHTML = `<h2>Tendencia de Planta <span class="hint">Producción por hora + acumulado del turno</span></h2><div class="chart-wrap"><canvas id="chart-trend"></canvas></div>`;
-        setTimeout(() => { charts['trend'] = new Chart(document.getElementById('chart-trend'), trendConfig()); }, 0);
-        return div;
+        function refreshFurnaceCardDisplay(f) {
+        const chart = charts['f' + f.furnaceId];
+        if (chart) {
+        chart.data = lineBarConfig(f).data;
+        chart.update('none');
+        }
+        const { pageType } = furnaceLinesPage(f);
+        const numbersEl = document.getElementById('numbers-' + f.furnaceId);
+        if (numbersEl) numbersEl.innerHTML = cardNumbersHtml(f, pageType);
+        renderPageRing(f);
         }
 
-        function cumulativeSeries() {
+        function stepFurnacePage(furnaceId, delta) {
+        const f = snapshot.furnaces.find(x => x.furnaceId === furnaceId);
+        if (!f) return;
+        const { totalPages } = furnaceLinesPage(f);
+        if (totalPages <= 1) return;
+        furnacePage[furnaceId] = ((furnacePage[furnaceId] || 0) + delta + totalPages) % totalPages;
+        refreshFurnaceCardDisplay(f);
+        }
+
+        // ---------------------------------------------------------------
+        // PANTALLA DE TENDENCIAS (flecha derecha del dashboard general): 4 gráficas, una
+        // por categoría (Core Builders / Back End / Clam Shells / Tube Mills), cada una con
+        // Producción/hora + Acumulado + Acumulado esperado — Back End además trae SAP
+        // escaneado (aproximado). Se navega 100% manual, nunca se mueve sola.
+        // ---------------------------------------------------------------
+        let currentScreen = 'main'; // 'main' | 'trends'
+
+        function goToScreen(screen) {
+        currentScreen = screen;
+        document.getElementById('screensTrack').style.transform = screen === 'trends' ? 'translateX(-50%)' : 'translateX(0)';
+        document.getElementById('rightArrow').style.display = screen === 'main' ? 'flex' : 'none';
+        document.getElementById('leftArrow').style.display = screen === 'trends' ? 'flex' : 'none';
+        if (screen === 'trends') renderTrendsScreen();
+        }
+
+        document.getElementById('rightArrow').onclick = () => goToScreen('trends');
+        document.getElementById('leftArrow').onclick = () => goToScreen('main');
+
+        function categoryCumulative(trend, key) {
         let running = 0;
-        return snapshot.hourlyTrend.map(h => (running += h.production));
+        return trend.map(h => (running += (h[key] || 0)));
         }
 
-        function trendConfig() {
-        return {
-        data: {
-        labels: snapshot.hourlyTrend.map(h => h.hour),
-        datasets: [
+        function buildCategoryTrendConfig(trend, withSapLine) {
+        const datasets = [
         {
         type: 'bar', label: 'Producción / hora',
-        data: snapshot.hourlyTrend.map(h => h.production),
+        data: trend.map(h => h.production),
         backgroundColor: hexToRgba(getCss('--accent'), .55),
-        borderRadius: 6, maxBarThickness: 40, yAxisID: 'y', order: 2
+        borderRadius: 6, maxBarThickness: 40, yAxisID: 'y', order: 3
         },
         {
         type: 'line', label: 'Acumulado del turno',
-        data: cumulativeSeries(),
+        data: categoryCumulative(trend, 'production'),
         borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .12),
         fill: true, tension: .35, pointRadius: 3, pointBackgroundColor: getCss('--good'),
-        yAxisID: 'y1', order: 1
-        }
-        ]
+        yAxisID: 'y1', order: 2
         },
+        {
+        type: 'line', label: 'Acumulado esperado a esta hora',
+        data: trend.map(h => h.expectedCumulative),
+        borderColor: getCss('--warn'), backgroundColor: 'transparent',
+        borderDash: [6, 4], tension: .35, pointRadius: 3, pointBackgroundColor: getCss('--warn'),
+        fill: false, yAxisID: 'y1', order: 1
+        }
+        ];
+        if (withSapLine) {
+        datasets.push({
+        type: 'line', label: 'SAP escaneado (aprox.)',
+        data: categoryCumulative(trend, 'sapProduction'),
+        borderColor: getCss('--bad'), backgroundColor: 'transparent',
+        borderDash: [2, 3], tension: .35, pointRadius: 2, fill: false,
+        yAxisID: 'y1', order: 0
+        });
+        }
+        return {
+        data: { labels: trend.map(h => h.hour), datasets },
         options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
-        animation: { duration: 500 },
-        plugins: { legend: { labels: { color: getCss('--text-dim'), font: { size: 14, weight: '600' }, boxWidth: 14 } } },
+        animation: { duration: 400 },
+        plugins: { legend: { labels: { color: getCss('--text-dim'), font: { size: 11, weight: '600' }, boxWidth: 11 } } },
         scales: {
-        x: { ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
-        y: {
-        position: 'left', beginAtZero: true,
-        ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') },
-        title: { display: true, text: 'Piezas / hora', color: getCss('--text-faint'), font: { size: 13, weight: '600' } }
-        },
-        y1: {
-        position: 'right', beginAtZero: true,
-        ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { display: false },
-        title: { display: true, text: 'Acumulado del turno', color: getCss('--text-faint'), font: { size: 13, weight: '600' } }
-        }
+        x: { ticks: { color: getCss('--text-dim'), font: { size: 11 } }, grid: { color: getCss('--grid-line') } },
+        y: { position: 'left', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 11 } }, grid: { color: getCss('--grid-line') } },
+        y1: { position: 'right', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 11 } }, grid: { display: false } }
         }
         }
         };
         }
 
-        function updateTrendChart() {
-        const chart = charts['trend'];
-        if (!chart) return;
-        chart.data.labels = snapshot.hourlyTrend.map(h => h.hour);
-        chart.data.datasets[0].data = snapshot.hourlyTrend.map(h => h.production);
-        chart.data.datasets[1].data = cumulativeSeries();
-        chart.update('none');
+        function renderTrendsScreen() {
+        const specs = [
+        { id: 'chart-cb', trend: snapshot.coreBuilderHourlyTrend || [], sap: false },
+        { id: 'chart-be', trend: snapshot.backEndHourlyTrend || [], sap: true },
+        { id: 'chart-cs', trend: snapshot.clamShellHourlyTrend || [], sap: false },
+        { id: 'chart-tm', trend: snapshot.tubeMillsHourlyTrend || [], sap: false }
+        ];
+        specs.forEach(spec => {
+        const cfg = buildCategoryTrendConfig(spec.trend, spec.sap);
+        if (charts[spec.id]) {
+        charts[spec.id].data = cfg.data;
+        charts[spec.id].update('none');
+        } else {
+        charts[spec.id] = new Chart(document.getElementById(spec.id), cfg);
+        }
+        });
         }
 
-        // ---------------------------------------------------------------
-        // CROSS-FILTER: clic en un horno -> dimear los demás + abrir drill-down con TODAS sus líneas
-        // ---------------------------------------------------------------
         function selectFurnace(id) {
         selectedFurnaceId = (selectedFurnaceId === id) ? null : id;
         applySelection();
@@ -1207,7 +1579,7 @@
         function renderDrilldown(f) {
         if (!f) return;
         document.getElementById('drilldownTitle').innerHTML =
-        `<span class="fnum" style="display:inline-flex;width:22px;height:22px;border-radius:7px;background:${furnaceColor(f.furnaceId)};color:#06101f;align-items:center;justify-content:center;font-size:.75rem;">${f.furnaceId}</span> ${f.furnaceName}`;
+        `<span class="fnum" style="display:inline-flex;width:22px;height:22px;border-radius:7px;background:${furnaceColor(f.furnaceId)};color:#06101f;align-items:center;justify-content:center;font-size:.75rem;">${fnumLabel(f.furnaceId)}</span> ${f.furnaceName}`;
 
         if (f.lines.length === 0) {
         document.getElementById('drilldownChips').innerHTML = `<span class="chip">Sin producción planeada en el turno actual</span>`;
@@ -1220,7 +1592,8 @@
         <span class="chip">Plan: ${f.totalPlanned.toLocaleString()}</span>
         <span class="chip">OEE: ${pct(f.oee)}</span>
         <span class="chip">SAP: ${pct(f.sapPercent)}</span>
-        <span class="chip">${f.lines.length} líneas</span>
+        <span class="chip">${f.lines.filter(l => l.countsForStats).length} líneas</span>
+        ${f.lines.some(l => l.isUnplannedProduction) ? `<span class="chip chip-unplanned">⚠ ${f.lines.filter(l => l.isUnplannedProduction).length} no planeada(s)</span>` : ''}
         `;
         const rows = [...f.lines].sort((a, b) => a.productOrder - b.productOrder).map(l => {
         const sapCell = l.excludedFromSap
@@ -1229,6 +1602,17 @@
         const nameCell = l.productListId > 0
         ? `<a href="/Line/${l.productListId}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>`
         : l.productDesc;
+        if (l.isUnplannedProduction) {
+        return `
+        <tr class="unplanned-row">
+        <td>${nameCell}</td>
+        <td><span class="unplanned-tag">⚠ PRODUCCIÓN NO PLANEADA</span></td>
+        <td class="num">${l.total.toLocaleString()}</td>
+        <td class="num">-</td>
+        <td class="num">-</td>
+        <td class="num">${sapCell}</td>
+        </tr>`;
+        }
         if (l.total === 0) {
         return `
         <tr class="no-prod-row">
@@ -1245,7 +1629,7 @@
         <td>${nameCell}</td>
         <td>
         <div class="bar-cell">
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}"></div></div>
+        <div class="bar-track"><div class="target-marker" style="left:85%"></div><div class="bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}"></div></div>
         <span style="font-family:'JetBrains Mono',monospace;">${pct(l.oeeShift)}</span>
         </div>
         </td>
@@ -1263,9 +1647,6 @@
         if (e.target.id === 'drilldownOverlay') selectFurnace(selectedFurnaceId);
         };
 
-        // ---------------------------------------------------------------
-        // TEMA / PRESENTACIÓN / SELECTOR DE FECHA
-        // ---------------------------------------------------------------
         document.getElementById('toggleTheme').onclick = () => {
         const html = document.documentElement;
         const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -1275,6 +1656,7 @@
         for (const k in charts) delete charts[k];
         document.getElementById('grid').innerHTML = '';
         render(false);
+        if (currentScreen === 'trends') renderTrendsScreen();
         };
         const savedTheme = localStorage.getItem('pm-theme');
         if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
@@ -1289,32 +1671,42 @@
         setTimeout(() => Object.values(charts).forEach(c => c && c.resize()), 260);
         };
 
-        document.getElementById('toggleDate').onclick = () => {
-        document.getElementById('datePicker').classList.toggle('open');
-        };
+        let carouselMode = localStorage.getItem('pm-carousel-mode') || 'auto';
+        let cardIntervalId = null, kpiIntervalId = null;
 
-        // ---------------------------------------------------------------
-        // CARRUSEL: cada 15s avanza a la siguiente página de líneas por horno
-        // (como los monitores de vuelos en un aeropuerto), sin esperar al refresh de datos.
-        // ---------------------------------------------------------------
-        setInterval(() => {
+        function advanceAllCardPages() {
         snapshot.furnaces.forEach(f => {
         const { totalPages } = furnaceLinesPage(f);
         if (totalPages <= 1) return;
         furnacePage[f.furnaceId] = ((furnacePage[f.furnaceId] || 0) + 1) % totalPages;
-        const chart = charts['f' + f.furnaceId];
-        if (chart) {
-        chart.data = lineBarConfig(f).data;
-        // el anillo se reinicia justo aquí, en el mismo instante del cambio de página
-        chart.update('none');
-        }
-        renderPageRing(f);
+        refreshFurnaceCardDisplay(f);
         });
-        }, PAGE_ROTATE_MS);
+        }
 
-        // ---------------------------------------------------------------
-        // SIGNALR: conexión + recepción de actualizaciones en vivo
-        // ---------------------------------------------------------------
+        function applyModeUI() {
+        document.getElementById('modeCheckbox').checked = carouselMode === 'manual';
+        document.getElementById('modeLabelAuto').classList.toggle('active', carouselMode === 'auto');
+        document.getElementById('modeLabelManual').classList.toggle('active', carouselMode === 'manual');
+        document.getElementById('app').classList.toggle('manual-mode', carouselMode === 'manual');
+        }
+
+        function restartAutoCarousels() {
+        if (cardIntervalId) clearInterval(cardIntervalId);
+        if (kpiIntervalId) clearInterval(kpiIntervalId);
+        cardIntervalId = null;
+        kpiIntervalId = null;
+        if (carouselMode !== 'auto') return;
+        cardIntervalId = setInterval(advanceAllCardPages, PAGE_ROTATE_MS);
+        kpiIntervalId = setInterval(advanceKpiGroup, KPI_ROTATE_MS);
+        }
+
+        document.getElementById('modeCheckbox').addEventListener('change', (e) => {
+        carouselMode = e.target.checked ? 'manual' : 'auto';
+        localStorage.setItem('pm-carousel-mode', carouselMode);
+        applyModeUI();
+        restartAutoCarousels();
+        });
+
         const connection = new signalR.HubConnectionBuilder()
         .withUrl('/hubs/metrics')
         .withAutomaticReconnect()
@@ -1328,6 +1720,8 @@
         connection.start().catch(err => console.error('SignalR error:', err));
 
         render(false);
+        applyModeUI();
+        restartAutoCarousels();
     </script>
 </body>
 </html>
