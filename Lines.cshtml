@@ -119,33 +119,33 @@
         .metric-card .ml { font-size: max(.95rem, calc(var(--u) * .95)); color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; font-weight: 800; margin-top: calc(var(--u) * .2); }
 
         /* Shift progress (compact) */
-        .hero-panel { display: flex; flex-direction: column; gap: calc(var(--u) * .35); padding: calc(var(--u) * .5) calc(var(--u) * .9) calc(var(--u) * .6); }
+        .hero-panel { display: flex; flex-direction: column; gap: calc(var(--u) * .4); padding: calc(var(--u) * .6) calc(var(--u) * .9) calc(var(--u) * .7); }
         .hero-top { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * .8); }
-        .hero-title { font-size: max(1.05rem, calc(var(--u) * 1.3)); font-weight: 900; text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim); white-space: nowrap; }
-        .hero-badges { display: flex; align-items: center; gap: calc(var(--u) * .8); }
-        .metric-badge { display: flex; align-items: center; gap: calc(var(--u) * .45); }
-        .badge-label { font-size: max(.9rem, calc(var(--u) * .85)); color: var(--text-faint); text-transform: uppercase; letter-spacing: .4px; font-weight: 800; line-height: 1.05; text-align: right; }
-        .badge-pill { font-size: calc(var(--u) * 1.9); font-weight: 900; font-family: 'JetBrains Mono', monospace; padding: 0 calc(var(--u) * .7); border-radius: 999px; line-height: 1.25; }
+        .hero-title { font-size: max(1.3rem, calc(var(--u) * 1.9)); font-weight: 900; text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim); white-space: nowrap; }
+        .hero-badges { display: flex; align-items: center; gap: calc(var(--u) * 1.1); }
+        .metric-badge { display: flex; align-items: center; gap: calc(var(--u) * .6); }
+        .badge-label { font-size: max(1.05rem, calc(var(--u) * 1.15)); color: var(--text-faint); text-transform: uppercase; letter-spacing: .4px; font-weight: 800; line-height: 1.05; text-align: right; }
+        .badge-pill { font-size: calc(var(--u) * 3.4); font-weight: 900; font-family: 'JetBrains Mono', monospace; padding: 0 calc(var(--u) * .9); border-radius: 999px; line-height: 1.2; }
         .badge-pill.solid { color: var(--pill-text); text-shadow: 0 1px 3px rgba(0,0,0,.25); }
-        .badge-pill.outline { background: transparent; border: 3px solid var(--accent); color: var(--accent); }
-        .pace-badge { padding: 0 calc(var(--u) * .9); border-radius: 999px; font-size: calc(var(--u) * 1.15); font-weight: 800; display: flex; align-items: center; gap: 8px; border: 2px solid transparent; line-height: 1.5; white-space: nowrap; }
+        .badge-pill.outline { background: transparent; border: 4px solid var(--accent); color: var(--accent); }
+        .pace-badge { padding: calc(var(--u) * .15) calc(var(--u) * 1); border-radius: 999px; font-size: calc(var(--u) * 1.7); font-weight: 800; display: flex; align-items: center; gap: 10px; border: 3px solid transparent; line-height: 1.3; white-space: nowrap; }
         .pace-badge.ahead { background: rgba(53,227,154,.14); color: var(--good); border-color: var(--good); }
         .pace-badge.behind { background: rgba(255,100,114,.14); color: var(--bad); border-color: var(--bad); }
 
-        .race-wrap { position: relative; padding-top: calc(var(--u) * 1.5); }
-        .race-track { position: relative; height: calc(var(--u) * 2.9); border-radius: 14px; background: var(--track-bg); border: 2px solid var(--border-soft); overflow: hidden; }
+        .race-wrap { position: relative; padding-top: calc(var(--u) * 2); }
+        .race-track { position: relative; height: calc(var(--u) * 4.6); border-radius: 14px; background: var(--track-bg); border: 2px solid var(--border-soft); overflow: hidden; }
         .race-fill { position: relative; height: 100%; border-radius: 12px 0 0 12px; transition: width .8s cubic-bezier(.22,1,.36,1); overflow: hidden; min-width: 2px; }
         .race-fill.full { border-radius: 12px; }
         .race-shine { position: absolute; top: 0; bottom: 0; width: 55%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.32), transparent); animation: shine 3.4s ease-in-out infinite; }
         @@keyframes shine { 0% { transform: translateX(-140%); } 100% { transform: translateX(240%); } }
-        .race-fill-label { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); font-size: calc(var(--u) * 1.9); font-weight: 900; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.55); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
-        .race-endcap { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); text-align: right; font-size: calc(var(--u) * 1.1); color: var(--text-dim); font-weight: 800; z-index: 1; pointer-events: none; }
+        .race-fill-label { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); font-size: calc(var(--u) * 3); font-weight: 900; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.55); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+        .race-endcap { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); text-align: right; font-size: calc(var(--u) * 1.8); color: var(--text-dim); font-weight: 800; z-index: 1; pointer-events: none; }
 
         /* GOAL marker: solid blue line + blue chip on top */
-        .race-marker-line { position: absolute; top: calc(var(--u) * 1.3); bottom: -4px; width: 0; border-left: 5px solid var(--goal); z-index: 3; box-shadow: 0 0 10px var(--goal); transform: translateX(-50%); }
+        .race-marker-line { position: absolute; top: calc(var(--u) * 1.8); bottom: -4px; width: 0; border-left: 5px solid var(--goal); z-index: 3; box-shadow: 0 0 10px var(--goal); transform: translateX(-50%); }
         .race-marker-chip {
             position: absolute; top: 0; z-index: 4; transform: translateX(-50%); background: var(--goal); color: #fff; font-weight: 900;
-            font-size: calc(var(--u) * 1); padding: 0 calc(var(--u) * .6); border-radius: 8px; white-space: nowrap; line-height: 1.35;
+            font-size: calc(var(--u) * 1.4); padding: 0 calc(var(--u) * .7); border-radius: 8px; white-space: nowrap; line-height: 1.3;
         }
 
         /* Charts (the stars) */
@@ -423,14 +423,37 @@
         };
 
         // ---------------- HOURLY TREND ----------------
+        // GOAL line = 85% of the expected accumulated that the SP reports (snapshot.accumulatedRate).
+        // The expected pieces per hour come from the same available-seconds curve used for cycle time
+        // (breaks excluded, already scaled by the service so its sum = accumulatedRate x theoretical CT),
+        // so the LAST point of the goal line is exactly 0.85 x accumulatedRate (e.g. 0.85 x 273 = 232).
+        function expectedCumulativeSeries(pts) {
+            const ct = snapshot.cycleTimeSecs;
+            const byHour = {};
+            (snapshot.cycleTimeTrend || []).forEach(p => byHour[p.hour] = p.availableSeconds || 0);
+            const secs = pts.map(h => byHour[h.hour] || 0);
+            const totalSecs = secs.reduce((a, b) => a + b, 0);
+            if (ct > 0 && totalSecs > 0) {
+                let run = 0;
+                // normalize so the curve ends exactly at accumulatedRate even with rounding
+                const k = (snapshot.accumulatedRate || 0) / (totalSecs / ct);
+                return secs.map(sx => (run += (sx / ct) * k));
+            }
+            // Fallback (no cycle-time data): rescale the server curve so its latest point equals accumulatedRate.
+            const last = pts.length ? (pts[pts.length - 1].expectedCumulative || 0) : 0;
+            const k = last > 0 ? (snapshot.accumulatedRate || 0) / last : 1;
+            return pts.map(h => (h.expectedCumulative || 0) * k);
+        }
+
         function trendSeries() {
             const pts = snapshot.hourlyTrend || [];
             let run = 0;
+            const expected = expectedCumulativeSeries(pts);
             return {
                 labels: pts.map(h => h.hour),
                 perHour: pts.map(h => h.production),
                 acc: pts.map(h => (run += h.production)),
-                goal: pts.map(h => h.expectedCumulative * TARGET),
+                goal: expected.map(v => v * TARGET),
                 pts
             };
         }
@@ -440,11 +463,10 @@
             if (!canvas) return;
             const s = trendSeries();
 
-            // KPIs: accumulated at close vs goal at the last hour with production (live) / end of shift (historical)
-            let idx = s.goal.length - 1;
-            if (!IS_HISTORICAL) { for (let i = s.pts.length - 1; i >= 0; i--) { if (s.pts[i].production > 0) { idx = i; break; } } }
+            // KPIs at the latest point: goal = 85% of the SP's expected accumulated (accumulatedRate)
+            const idx = s.goal.length - 1;
             const accNow = s.acc[idx] ?? 0, goalNow = s.goal[idx] ?? 0, diff = accNow - goalNow;
-            document.getElementById('kAcc').textContent = fmt(s.acc.length ? s.acc[s.acc.length - 1] : 0);
+            document.getElementById('kAcc').textContent = fmt(accNow);
             document.getElementById('kGoal').textContent = fmt(goalNow);
             const kd = document.getElementById('kDiff');
             kd.textContent = (diff >= 0 ? '+' : '') + fmt(diff);
