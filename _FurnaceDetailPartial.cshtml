@@ -30,7 +30,8 @@
             --grid-line: rgba(255,255,255,0.10); --shadow: 0 12px 30px -12px rgba(0,0,0,0.65);
             --flash: rgba(85,172,255,0.50);
             --seg-cb: #ffc24e; --seg-be: #59b2ff; --seg-cs: #c894ff; --seg-all: #e8edf7;
-            --bar-fill: rgba(89,178,255,0.78);
+            --bar-fill: rgba(167,139,250,0.85);   /* hourly bars: purple (never mixes with the blue goal) */
+            --goal: #3aa0ff;                       /* GOAL lines: solid blue */
         }
         :root[data-theme="light"] {
             --bg: #dfe5ef; --card: #ffffff; --card-2: #f1f4f9; --card-hover: #edf2fa;
@@ -42,7 +43,8 @@
             --grid-line: rgba(16,24,40,0.13); --shadow: 0 12px 28px -14px rgba(20,30,60,0.28);
             --flash: rgba(25,87,194,0.24);
             --seg-cb: #8a5900; --seg-be: #124faa; --seg-cs: #6d28d9; --seg-all: #0a1220;
-            --bar-fill: rgba(18,79,170,0.80);
+            --bar-fill: rgba(109,40,217,0.80);
+            --goal: #0b5bd3;
         }
 
         * { box-sizing: border-box; }
@@ -173,7 +175,7 @@
         .line-link { color: inherit; text-decoration: none; border-bottom: 2px dashed var(--border); }
         .line-link:hover { color: var(--furnace-color); border-bottom-color: var(--furnace-color); }
         .line-bar-track { height: 78%; max-height: 2.1em; border-radius: 8px; background: var(--grid-line); overflow: hidden; position: relative; }
-        .target-marker { position: absolute; top: 0; bottom: 0; width: 0; border-left: 3px dashed rgba(255,255,255,.85); z-index: 2; mix-blend-mode: difference; }
+        .target-marker { position: absolute; top: -2px; bottom: -2px; width: 0; border-left: 4px solid var(--goal); box-shadow: 0 0 8px var(--goal); z-index: 2; }
         .line-bar-fill { height: 100%; border-radius: 8px; display: flex; align-items: center; padding-left: 10px; transition: width .5s ease; min-width: 3.4em; }
         .line-bar-fill span { font-family: 'JetBrains Mono', monospace; font-weight: 900; color: #fff; font-size: .95em; text-shadow: 0 1px 3px rgba(0,0,0,.6); white-space: nowrap; }
         .line-qty { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: .88em; white-space: nowrap; line-height: 1.1; font-variant-numeric: tabular-nums; }
@@ -217,7 +219,7 @@
                         <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
                         @if (IsHistorical)
                         {
-                            <span class="historical-badge">📅 Histórico</span>
+                            <span class="historical-badge">📅 Historical</span>
                         }
                         else
                         {
@@ -232,17 +234,17 @@
                     <form class="historical-picker" id="historicalPicker" method="get" action="@Context.Request.Path">
                         <input type="date" id="pickerDate" name="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
                         <select id="pickerShift" name="shiftId">
-                            <option value="1">Turno 1</option>
-                            <option value="2">Turno 2</option>
-                            <option value="3">Turno 3</option>
+                            <option value="1">Shift 1</option>
+                            <option value="2">Shift 2</option>
+                            <option value="3">Shift 3</option>
                         </select>
-                        <button type="submit" class="btn">Ver</button>
+                        <button type="submit" class="btn">Go</button>
                     </form>
-                    <a class="btn" href="/Dashboard/Historical?date=@HistoricalDateStr&shiftId=@HistoricalShiftId" title="Volver al histórico general">📅 Volver</a>
+                    <a class="btn" href="/Dashboard/Historical?date=@HistoricalDateStr&shiftId=@HistoricalShiftId" title="Back to general history">📅 Back</a>
                 }
                 else
                 {
-                    <a class="btn" href="/Dashboard" title="Volver al dashboard general">📊 General</a>
+                    <a class="btn" href="/Dashboard" title="Back to general dashboard">📊 General</a>
                 }
                 <button class="btn" id="toggleTheme">🌗</button>
                 <button class="btn" id="togglePresentation">🖥️</button>
@@ -270,7 +272,7 @@
                     </div>
                     <div class="trend-kpis">
                         <div class="trend-kpi"><div class="v" id="kAcc" style="color:var(--good)">–</div><div class="l">ACCUMULATED</div></div>
-                        <div class="trend-kpi"><div class="v" id="kExp" style="color:var(--warn)">–</div><div class="l" id="kExpL">GOAL 85%</div></div>
+                        <div class="trend-kpi"><div class="v" id="kExp" style="color:var(--goal)">–</div><div class="l" id="kExpL">GOAL 85%</div></div>
                         <div class="trend-kpi"><div class="v" id="kDiff">–</div><div class="l">DIFFERENCE</div></div>
                     </div>
                 </div>
@@ -339,7 +341,7 @@
         function renderSegments() {
             const el = document.getElementById('segStrip');
             if (FURNACE_ID === 6) {
-                el.innerHTML = segCard('Tube Mills', 'OEE del turno', 'var(--furnace-color)', snapshot.oee, snapshot.totalProduction, snapshot.totalPlanned, snapshot.remainingToPlan, null, true);
+                el.innerHTML = segCard('Tube Mills', 'Shift OEE', 'var(--furnace-color)', snapshot.oee, snapshot.totalProduction, snapshot.totalPlanned, snapshot.remainingToPlan, null, true);
                 return;
             }
             let h = segCard('Furnace', 'Total', 'var(--seg-all)', snapshot.oee, snapshot.totalProduction, snapshot.totalPlanned, snapshot.remainingToPlan, null, false);
@@ -354,7 +356,7 @@
         function render(isLiveUpdate) {
             document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
             if (!IS_HISTORICAL) {
-                document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             }
             document.getElementById('linesCountChip').textContent = snapshot.lines.length + ' lines';
             renderSegments();
@@ -401,7 +403,7 @@
                 <div class="line-row unplanned-line-row ${changed(l) ? 'flash' : ''}" data-desc="${l.productDesc}" data-total="${l.total}">
                     <div class="line-name" title="${l.productDesc}">${lineLink(l)}</div>
                     <div class="unplanned-badge">⚠ NON PLANNED PRODUCTION</div>
-                    <div class="line-qty">${fmt(l.total)}<small>piezas</small></div>
+                    <div class="line-qty">${fmt(l.total)}<small>pieces</small></div>
                 </div>`).join('');
 
             container.innerHTML = activeRows + unplannedRows;
@@ -471,6 +473,19 @@
             }
         };
 
+        // Soft glow on every dataset flagged isGoal (solid blue GOAL line).
+        const goalGlowPlugin = {
+            id: 'goalGlow',
+            beforeDatasetDraw(chart, args) {
+                if (!chart.data.datasets[args.index].isGoal) return;
+                chart.ctx.save(); chart.ctx.shadowColor = getCss('--goal'); chart.ctx.shadowBlur = 12;
+            },
+            afterDatasetDraw(chart, args) {
+                if (!chart.data.datasets[args.index].isGoal) return;
+                chart.ctx.restore();
+            }
+        };
+
         function enableLineMarquee() {
     document.querySelectorAll('.line-name').forEach(el => {
         const text = el.querySelector('.line-name-text');
@@ -529,7 +544,7 @@
                     datasets: [
                         { type: 'bar', label: 'Production / hour (bars)', data: s.perHour, backgroundColor: getCss('--bar-fill'), borderRadius: 6, maxBarThickness: 70, yAxisID: 'y', order: 3 },
                         { type: 'line', label: 'Real Accumulated (right axis)', data: s.acc, borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .14), fill: true, borderWidth: 4, tension: .3, pointRadius: 5, yAxisID: 'y1', order: 2 },
-                        { type: 'line', label: '85% Goal Plan (right axis)', data: s.exp, borderColor: getCss('--warn'), backgroundColor: 'transparent', borderDash: [10, 6], borderWidth: 4, tension: .3, pointRadius: 5, pointBackgroundColor: getCss('--warn'), fill: false, yAxisID: 'y1', order: 1 }
+                        { type: 'line', label: 'GOAL 85% (right axis)', data: s.exp, isGoal: true, borderColor: getCss('--goal'), backgroundColor: 'transparent', borderWidth: 5, tension: .3, pointRadius: 6, pointBackgroundColor: getCss('--goal'), pointBorderColor: getCss('--card'), pointBorderWidth: 2, fill: false, yAxisID: 'y1', order: 1 }
                     ]
                 },
                 options: {
@@ -542,11 +557,11 @@
                     },
                     scales: {
                         x: { title: axisTitle('Shift Hour'), ticks: tick, grid: { color: getCss('--grid-line') } },
-                        y: { position: 'left', beginAtZero: true, title: axisTitle(`Pieces / hour (${src.label === 'BACK END' ? 'Back End' : src.label})`, getCss('--accent')), ticks: tick, grid: { color: getCss('--grid-line') } },
+                        y: { position: 'left', beginAtZero: true, title: axisTitle(`Pieces / hour (${src.label === 'BACK END' ? 'Back End' : src.label})`, getCss('--bar-fill')), ticks: tick, grid: { color: getCss('--grid-line') } },
                         y1: { position: 'right', beginAtZero: true, title: axisTitle('Shift Accumulated (pieces)', getCss('--good')), ticks: tick, grid: { display: false } }
                     }
                 },
-                plugins: [barValuesPlugin]
+                plugins: [barValuesPlugin, goalGlowPlugin]
             });
         }
 

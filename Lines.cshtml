@@ -1,4 +1,4 @@
-@model Metrics_Dashboard.Models.LineDetailSnapshot
+@model Metrics_Dashboard.Models.PlantDashboardSnapshot
 @{
     Layout = null;
 }
@@ -7,660 +7,1748 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Plant Metrics · @Model.ProductDesc</title>
+    <title>Plant Metrics · General Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <script src="~/lib/signalr/signalr.min.js"></script>
     <script src="~/lib/chartjs/chart.umd.min.js"></script>
     <script src="~/js/tv-refresh.js"></script>
     <style>
-        /* ============================================================
-           LINE VIEW - TV DESIGN (readable from ~5 m, no scroll)
-           Everything scales with --u (1u = 1% of width, min 14px => 19.2px at 1920).
-           Same sizing system as the Furnace view.
-           ============================================================ */
-        :root { --u: max(14px, 1vw); }
-
         :root[data-theme="dark"] {
-            --bg: #070b12; --card: #111a28; --card-2: #0b121d; --card-hover: #192438;
-            --border: #31415e; --border-soft: rgba(255,255,255,0.10);
-            --text: #ffffff; --text-dim: #c3cde0; --text-faint: #8e9cb8;
-            --accent: #55acff; --accent-soft: rgba(85,172,255,0.18);
-            --good: #35e39a; --warn: #ffc557; --bad: #ff6472;
-            --no-plan-bg: rgba(172,138,255,0.18); --no-plan-border: #b799ff; --no-plan-text: #dccfff;
-            --grid-line: rgba(255,255,255,0.10); --shadow: 0 12px 30px -12px rgba(0,0,0,0.65);
-            --pill-text: #061018; --track-bg: rgba(255,255,255,0.08);
-            --goal: #3aa0ff;            /* all GOAL lines: solid blue */
-            --bar: rgba(167,139,250,0.85); /* hourly bars (purple, so they never mix with the blue goal) */
-            --avg: #d08bff;             /* cycle-time average: its own color */
-        }
-        :root[data-theme="light"] {
-            --bg: #dfe5ef; --card: #ffffff; --card-2: #f1f4f9; --card-hover: #edf2fa;
-            --border: #adb9cd; --border-soft: rgba(16,24,40,0.13);
-            --text: #0a1220; --text-dim: #2f3d56; --text-faint: #5b6882;
-            --accent: #124faa; --accent-soft: rgba(18,79,170,0.13);
-            --good: #087d4c; --warn: #8a5900; --bad: #bd2637;
-            --no-plan-bg: rgba(109,40,217,0.11); --no-plan-border: #6d28d9; --no-plan-text: #521aa8;
-            --grid-line: rgba(16,24,40,0.13); --shadow: 0 12px 28px -14px rgba(20,30,60,0.28);
-            --pill-text: #ffffff; --track-bg: rgba(16,24,40,0.09);
-            --goal: #0b5bd3;
-            --bar: rgba(109,40,217,0.80);
-            --avg: #9333ea;
+        --bg: #0a0e15;
+        --card: #131a28;
+        --card-hover: #1a2338;
+        --border: #263652;
+        --border-soft: rgba(255,255,255,0.07);
+        --text: #f2f5fb;
+        --text-dim: #93a4c2;
+        --text-faint: #62729a;
+        --accent: #55acff;
+        --accent-soft: rgba(85,172,255,0.16);
+        --good: #3ddb98;
+        --warn: #f5c15c;
+        --bad: #ff6b78;
+        --neutral: #8a99ba;
+        --no-plan-bg: rgba(172,138,255,0.14);
+        --no-plan-border: #ac8aff;
+        --no-plan-text: #d1bfff;
+        --grid-line: rgba(255,255,255,0.06);
+        --shadow: 0 10px 26px -12px rgba(0,0,0,0.55);
+        --flash: rgba(85,172,255,0.38);
+        --pill-text: #061018;
+        --seg-cb: #f2b84b;
+        --seg-be: #55acff;
+        --goal: #3aa0ff;                 /* GOAL lines: solid blue */
+        --bar: rgba(167,139,250,0.85);   /* hourly bars: purple */
         }
 
-        * { box-sizing: border-box; }
+        :root[data-theme="light"] {
+        --bg: #e7ebf3;
+        --card: #ffffff;
+        --card-hover: #eef2fa;
+        --border: #c3ccdc;
+        --border-soft: rgba(16,24,40,0.08);
+        --text: #0c1526;
+        --text-dim: #46536b;
+        --text-faint: #707f9c;
+        --accent: #1957c2;
+        --accent-soft: rgba(25,87,194,0.11);
+        --good: #0e8f57;
+        --warn: #96650a;
+        --bad: #c22e3e;
+        --neutral: #5c6a86;
+        --no-plan-bg: rgba(109,40,217,0.09);
+        --no-plan-border: #6d28d9;
+        --no-plan-text: #5b21b6;
+        --grid-line: rgba(16,24,40,0.08);
+        --shadow: 0 12px 28px -14px rgba(20,30,60,0.22);
+        --flash: rgba(25,87,194,0.16);
+        --pill-text: #ffffff;
+        --seg-cb: #96650a;
+        --seg-be: #1957c2;
+        --goal: #0b5bd3;
+        --bar: rgba(109,40,217,0.80);
+        }
+
+        * {
+        box-sizing: border-box;
+        }
 
         html, body {
-            margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
-            font-family: 'Inter', 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased;
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Inter', 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+        -webkit-font-smoothing: antialiased;
         }
 
         .app {
-            height: 100vh; width: 100vw; display: grid; grid-template-rows: auto minmax(0, 1fr);
-            gap: calc(var(--u) * .6); padding: calc(var(--u) * .7); background: var(--bg);
+        height: 100vh;
+        width: 100vw;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: clamp(10px, 1vh, 16px);
+        padding: clamp(12px, 1.2vh, 20px);
         }
-        .app.presentation .controls-collapsible { display: none; }
 
-        /* ---------- HEADER ---------- */
         header {
-            display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 1.2);
-            background: var(--card); border: 1px solid var(--border); border-top: 6px solid var(--furnace-color);
-            border-radius: 16px; padding: calc(var(--u) * .3) calc(var(--u) * 1.2); box-shadow: var(--shadow);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: clamp(12px, 1.4vh, 20px) clamp(20px, 1.8vw, 32px);
+        box-shadow: var(--shadow);
         }
-        .brand { display: flex; align-items: center; gap: calc(var(--u) * 1); min-width: 0; }
-        .furnace-tag.logo-tag {
-            flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none;
-            padding: calc(var(--u) * .25) calc(var(--u) * .6); border-radius: 12px; background: transparent;
-        }
-        .furnace-tag.logo-tag img { height: calc(var(--u) * 3.4); width: auto; object-fit: contain; display: block; }
-        .brand-text { min-width: 0; }
-        .brand-text h1 { margin: 0; font-size: calc(var(--u) * 2.8); font-weight: 900; line-height: 1.05; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .brand-text .furnace-name { color: var(--text-dim); font-weight: 700; font-size: calc(var(--u) * 1.1); }
 
-        .hdr-right { display: flex; align-items: center; gap: calc(var(--u) * 1.2); flex-shrink: 0; }
-        .hdr-info { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; line-height: 1.1; }
-        .hdr-date { color: var(--text-dim); font-weight: 700; font-size: calc(var(--u) * 1.25); }
-        .hdr-line { display: flex; align-items: center; gap: calc(var(--u) * .8); }
-        .shift-badge, .historical-badge {
-            background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border);
-            padding: 0 calc(var(--u) * .8); border-radius: 999px; font-weight: 900; font-size: calc(var(--u) * 1.7);
+        .app.presentation .controls-collapsible {
+        display: none;
         }
-        .historical-badge { background: var(--no-plan-bg); color: var(--no-plan-text); border-color: var(--no-plan-border); }
-        .hdr-time { display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 900; font-size: calc(var(--u) * 2.1); font-variant-numeric: tabular-nums; }
-        .app.presentation .hdr-date { font-size: calc(var(--u) * 1.5); }
-        .app.presentation .shift-badge, .app.presentation .historical-badge { font-size: calc(var(--u) * 2.2); }
-        .app.presentation .hdr-time { font-size: calc(var(--u) * 2.7); }
-        .live-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--good); animation: pulse 1.8s infinite; }
-        @@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(53,227,154,.55); } 70% { box-shadow: 0 0 0 10px rgba(53,227,154,0); } 100% { box-shadow: 0 0 0 0 rgba(53,227,154,0); } }
 
-        .header-actions { display: flex; align-items: center; gap: calc(var(--u) * .5); }
+        .brand {
+        display: flex;
+        align-items: center;
+        gap: clamp(14px, 1.4vw, 22px);
+        }
+
+        .brand-text h1 {
+        font-size: clamp(1.35rem, 1.7vw, 1.85rem);
+        margin: 0;
+        font-weight: 800;
+        letter-spacing: .2px;
+        }
+
+        .brand-text .subtitle {
+        color: var(--text-dim);
+        font-size: clamp(.85rem, .95vw, 1.05rem);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 4px;
+        font-weight: 600;
+        }
+
+        .shift-badge {
+        background: var(--accent-soft);
+        color: var(--accent);
+        border: 1px solid var(--border);
+        padding: 3px 12px;
+        border-radius: 999px;
+        font-size: clamp(.72rem, .82vw, .88rem);
+        font-weight: 700;
+        letter-spacing: .3px;
+        }
+
+        .plant-kpi {
+        display: flex;
+        align-items: center;
+        gap: clamp(18px, 2.2vw, 34px);
+        }
+
+        .kpi-cluster {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: clamp(8px, 1vh, 12px);
+        }
+
+        .kpi-cluster-row {
+        display: flex;
+        align-items: center;
+        gap: clamp(18px, 2.2vw, 34px);
+        }
+
+        .kpi-group-badge {
+        position: relative;
+        overflow: hidden;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: clamp(6px, .8vh, 9px) clamp(14px, 1.4vw, 22px);
+        border-radius: 999px;
+        border: 1.5px solid var(--accent);
+        background: var(--card);
+        min-width: clamp(160px, 14vw, 220px);
+        }
+
+        .kpi-group-badge .fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 0%;
+        background: var(--accent-soft);
+        z-index: 0;
+        }
+
+        .kpi-group-badge .fill.animating {
+        animation: badgeFill 15s linear forwards;
+        }
+
+        @@keyframes badgeFill {
+        from {
+        width: 0%;
+        }
+
+        to {
+        width: 100%;
+        }
+        }
+
+        .kpi-group-badge .label-text {
+        position: relative;
+        z-index: 1;
+        color: var(--accent);
+        font-size: clamp(.76rem, .88vw, .92rem);
+        font-weight: 800;
+        letter-spacing: .6px;
+        text-transform: uppercase;
+        white-space: nowrap;
+        }
+
+        .kpi-block {
+        text-align: center;
+        min-width: 70px;
+        }
+
+        .kpi-block .value {
+        font-size: clamp(2.5rem, 3.6vw, 4.1rem);
+        font-weight: 800;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+        font-family: 'JetBrains Mono', monospace;
+        transition: color .3s ease;
+        }
+
+        .kpi-block .label {
+        font-size: clamp(.68rem, .78vw, .82rem);
+        text-transform: uppercase;
+        letter-spacing: .7px;
+        color: var(--text-faint);
+        margin-top: 6px;
+        font-weight: 700;
+        }
+
+        .kpi-divider {
+        width: 1px;
+        height: clamp(40px, 4.5vh, 60px);
+        background: var(--border);
+        }
+
+        .header-actions-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+        }
+
+        .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        }
+
         .btn {
-            background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 10px;
-            padding: calc(var(--u) * .5) calc(var(--u) * .9); font-size: max(1rem, calc(var(--u) * 1)); font-weight: 700;
-            cursor: pointer; text-decoration: none; display: flex; align-items: center; gap: 6px;
-        }
-        .btn:hover { background: var(--card-hover); border-color: var(--furnace-color); }
-        .historical-picker { display: flex; align-items: center; gap: 6px; margin: 0; }
-        .historical-picker input, .historical-picker select {
-            background: var(--card-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
-            padding: 6px 8px; font-size: max(1rem, calc(var(--u) * .95)); font-family: inherit;
-        }
-
-        /* ---------- BODY: metrics strip -> shift progress (compact) -> BIG charts ---------- */
-        .body-grid { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: calc(var(--u) * .6); min-height: 0; }
-
-        .card { background: var(--card); border: 1px solid var(--border); border-top: 5px solid var(--furnace-color); border-radius: 16px; box-shadow: var(--shadow); }
-
-        /* Metrics strip (4 cards, big numbers) */
-        .metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--u) * .6); }
-        .metric-card { padding: calc(var(--u) * .45) calc(var(--u) * .8); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-        .metric-card .mv { font-size: calc(var(--u) * 3.9); font-weight: 900; font-family: 'JetBrains Mono', monospace; line-height: 1; font-variant-numeric: tabular-nums; }
-        .metric-card .ml { font-size: max(.95rem, calc(var(--u) * .95)); color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; font-weight: 800; margin-top: calc(var(--u) * .2); }
-
-        /* Shift progress (compact) */
-        .hero-panel { display: flex; flex-direction: column; gap: calc(var(--u) * .4); padding: calc(var(--u) * .6) calc(var(--u) * .9) calc(var(--u) * .7); }
-        .hero-top { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * .8); }
-        .hero-title { font-size: max(1.3rem, calc(var(--u) * 1.9)); font-weight: 900; text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim); white-space: nowrap; }
-        .hero-badges { display: flex; align-items: center; gap: calc(var(--u) * 1.1); }
-        .metric-badge { display: flex; align-items: center; gap: calc(var(--u) * .6); }
-        .badge-label { font-size: max(1.05rem, calc(var(--u) * 1.15)); color: var(--text-faint); text-transform: uppercase; letter-spacing: .4px; font-weight: 800; line-height: 1.05; text-align: right; }
-        .badge-pill { font-size: calc(var(--u) * 3.4); font-weight: 900; font-family: 'JetBrains Mono', monospace; padding: 0 calc(var(--u) * .9); border-radius: 999px; line-height: 1.2; }
-        .badge-pill.solid { color: var(--pill-text); text-shadow: 0 1px 3px rgba(0,0,0,.25); }
-        .badge-pill.outline { background: transparent; border: 4px solid var(--accent); color: var(--accent); }
-        .pace-badge { padding: calc(var(--u) * .15) calc(var(--u) * 1); border-radius: 999px; font-size: calc(var(--u) * 1.7); font-weight: 800; display: flex; align-items: center; gap: 10px; border: 3px solid transparent; line-height: 1.3; white-space: nowrap; }
-        .pace-badge.ahead { background: rgba(53,227,154,.14); color: var(--good); border-color: var(--good); }
-        .pace-badge.behind { background: rgba(255,100,114,.14); color: var(--bad); border-color: var(--bad); }
-
-        .race-wrap { position: relative; padding-top: calc(var(--u) * 2); }
-        .race-track { position: relative; height: calc(var(--u) * 4.6); border-radius: 14px; background: var(--track-bg); border: 2px solid var(--border-soft); overflow: hidden; }
-        .race-fill { position: relative; height: 100%; border-radius: 12px 0 0 12px; transition: width .8s cubic-bezier(.22,1,.36,1); overflow: hidden; min-width: 2px; }
-        .race-fill.full { border-radius: 12px; }
-        .race-shine { position: absolute; top: 0; bottom: 0; width: 55%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.32), transparent); animation: shine 3.4s ease-in-out infinite; }
-        @@keyframes shine { 0% { transform: translateX(-140%); } 100% { transform: translateX(240%); } }
-        .race-fill-label { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); font-size: calc(var(--u) * 3); font-weight: 900; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.55); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
-        .race-endcap { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); text-align: right; font-size: calc(var(--u) * 1.8); color: var(--text-dim); font-weight: 800; z-index: 1; pointer-events: none; }
-
-        /* GOAL marker: solid blue line + blue chip on top */
-        .race-marker-line { position: absolute; top: calc(var(--u) * 1.8); bottom: -4px; width: 0; border-left: 5px solid var(--goal); z-index: 3; box-shadow: 0 0 10px var(--goal); transform: translateX(-50%); }
-        .race-marker-chip {
-            position: absolute; top: 0; z-index: 4; transform: translateX(-50%); background: var(--goal); color: #fff; font-weight: 900;
-            font-size: calc(var(--u) * 1.4); padding: 0 calc(var(--u) * .7); border-radius: 8px; white-space: nowrap; line-height: 1.3;
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-size: clamp(.82rem, .95vw, 1rem);
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        transition: background .15s, border-color .15s;
         }
 
-        /* Charts (the stars) */
-        .lower-row { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * .6); min-height: 0; }
-        .trend-card { padding: calc(var(--u) * .6) calc(var(--u) * .9); display: flex; flex-direction: column; min-height: 0; }
-        .trend-head { display: flex; align-items: flex-start; justify-content: space-between; gap: calc(var(--u) * .8); margin-bottom: calc(var(--u) * .2); }
-        .trend-card h2 { font-size: max(1.15rem, calc(var(--u) * 1.4)); margin: 0; font-weight: 900; text-transform: uppercase; letter-spacing: .4px; line-height: 1.1; }
-        .trend-card .subtitle-note { font-size: max(.95rem, calc(var(--u) * .9)); color: var(--text-dim); font-weight: 600; margin-top: 3px; }
-        .trend-kpis { display: flex; gap: calc(var(--u) * 1); flex-shrink: 0; }
-        .trend-kpi { text-align: right; }
-        .trend-kpi .v { font-family: 'JetBrains Mono', monospace; font-weight: 900; font-size: calc(var(--u) * 2.1); line-height: 1; font-variant-numeric: tabular-nums; }
-        .trend-kpi .l { font-size: max(.85rem, calc(var(--u) * .75)); color: var(--text-faint); text-transform: uppercase; font-weight: 800; margin-top: 3px; }
-        .chart-wrap { flex: 1; min-height: 0; position: relative; }
-
-        /* No production / unplanned states */
-        .no-plan-hero {
-            grid-row: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: var(--no-plan-bg); border: 3px dashed var(--no-plan-border); border-radius: 22px; color: var(--no-plan-text);
-            text-align: center; gap: 14px; height: 100%; padding: 0 calc(var(--u) * 3);
+        .btn:hover {
+        background: var(--card-hover);
+        border-color: var(--accent);
         }
-        .no-plan-hero .big { font-size: calc(var(--u) * 4); font-weight: 900; letter-spacing: .5px; }
-        .no-plan-hero .small { font-size: calc(var(--u) * 1.6); font-weight: 700; opacity: .9; }
-        .no-plan-hero.unplanned-hero { background: rgba(255,100,114,0.1); border-color: var(--bad); color: var(--bad); }
+
+        .mode-switch {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: .72rem;
+        font-weight: 800;
+        color: var(--text-faint);
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        }
+
+        .mode-label.active {
+        color: var(--accent);
+        }
+
+        .mode-toggle {
+        position: relative;
+        width: 36px;
+        height: 19px;
+        display: inline-block;
+        flex-shrink: 0;
+        }
+
+        .mode-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        }
+
+        .mode-slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: var(--border);
+        border-radius: 999px;
+        transition: background .2s;
+        }
+
+        .mode-slider::before {
+        content: '';
+        position: absolute;
+        height: 13px;
+        width: 13px;
+        left: 3px;
+        top: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform .2s;
+        }
+
+        .mode-toggle input:checked + .mode-slider {
+        background: var(--accent);
+        }
+
+        .mode-toggle input:checked + .mode-slider::before {
+        transform: translateX(17px);
+        }
+
+        .carousel-arrow {
+        display: none;
+        background: transparent;
+        border: none;
+        color: var(--text-faint);
+        cursor: pointer;
+        font-size: .8rem;
+        padding: 2px 4px;
+        line-height: 1;
+        flex-shrink: 0;
+        }
+
+        .carousel-arrow:hover {
+        color: var(--accent);
+        }
+
+        .app.manual-mode .carousel-arrow {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        }
+
+        .kpi-arrow {
+        position: relative;
+        z-index: 1;
+        color: var(--accent);
+        }
+
+        /* ---------- PANTALLAS: dashboard principal <-> tendencias por categoría ---------- */
+        .screens-viewport {
+        position: relative;
+        overflow: hidden;
+        min-height: 0;
+        border-radius: 4px;
+        }
+
+        .screens-track {
+        display: flex;
+        width: 200%;
+        height: 100%;
+        transition: transform .5s cubic-bezier(.22, 1, .36, 1);
+        }
+
+        .screen {
+        width: 50%;
+        flex-shrink: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        }
+
+        .grid-main {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: clamp(10px, 1vw, 16px);
+        min-height: 0;
+        flex: 1;
+        }
+
+        .trends-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: clamp(10px, 1vw, 16px);
+        min-height: 0;
+        flex: 1;
+        }
+
+        /* Flechas fantasma en los bordes: invisibles hasta que pasas el cursor por su franja,
+        se difuminan con un degradado suave. Derecha en la pantalla principal -> tendencias;
+        izquierda en tendencias -> regresa. Nunca se mueven solas. */
+        .edge-arrow {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        width: 68px;
+        z-index: 45;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity .3s ease;
+        }
+
+        .edge-arrow:hover {
+        opacity: 1;
+        }
+
+        .edge-arrow.right-arrow {
+        right: 0;
+        background: linear-gradient(to left, rgba(0,0,0,.3), transparent 80%);
+        }
+
+        .edge-arrow.left-arrow {
+        left: 0;
+        background: linear-gradient(to right, rgba(0,0,0,.3), transparent 80%);
+        }
+
+        :root[data-theme="light"] .edge-arrow.right-arrow {
+        background: linear-gradient(to left, rgba(20,30,60,.16), transparent 80%);
+        }
+
+        :root[data-theme="light"] .edge-arrow.left-arrow {
+        background: linear-gradient(to right, rgba(20,30,60,.16), transparent 80%);
+        }
+
+        .edge-arrow .arrow-icon {
+        font-size: 2.6rem;
+        font-weight: 300;
+        color: var(--text-dim);
+        opacity: .55;
+        user-select: none;
+        filter: blur(.2px);
+        }
+
+        .edge-arrow:hover .arrow-icon {
+        opacity: 1;
+        color: var(--accent);
+        }
+
+        .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: clamp(16px, 1.6vw, 24px) clamp(18px, 1.8vw, 26px);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+        transition: transform .12s ease, border-color .12s ease, background .12s ease;
+        position: relative;
+        overflow: hidden;
+        }
+
+        .card::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: var(--furnace-color, var(--accent));
+        }
+
+        .card:hover {
+        transform: translateY(-2px);
+        border-color: var(--furnace-color, var(--accent));
+        }
+
+        .card.selected {
+        border-color: var(--furnace-color, var(--accent));
+        background: var(--card-hover);
+        box-shadow: 0 0 0 2px var(--furnace-color, var(--accent));
+        }
+
+        .card.dimmed {
+        opacity: .32;
+        }
+
+        .card.flash {
+        animation: flashUpdate 900ms ease;
+        }
+
+        @@keyframes flashUpdate {
+        0% {
+        box-shadow: 0 0 0 3px var(--flash);
+        }
+
+        100% {
+        box-shadow: var(--shadow);
+        }
+        }
+
+        .furnace-card .card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        }
+
+        .furnace-card h2 {
+        font-size: clamp(1.15rem, 1.4vw, 1.55rem);
+        margin: 0;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        }
+
+        .furnace-card h2 .fnum {
+        width: clamp(26px, 2vw, 32px);
+        height: clamp(26px, 2vw, 32px);
+        border-radius: 8px;
+        background: var(--furnace-color, var(--accent));
+        color: #06101f;
+        font-size: clamp(.82rem, .95vw, 1rem);
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        }
+
+        .furnace-card h2 .fname {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        }
+
+        .detail-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: clamp(26px, 2vw, 32px);
+        height: clamp(26px, 2vw, 32px);
+        border-radius: 8px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--text-faint);
+        text-decoration: none;
+        transition: background .15s, color .15s, border-color .15s;
+        }
+
+        .detail-link svg {
+        width: 60%;
+        height: 60%;
+        }
+
+        .detail-link:hover {
+        background: var(--furnace-color, var(--accent));
+        color: #06101f;
+        border-color: transparent;
+        }
+
+        .oee-block {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 3px;
+        flex-shrink: 0;
+        }
+
+        .furnace-card .oee-pill {
+        font-size: clamp(1.1rem, 1.4vw, 1.55rem);
+        font-weight: 800;
+        padding: 5px 16px;
+        border-radius: 999px;
+        color: var(--pill-text);
+        font-family: 'JetBrains Mono', monospace;
+        text-shadow: 0 1px 2px rgba(0,0,0,.2);
+        }
+
+        .oee-caption {
+        font-size: clamp(.62rem, .72vw, .78rem);
+        color: var(--text-faint);
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        font-weight: 700;
+        }
+
+        .furnace-card .numbers {
+        display: flex;
+        gap: clamp(12px, 1.6vw, 24px);
+        margin-top: clamp(10px, 1.2vh, 16px);
+        }
+
+        .furnace-card .numbers .n .v {
+        font-size: clamp(1.15rem, 1.5vw, 1.85rem);
+        font-weight: 800;
+        font-family: 'JetBrains Mono', monospace;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        }
+
+        .furnace-card .numbers .n .v .sep {
+        color: var(--text-faint);
+        margin: 0 4px;
+        font-weight: 500;
+        }
+
+        .furnace-card .numbers .n .v .seg-cb {
+        color: var(--seg-cb);
+        }
+
+        .furnace-card .numbers .n .v .seg-be {
+        color: var(--seg-be);
+        }
+
+        .furnace-card .numbers .n .l {
+        font-size: clamp(.6rem, .68vw, .74rem);
+        color: var(--text-faint);
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        font-weight: 700;
+        margin-top: 3px;
+        white-space: nowrap;
+        }
+
+        .furnace-card .chart-wrap {
+        flex: 1;
+        min-height: 0;
+        margin-top: clamp(8px, 1vh, 14px);
+        position: relative;
+        }
+
+        .furnace-card .worst-line {
+        margin-top: clamp(8px, 1vh, 12px);
+        font-size: clamp(.78rem, .9vw, .95rem);
+        color: var(--text-dim);
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        border-top: 1px solid var(--border-soft);
+        padding-top: 10px;
+        }
+
+        .furnace-card .worst-line b {
+        color: var(--bad);
+        font-family: 'JetBrains Mono', monospace;
+        }
+
+        .no-plan-box {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        background: var(--no-plan-bg);
+        border: 2px dashed var(--no-plan-border);
+        border-radius: 12px;
+        color: var(--no-plan-text);
+        font-size: clamp(1rem, 1.2vw, 1.3rem);
+        font-weight: 800;
+        letter-spacing: .3px;
+        padding: 10px;
+        margin-top: 8px;
+        line-height: 1.4;
+        }
+
+        .trend-card {
+        display: flex;
+        flex-direction: column;
+        }
+
+        .trend-card h2 {
+        font-size: clamp(1rem, 1.25vw, 1.35rem);
+        margin: 0 0 10px 0;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        }
+
+        .trend-card h2 .hint {
+        font-size: clamp(.62rem, .74vw, .8rem);
+        font-weight: 600;
+        color: var(--text-faint);
+        text-transform: none;
+        letter-spacing: 0;
+        }
+
+        .trend-card .chart-wrap {
+        flex: 1;
+        min-height: 0;
+        }
+
+        .drilldown-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(4,7,14,.6);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+        }
+
+        .drilldown-overlay.open {
+        display: flex;
+        }
+
+        .drilldown-panel {
+        width: min(1040px, 92vw);
+        max-height: 84vh;
+        overflow: auto;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 26px 28px;
+        box-shadow: var(--shadow);
+        }
+
+        .drilldown-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 16px;
+        }
+
+        .drilldown-panel h3 {
+        margin: 0 0 8px 0;
+        font-size: 1.35rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        }
+
+        .drilldown-chips {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        }
+
+        .chip {
+        background: var(--accent-soft);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 6px 13px;
+        border-radius: 999px;
+        font-size: .8rem;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+        }
+
+        table.lines-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: .92rem;
+        margin-top: 8px;
+        }
+
+        table.lines-table th, table.lines-table td {
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border-soft);
+        }
+
+        table.lines-table th {
+        color: var(--text-faint);
+        font-weight: 800;
+        font-size: .72rem;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        }
+
+        table.lines-table tbody tr:hover {
+        background: var(--card-hover);
+        }
+
+        table.lines-table td.num {
+        font-family: 'JetBrains Mono', monospace;
+        font-variant-numeric: tabular-nums;
+        }
+
+        .bar-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        }
+
+        .bar-track {
+        flex: 1;
+        height: 8px;
+        border-radius: 4px;
+        background: var(--grid-line);
+        overflow: hidden;
+        position: relative;
+        }
+
+        .bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        }
+
+        .target-marker {
+        position: absolute;
+        top: -2px;
+        bottom: -2px;
+        width: 0;
+        border-left: 3px solid var(--goal);
+        box-shadow: 0 0 6px var(--goal);
+        z-index: 2;
+        }
+
+        .close-btn {
+        flex-shrink: 0;
+        }
+
+        tr.no-prod-row td {
+        color: var(--no-plan-text);
+        }
+
+        .no-prod-tag {
+        background: var(--no-plan-bg);
+        border: 1px solid var(--no-plan-border);
+        color: var(--no-plan-text);
+        padding: 4px 11px;
+        border-radius: 6px;
+        font-size: .74rem;
+        font-weight: 700;
+        letter-spacing: .3px;
+        display: inline-block;
+        }
+
+        tr.unplanned-row td {
+        color: var(--bad);
+        }
+
+        .unplanned-tag {
+        background: rgba(255,107,120,0.14);
+        border: 1px solid var(--bad);
+        color: var(--bad);
+        padding: 4px 11px;
+        border-radius: 6px;
+        font-size: .74rem;
+        font-weight: 700;
+        letter-spacing: .3px;
+        display: inline-block;
+        }
+
+        .chip-unplanned {
+        background: rgba(255,107,120,0.14);
+        border-color: var(--bad);
+        color: var(--bad);
+        }
+
+        .sap-excluded {
+        color: var(--text-faint);
+        font-weight: 600;
+        }
+
+        .line-link {
+        color: inherit;
+        text-decoration: none;
+        border-bottom: 1px dashed var(--border);
+        }
+
+        .line-link:hover {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+        }
+
+        .page-ring-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        margin-top: 8px;
+        height: 18px;
+        }
+
+        .page-ring-svg {
+        width: 18px;
+        height: 18px;
+        transform: rotate(-90deg);
+        flex-shrink: 0;
+        }
+
+        .ring-bg {
+        fill: none;
+        stroke: var(--border);
+        stroke-width: 2.5;
+        }
+
+        .ring-fill {
+        fill: none;
+        stroke: var(--furnace-color, var(--accent));
+        stroke-width: 2.5;
+        stroke-linecap: round;
+        stroke-dasharray: 44;
+        stroke-dashoffset: 44;
+        }
+
+        .ring-fill.animating {
+        animation: ringFill 15s linear forwards;
+        }
+
+        @@keyframes ringFill {
+        to {
+        stroke-dashoffset: 0;
+        }
+        }
+
+        .page-ring-label {
+        font-size: .72rem;
+        color: var(--text-faint);
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 700;
+        }
+
+        .live-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--good);
+        box-shadow: 0 0 0 0 rgba(61,219,152,.6);
+        animation: pulse 1.8s infinite;
+        }
+
+        @@keyframes pulse {
+        0% {
+        box-shadow: 0 0 0 0 rgba(61,219,152,.55);
+        }
+
+        70% {
+        box-shadow: 0 0 0 9px rgba(61,219,152,0);
+        }
+
+        100% {
+        box-shadow: 0 0 0 0 rgba(61,219,152,0);
+        }
+        }
+
+        @@media (max-width: 900px) {
+        .furnace-card .numbers .n .v {
+        font-size: 1rem;
+        }
+
+        .furnace-card .numbers {
+        gap: 10px;
+        }
+        }
     </style>
 </head>
 <body>
-    <div class="app" id="app" style="--furnace-color: @FurnaceColor(Model.FurnaceId)">
+    <div class="app" id="app">
 
         <header>
             <div class="brand">
-                <a class="furnace-tag logo-tag" href="@FurnaceHref(Model.FurnaceId)" title="View full @Model.FurnaceName">
-                    <img src="~/images/@(GetClientLogo(Model.ProductDesc).LogoFile)" alt="@(GetClientLogo(Model.ProductDesc).AltText)" />
-                </a>
+                <img src="~/images/m2s.png" style="width: 60px;" />
                 <div class="brand-text">
-                    <h1 id="lineTitle">@Model.ProductDesc</h1>
-                    <div class="furnace-name">@Model.FurnaceName</div>
+                    <h1><img src="~/images/MahleOriginal.png" style="width: 80px; margin:20px,0,0,0" /> · Plant 1</h1>
+                    <div class="subtitle">
+                        <span id="dateLabel"></span>
+                        <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
+                    </div>
                 </div>
             </div>
 
-            <div class="hdr-right">
-                <div class="hdr-info">
-                    <div class="hdr-date" id="dateLabel"></div>
-                    <div class="hdr-line">
-                        <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
-                        @if (IsHistorical)
-                        {
-                            <span class="historical-badge">📅 Historical</span>
-                        }
-                        else
-                        {
-                            <span class="hdr-time"><span class="live-dot"></span><span id="lastUpdate">--:--</span></span>
-                        }
+            <div class="plant-kpi">
+                <div class="kpi-cluster">
+                    <div class="kpi-cluster-row">
+                        <div class="kpi-block">
+                            <div class="value" id="plantOee">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].Oee.ToString("P0") : "0%")</div>
+                            <div class="label">OEE</div>
+                        </div>
+                        <div class="kpi-divider"></div>
+                        <div class="kpi-block">
+                            <div class="value" id="plantProd">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].TotalProduction.ToString("N0") : "0")</div>
+                            <div class="label">Production</div>
+                        </div>
+                        <div class="kpi-divider"></div>
+                        <div class="kpi-block">
+                            <div class="value" id="plantPlanned">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].TotalPlanned.ToString("N0") : "0")</div>
+                            <div class="label">Shift Plan</div>
+                        </div>
+                    </div>
+                    <div class="kpi-group-badge" id="kpiGroupBadge">
+                        <button class="carousel-arrow kpi-arrow" id="kpiArrowPrev" title="Previous group">◀</button>
+                        <div class="fill" id="kpiGroupFill"></div>
+                        <span class="label-text" id="kpiGroupName">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].Label : "")</span>
+                        <button class="carousel-arrow kpi-arrow" id="kpiArrowNext" title="Next group">▶</button>
                     </div>
                 </div>
+                <div class="kpi-divider"></div>
+                <div class="kpi-block">
+                    <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
+                        <span class="live-dot"></span>
+                        <span class="value" style="font-size:.88rem" id="lastUpdate">--:--</span>
+                    </div>
+                    <div class="label">Last Update</div>
+                </div>
+            </div>
 
-                <div class="header-actions controls-collapsible">
-                    @if (IsHistorical)
-                    {
-                        <form class="historical-picker" id="historicalPicker" method="get" action="@Context.Request.Path">
-                            <input type="date" id="pickerDate" name="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" value="@HistoricalDateStr" />
-                            <select id="pickerShift" name="shiftId">
-                                <option value="1">Shift 1</option>
-                                <option value="2">Shift 2</option>
-                                <option value="3">Shift 3</option>
-                            </select>
-                            <button type="submit" class="btn">Go</button>
-                        </form>
-                    }
-                    <a class="btn" href="@FurnaceHref(Model.FurnaceId)@(IsHistorical ? $"?date={HistoricalDateStr}&shiftId={HistoricalShiftId}" : "")" title="Back to furnace">📊 @Model.FurnaceName</a>
+            <div class="header-actions-wrap controls-collapsible">
+                <div class="header-actions">
+                    <a class="btn" href="/Dashboard/Historical" title="View history">📅</a>
                     <button class="btn" id="toggleTheme">🌗</button>
                     <button class="btn" id="togglePresentation">🖥️</button>
+                </div>
+                <div class="mode-switch">
+                    <span class="mode-label" id="modeLabelAuto">Auto</span>
+                    <label class="mode-toggle">
+                        <input type="checkbox" id="modeCheckbox" />
+                        <span class="mode-slider"></span>
+                    </label>
+                    <span class="mode-label" id="modeLabelManual">Manual</span>
                 </div>
             </div>
         </header>
 
-        <div class="body-grid" id="bodyGrid"></div>
+        <div class="screens-viewport">
+            <div class="screens-track" id="screensTrack">
+                <div class="screen screen-main">
+                    <div class="grid-main" id="grid"></div>
+                </div>
+                <div class="screen screen-trends">
+                    <div class="trends-grid" id="trendsGrid">
+                        <div class="card trend-card">
+                            <h2>Core Builders</h2>
+                            <div class="chart-wrap"><canvas id="chart-cb"></canvas></div>
+                        </div>
+                        <div class="card trend-card">
+                            <h2>Back End</h2>
+                            <div class="chart-wrap"><canvas id="chart-be"></canvas></div>
+                        </div>
+                        <div class="card trend-card">
+                            <h2>Clam Shells</h2>
+                            <div class="chart-wrap"><canvas id="chart-cs"></canvas></div>
+                        </div>
+                        <div class="card trend-card">
+                            <h2>Tube Mills</h2>
+                            <div class="chart-wrap"><canvas id="chart-tm"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="edge-arrow right-arrow" id="rightArrow" title="View trends by category">
+        <span class="arrow-icon">›</span>
+    </div>
+    <div class="edge-arrow left-arrow" id="leftArrow" title="Back to dashboard" style="display:none;">
+        <span class="arrow-icon">‹</span>
+    </div>
+
+    <div class="drilldown-overlay" id="drilldownOverlay">
+        <div class="drilldown-panel">
+            <div class="drilldown-head">
+                <div>
+                    <h3 id="drilldownTitle">Furnace</h3>
+                    <div class="drilldown-chips" id="drilldownChips"></div>
+                </div>
+                <button class="btn close-btn" id="closeDrilldown">Close ✕</button>
+            </div>
+            <table class="lines-table">
+                <thead>
+                    <tr><th>Line</th><th>Shift OEE</th><th>Production</th><th>Expected by Now</th><th>Shift Plan</th><th>SAP</th></tr>
+                </thead>
+                <tbody id="drilldownBody"></tbody>
+            </table>
+        </div>
     </div>
 
     <script>
         let snapshot = @Html.Raw(Json.Serialize(Model));
-        const LINE_ID = @Model.ProductListId;
-        const IS_HISTORICAL = @(IsHistorical ? "true" : "false");
-        const TARGET = 0.85;   // OEE goal: the trend GOAL line = expected cumulative x 85%
+        let selectedFurnaceId = null;
         const charts = {};
+        const furnacePage = {};
+        const PAGE_SIZE = 5;
+        const PAGE_ROTATE_MS = 15000;
+        const KPI_ROTATE_MS = 15000;
+        let kpiGroupIndex = 0;
+        const FURNACE_COLORS = ['#4da3ff', '#35d68f', '#f2b84b', '#c084fc', '#ff8a5c', '#64748b'];
+        const isSmallScreen = window.innerWidth < 900;
 
-        function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
-        function oeeColor(oee) { return oee >= 0.85 ? getCss('--good') : oee >= 0.70 ? getCss('--warn') : getCss('--bad'); }
+        function oeeColor(oee) {
+        if (oee >= 0.85) return getCss('--good');
+        if (oee >= 0.70) return getCss('--warn');
+        return getCss('--bad');
+        }
+        function furnaceColor(id) { return id === 7 ? '#c084fc' : FURNACE_COLORS[(id - 1) % FURNACE_COLORS.length]; }
+        function fnumLabel(id) { return id === 6 ? 'TM' : (id === 7 ? 'CS' : id); }
+        function detailHref(id) { return id === 6 ? '/TubeMills' : (id === 7 ? '/Furnace1' : '/Furnace' + id); }
+        function getCss(varName) { return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); }
         function hexToRgba(hex, alpha) {
-            const h = hex.replace('#', '');
-            const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
-            return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+        const h = hex.replace('#', '');
+        const bigint = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+        const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255;
+        return `rgba(${r},${g},${b},${alpha})`;
         }
         function pct(v) { return (v * 100).toFixed(0) + '%'; }
-        function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
+
+        function countedLines(f) { return f.lines.filter(l => l.countsForStats); }
+
+        function furnaceCarouselPages(f) {
+        const lines = countedLines(f);
+        const clamShell = lines.filter(l => l.groupId === 6).sort((a, b) => a.productOrder - b.productOrder);
+        const regular = lines.filter(l => l.groupId !== 6).sort((a, b) => a.productOrder - b.productOrder);
+        const pages = [];
+        const pushPages = (arr, type) => {
+        const total = Math.max(1, Math.ceil(arr.length / PAGE_SIZE));
+        for (let i = 0; i < total && arr.length > 0; i++) {
+        pages.push({ type, lines: arr.slice(i * PAGE_SIZE, i * PAGE_SIZE + PAGE_SIZE) });
+        }
+        };
+        pushPages(regular, 'regular');
+        pushPages(clamShell, 'clamshell');
+        if (pages.length === 0) pages.push({ type: 'regular', lines: [] });
+        return pages;
+        }
+
+        function furnaceLinesPage(f) {
+        const pages = furnaceCarouselPages(f);
+        const idx = (furnacePage[f.furnaceId] || 0) % pages.length;
+        return { page: pages[idx].lines, pageType: pages[idx].type, totalPages: pages.length, idx };
+        }
+
+        function cardNumbersHtml(f, pageType) {
+        if (f.furnaceId === 6) {
+        return `
+        <div class="n"><div class="v">${f.totalProduction.toLocaleString()}</div><div class="l">Production</div></div>
+        <div class="n"><div class="v">${f.totalPlanned.toLocaleString()}</div><div class="l">Shift Plan</div></div>
+        <div class="n"><div class="v">—</div><div class="l">SAP % (N/A)</div></div>
+        `;
+        }
+        if (pageType === 'clamshell') {
+        return `
+        <div class="n"><div class="v">${f.clamShellProduction.toLocaleString()}</div><div class="l">Clam Shells Production</div></div>
+        <div class="n"><div class="v">${f.clamShellPlanned.toLocaleString()}</div><div class="l">Clam Shells Plan</div></div>
+        <div class="n"><div class="v">—</div><div class="l">SAP % (N/A)</div></div>
+        `;
+        }
+        return `
+        <div class="n"><div class="v"><span class="seg-cb">${f.coreBuilderProduction.toLocaleString()}</span><span class="sep">|</span><span class="seg-be">${f.backEndProduction.toLocaleString()}</span></div><div class="l">Production (CB | BE)</div></div>
+        <div class="n"><div class="v"><span class="seg-cb">${f.coreBuilderPlanned.toLocaleString()}</span><span class="sep">|</span><span class="seg-be">${f.backEndPlanned.toLocaleString()}</span></div><div class="l">Shift Plan (CB | BE)</div></div>
+        <div class="n"><div class="v">${pct(f.backEndSapPercent)}</div><div class="l">SAP % (BE)</div></div>
+        `;
+        }
+
+        function restartRing(ring) {
+        ring.classList.remove('animating');
+        void ring.getBoundingClientRect();
+        ring.classList.add('animating');
+        }
+
+        function ensureRing(containerId, ringIdPrefix, furnaceId) {
+        const container = document.getElementById(containerId);
+        let ring = document.getElementById(ringIdPrefix + '-fill');
+        if (!ring) {
+        container.innerHTML = `
+        <button class="carousel-arrow" title="Previous page" onclick="event.stopPropagation(); stepFurnacePage(${furnaceId}, -1)">◀</button>
+        <svg class="page-ring-svg" viewBox="0 0 16 16">
+        <circle class="ring-bg" cx="8" cy="8" r="7"></circle>
+        <circle class="ring-fill" id="${ringIdPrefix}-fill" cx="8" cy="8" r="7"></circle>
+        </svg>
+        <span class="page-ring-label" id="${ringIdPrefix}-label"></span>
+        <button class="carousel-arrow" title="Next page" onclick="event.stopPropagation(); stepFurnacePage(${furnaceId}, 1)">▶</button>
+        `;
+        ring = document.getElementById(ringIdPrefix + '-fill');
+        }
+        return ring;
+        }
+
+        function renderPageRing(f) {
+        const container = document.getElementById('pagering-' + f.furnaceId);
+        if (!container) return;
+        const { totalPages, idx } = furnaceLinesPage(f);
+        if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+        const ring = ensureRing('pagering-' + f.furnaceId, 'ring-' + f.furnaceId, f.furnaceId);
+        document.getElementById('ring-' + f.furnaceId + '-label').textContent = `${idx + 1}/${totalPages}`;
+        restartRing(ring);
+        }
 
         function formatEnglishDate(date) {
-            const d = new Date(date);
-            const day = d.getDate();
-            const suffix = day % 10 === 1 && day !== 11 ? 'st' : day % 10 === 2 && day !== 12 ? 'nd' : day % 10 === 3 && day !== 13 ? 'rd' : 'th';
-            return `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${d.toLocaleDateString('en-US', { month: 'long' })} ${day}${suffix}`;
+        const d = new Date(date);
+        const day = d.getDate();
+        const suffix = day % 10 === 1 && day !== 11 ? 'st' : day % 10 === 2 && day !== 12 ? 'nd' : day % 10 === 3 && day !== 13 ? 'rd' : 'th';
+        return `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${d.toLocaleDateString('en-US', { month: 'long' })} ${day}${suffix}`;
         }
-        document.getElementById('dateLabel').textContent = formatEnglishDate(IS_HISTORICAL ? snapshot.generatedAt : new Date());
+        document.getElementById('dateLabel').textContent = formatEnglishDate(new Date());
 
-        function render() {
-            document.getElementById('lineTitle').textContent = snapshot.productDesc;
-            document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
-            if (!IS_HISTORICAL) {
-                document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            }
+        function render(isLiveUpdate) {
+        renderKpiGroup(isLiveUpdate);
 
-            const grid = document.getElementById('bodyGrid');
+        document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
+        document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-            if (!snapshot.hasPlan) {
-                if (snapshot.total > 0) {
-                    grid.innerHTML = `
-                    <div class="no-plan-hero unplanned-hero">
-                        <div class="big">⚠ NON PLANNED PRODUCTION</div>
-                        <div class="small">Heijunka shows this line had no plan this shift, but it produced ${snapshot.total.toLocaleString('en-US')} piece(s) — it does not count toward OEE.</div>
-                    </div>`;
-                    return;
-                }
-                grid.innerHTML = `
-                <div class="no-plan-hero">
-                    <div class="big">NO PRODUCTION THIS SHIFT</div>
-                    <div class="small">This line has no plan assigned for the current shift</div>
-                </div>`;
-                return;
-            }
+        const grid = document.getElementById('grid');
+        const isFirstRender = grid.children.length === 0;
 
-            const wasEmpty = !document.getElementById('oeeBadge');
-            if (wasEmpty) {
-                grid.innerHTML = `
-                <div class="metrics-row">
-                    <div class="card metric-card"><div class="mv" id="prodVal">-</div><div class="ml">Production</div></div>
-                    <div class="card metric-card"><div class="mv" id="expVal" style="color:var(--goal)">-</div><div class="ml">Expected by Now</div></div>
-                    <div class="card metric-card"><div class="mv" id="remVal">-</div><div class="ml">Remaining to Plan</div></div>
-                    <div class="card metric-card"><div class="mv" id="sapVal">-</div><div class="ml">SAP</div></div>
-                </div>
-
-                <div class="card hero-panel">
-                    <div class="hero-top">
-                        <div class="hero-title">Shift Progress</div>
-                        <div class="hero-badges">
-                            <div class="pace-badge" id="paceBadge"></div>
-                            <div class="metric-badge"><div class="badge-label">Shift<br>OEE</div><div class="badge-pill solid" id="oeeBadge">-</div></div>
-                            <div class="metric-badge"><div class="badge-label">Progress<br>vs Plan</div><div class="badge-pill outline" id="progressBadge">-</div></div>
-                        </div>
-                    </div>
-                    <div class="race-wrap">
-                        <div class="race-marker-chip" id="raceMarkerChip"></div>
-                        <div class="race-marker-line" id="raceMarkerLine"></div>
-                        <div class="race-track" id="raceTrack">
-                            <div class="race-fill" id="raceFill">
-                                <div class="race-shine"></div>
-                                <div class="race-fill-label" id="raceFillLabel"></div>
-                            </div>
-                            <div class="race-endcap"><span id="racePlanVal"></span> plan</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="lower-row">
-                    <div class="card trend-card">
-                        <div class="trend-head">
-                            <div>
-                                <h2>Hourly Trend</h2>
-                                <div class="subtitle-note">Pieces produced per hour &amp; shift accumulated</div>
-                            </div>
-                            <div class="trend-kpis">
-                                <div class="trend-kpi"><div class="v" id="kAcc" style="color:var(--good)">–</div><div class="l">Accumulated</div></div>
-                                <div class="trend-kpi"><div class="v" id="kGoal" style="color:var(--goal)">–</div><div class="l">Goal 85%</div></div>
-                                <div class="trend-kpi"><div class="v" id="kDiff">–</div><div class="l">Difference</div></div>
-                            </div>
-                        </div>
-                        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-                    </div>
-                    <div class="card trend-card">
-                        <div class="trend-head">
-                            <div>
-                                <h2>Cycle Time: Real vs. Theoretical</h2>
-                                <div class="subtitle-note">Approx. per hour (sec / piece)</div>
-                            </div>
-                            <div class="trend-kpis">
-                                <div class="trend-kpi"><div class="v" id="kAvg" style="color:var(--avg)">–</div><div class="l">Shift Avg</div></div>
-                                <div class="trend-kpi"><div class="v" id="kTheo" style="color:var(--goal)">–</div><div class="l">Theoretical</div></div>
-                            </div>
-                        </div>
-                        <div class="chart-wrap"><canvas id="cycleTimeChart"></canvas></div>
-                    </div>
-                </div>`;
-            }
-
-            const color = oeeColor(snapshot.oeeShift);
-            const oeeBadge = document.getElementById('oeeBadge');
-            oeeBadge.textContent = pct(snapshot.oeeShift);
-            oeeBadge.style.background = color;
-
-            const plan = snapshot.plannedShift;
-            const actualPct = plan > 0 ? Math.min(100, (snapshot.total / plan) * 100) : 0;
-            const expectedPct = plan > 0 ? Math.min(100, (snapshot.accumulatedRate / plan) * 100) : 0;
-            document.getElementById('progressBadge').textContent = Math.round(actualPct) + '%';
-
-            const fill = document.getElementById('raceFill');
-            fill.style.width = actualPct + '%';
-            fill.style.background = `linear-gradient(90deg, ${hexToRgba(color, .8)}, ${color})`;
-            fill.classList.toggle('full', actualPct >= 99.5);
-            document.getElementById('raceFillLabel').textContent = fmt(snapshot.total);
-
-            // GOAL marker (solid blue). The chip is clamped so it never spills out of the card.
-            document.getElementById('raceMarkerLine').style.left = expectedPct + '%';
-            const chip = document.getElementById('raceMarkerChip');
-            chip.style.left = `clamp(9%, ${expectedPct}%, 91%)`;
-            chip.textContent = `Should be at ${fmt(snapshot.accumulatedRate)}`;
-            document.getElementById('racePlanVal').textContent = fmt(plan);
-
-            document.getElementById('prodVal').textContent = fmt(snapshot.total);
-            document.getElementById('expVal').textContent = fmt(snapshot.accumulatedRate);
-            document.getElementById('remVal').textContent = fmt(Math.max(0, plan - snapshot.total));
-            document.getElementById('sapVal').textContent = snapshot.excludedFromSap ? '—' : fmt(snapshot.totalSap);
-
-            const paceBadge = document.getElementById('paceBadge');
-            const diff = snapshot.total - snapshot.accumulatedRate;
-            if (plan > 0 && snapshot.total >= plan) {
-                paceBadge.className = 'pace-badge ahead';
-                paceBadge.innerHTML = `🏆 Plan complete! ${fmt(snapshot.total)} pcs`;
-            } else if (diff >= 0) {
-                paceBadge.className = 'pace-badge ahead';
-                paceBadge.innerHTML = `🔥 Ahead of pace +${fmt(diff)} pcs`;
-            } else {
-                paceBadge.className = 'pace-badge behind';
-                paceBadge.innerHTML = `⚠️ Behind pace ${fmt(Math.abs(diff))} pcs`;
-            }
-
-            renderTrend();
-            renderCycleTimeChart();
+        if (isFirstRender) {
+        grid.innerHTML = '';
+        // Ahora se agregan las 6 cards directas (Furnace 1-5 + Tube Mills) — Tube Mills ya
+        // no alterna con nada, es una card fija más del grid.
+        // Orden fijo del grid: arriba Furnace 1, 2, 3 — abajo Furnace 5, Clam Shells (su
+        // propia card, id 7), Tube Mills. Furnace 4 se queda oculto a propósito.
+        const CARD_ORDER = [1, 2, 3, 5, 7, 6];
+        CARD_ORDER
+        .map(id => snapshot.furnaces.find(f => f.furnaceId === id))
+        .filter(Boolean)
+        .forEach(f => grid.appendChild(buildFurnaceCard(f)));
+        } else {
+        snapshot.furnaces.forEach(f => updateFurnaceCard(f, isLiveUpdate));
+        }
+        if (currentScreen === 'trends') renderTrendsScreen();
+        applySelection();
         }
 
-        // ---------------- shared chart helpers ----------------
-        const tickStyle = () => ({ color: getCss('--text-dim'), font: { size: 17, weight: '700' } });
-        const axisTitle = (text, color) => ({ display: true, text, color: color || getCss('--text'), font: { size: 18, weight: '800' }, padding: 8 });
-        const legendStyle = () => ({ position: 'bottom', labels: { color: getCss('--text'), font: { size: 17, weight: '700' }, boxWidth: 26, boxHeight: 6, padding: 14 } });
+        function renderKpiGroup(isLiveUpdate) {
+        const groups = snapshot.topKpiGroups || [];
+        if (groups.length === 0) return;
+        if (kpiGroupIndex >= groups.length) kpiGroupIndex = 0;
+        const group = groups[kpiGroupIndex];
 
-        // Values above the first dataset's bars.
-        function barValuesPlugin(decimals, suffix) {
-            return {
-                id: 'barValues',
-                afterDatasetsDraw(chart) {
-                    const ds = chart.data.datasets[0], meta = chart.getDatasetMeta(0), ctx = chart.ctx;
-                    ctx.save();
-                    ctx.font = '800 17px "JetBrains Mono", monospace';
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-                    ctx.fillStyle = getCss('--text');
-                    meta.data.forEach((bar, i) => {
-                        const v = ds.data[i];
-                        if (v != null && v > 0) ctx.fillText(Number(v).toFixed(decimals) + suffix, bar.x, bar.y - 4);
-                    });
-                    ctx.restore();
-                }
-            };
+        document.getElementById('kpiGroupName').textContent = group.label;
+
+        const oeeEl = document.getElementById('plantOee');
+        oeeEl.textContent = pct(group.oee);
+        oeeEl.style.color = oeeColor(group.oee);
+        document.getElementById('plantProd').textContent = group.totalProduction.toLocaleString();
+        document.getElementById('plantPlanned').textContent = group.totalPlanned.toLocaleString();
+
+        if (!isLiveUpdate) {
+        const fill = document.getElementById('kpiGroupFill');
+        fill.classList.remove('animating');
+        void fill.getBoundingClientRect();
+        if (carouselMode === 'auto') fill.classList.add('animating');
+        }
         }
 
-        // Soft glow on every dataset flagged isGoal (blue solid GOAL lines).
+        function advanceKpiGroup() {
+        const groups = snapshot.topKpiGroups || [];
+        if (groups.length === 0) return;
+        kpiGroupIndex = (kpiGroupIndex + 1) % groups.length;
+        renderKpiGroup(false);
+        }
+
+        function stepKpiGroup(delta) {
+        const groups = snapshot.topKpiGroups || [];
+        if (groups.length === 0) return;
+        kpiGroupIndex = (kpiGroupIndex + delta + groups.length) % groups.length;
+        renderKpiGroup(false);
+        }
+
+        document.getElementById('kpiArrowPrev').onclick = () => stepKpiGroup(-1);
+        document.getElementById('kpiArrowNext').onclick = () => stepKpiGroup(1);
+
+        function buildFurnaceCard(f) {
+        const div = document.createElement('div');
+        div.className = 'card furnace-card';
+        div.id = 'furnace-' + f.furnaceId;
+        div.style.setProperty('--furnace-color', furnaceColor(f.furnaceId));
+        div.onclick = () => selectFurnace(f.furnaceId);
+
+        const hasProduction = countedLines(f).length > 0;
+        const { pageType } = furnaceLinesPage(f);
+        div.dataset.lastProd = f.totalProduction;
+
+        div.innerHTML = `
+        <div class="card-top">
+        <h2>
+        <span class="fnum">${fnumLabel(f.furnaceId)}</span><span class="fname">${f.furnaceName}</span>
+        <a class="detail-link" href="${detailHref(f.furnaceId)}" onclick="event.stopPropagation()" title="View ${f.furnaceName} detail">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+        </a>
+        </h2>
+        <div class="oee-block">
+        <span class="oee-pill ${hasProduction ? '' : 'neutral'}" id="pill-${f.furnaceId}"
+        style="background:${hasProduction ? oeeColor(f.oee) : 'var(--neutral)'}">${hasProduction ? pct(f.oee) : '—'}</span>
+        <span class="oee-caption">Shift OEE</span>
+        </div>
+        </div>
+        <div class="numbers" id="numbers-${f.furnaceId}">${cardNumbersHtml(f, pageType)}</div>
+        <div class="chart-wrap" id="chartwrap-${f.furnaceId}">
+        ${hasProduction ? `<canvas id="chart-${f.furnaceId}"></canvas>` : `<div class="no-plan-box">NO PRODUCTION<br>THIS SHIFT</div>`}
+        </div>
+        <div class="page-ring-wrap" id="pagering-${f.furnaceId}"></div>
+        <div class="worst-line" id="worst-${f.furnaceId}"></div>
+        `;
+        if (hasProduction) {
+        setTimeout(() => {
+        charts['f' + f.furnaceId] = new Chart(document.getElementById('chart-' + f.furnaceId), lineBarConfig(f));
+        renderWorstLine(f);
+        renderPageRing(f);
+        }, 0);
+        }
+        return div;
+        }
+
+        const barLabelsPlugin = {
+        id: 'lineBarLabels',
+        afterDatasetsDraw(chart) {
+        const dataset = chart.data.datasets[0];
+        const lines = dataset && dataset.linesRef;
+        if (!lines) return;
+        const meta = chart.getDatasetMeta(0);
+        const ctx = chart.ctx;
+        ctx.save();
+        meta.data.forEach((bar, i) => {
+        const line = lines[i];
+        if (!line || !bar) return;
+        const barLeft = Math.min(bar.x, bar.base);
+        const barRight = Math.max(bar.x, bar.base);
+        const y = bar.y;
+
+        if (line.total > 0) {
+        const oeeLabel = Math.round(line.oeeShift * 100) + '%';
+        ctx.font = '800 15px Inter, sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'left';
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+        ctx.strokeText(oeeLabel, barLeft + 8, y);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(oeeLabel, barLeft + 8, y);
+        }
+
+        ctx.font = '700 13px "JetBrains Mono", monospace';
+        ctx.fillStyle = getCss('--text-dim');
+        ctx.fillText(`${line.total}/${line.accumulatedRate}`, barRight + 8, y);
+        });
+        ctx.restore();
+        }
+        };
+
+        const OEE_TARGET = 85;
+
+        const targetLinePlugin = {
+        id: 'targetLine',
+        afterDatasetsDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        if (!chartArea || !scales.x) return;
+        const xPix = scales.x.getPixelForValue(OEE_TARGET);
+        if (xPix < chartArea.left || xPix > chartArea.right) return;
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = getCss('--goal');
+        ctx.shadowColor = getCss('--goal');
+        ctx.shadowBlur = 8;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(xPix, chartArea.top);
+        ctx.lineTo(xPix, chartArea.bottom);
+        ctx.stroke();
+        ctx.restore();
+        }
+        };
+
+        function lineBarConfig(f) {
+        const top = furnaceLinesPage(f).page;
+        return {
+        type: 'bar',
+        data: {
+        labels: top.map(l => l.productDesc.replace('PTC ', '')),
+        datasets: [{
+        data: top.map(l => l.oeeShift * 100),
+        backgroundColor: top.map(l => oeeColor(l.oeeShift)),
+        borderRadius: 7,
+        maxBarThickness: 26,
+        linesRef: top
+        }]
+        },
+        plugins: [barLabelsPlugin, targetLinePlugin],
+        options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 500 },
+        layout: { padding: { right: isSmallScreen ? 52 : 78 } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toFixed(0) + '% shift OEE (goal 85%)' } } },
+        scales: {
+        x: { min: 0, suggestedMax: 100, ticks: { display: false }, grid: { color: getCss('--grid-line') } },
+        y: {
+        ticks: { autoSkip: false, color: getCss('--text-dim'), font: { size: isSmallScreen ? 11 : 15, weight: '600' } },
+        grid: { display: false }
+        }
+        }
+        }
+        };
+        }
+
+        function renderWorstLine(f) {
+        const el = document.getElementById('worst-' + f.furnaceId);
+        if (!el) return;
+        if (f.worstLine) {
+        el.innerHTML = `<span>⚠ Lowest line: ${f.worstLine.productDesc}</span><b>${pct(f.worstLine.oeeShift)}</b>`;
+        } else {
+        el.innerHTML = '';
+        }
+        }
+
+        function updateFurnaceCard(f, isLiveUpdate) {
+        const card = document.getElementById('furnace-' + f.furnaceId);
+        const pill = document.getElementById('pill-' + f.furnaceId);
+        if (!card || !pill) return;
+
+        const hasProduction = countedLines(f).length > 0;
+        const prodChanged = card.dataset.lastProd !== String(f.totalProduction);
+        card.dataset.lastProd = f.totalProduction;
+
+        pill.textContent = hasProduction ? pct(f.oee) : '—';
+        pill.style.background = hasProduction ? oeeColor(f.oee) : 'var(--neutral)';
+        pill.classList.toggle('neutral', !hasProduction);
+
+        const { pageType } = furnaceLinesPage(f);
+        const numbersEl = document.getElementById('numbers-' + f.furnaceId);
+        if (numbersEl) numbersEl.innerHTML = cardNumbersHtml(f, pageType);
+        renderWorstLine(f);
+
+        const wrap = document.getElementById('chartwrap-' + f.furnaceId);
+        const hasCanvas = !!document.getElementById('chart-' + f.furnaceId);
+
+        if (hasProduction && !hasCanvas) {
+        wrap.innerHTML = `<canvas id="chart-${f.furnaceId}"></canvas>`;
+        charts['f' + f.furnaceId] = new Chart(document.getElementById('chart-' + f.furnaceId), lineBarConfig(f));
+        renderPageRing(f);
+        } else if (!hasProduction && hasCanvas) {
+        charts['f' + f.furnaceId]?.destroy();
+        delete charts['f' + f.furnaceId];
+        wrap.innerHTML = `<div class="no-plan-box">NO PRODUCTION<br>THIS SHIFT</div>`;
+        document.getElementById('pagering-' + f.furnaceId).innerHTML = '';
+        } else if (hasProduction && hasCanvas) {
+        const chart = charts['f' + f.furnaceId];
+        const cfg = lineBarConfig(f);
+        chart.data = cfg.data;
+        chart.update('none');
+        const label = document.getElementById('ring-' + f.furnaceId + '-label');
+        if (label) {
+        const { totalPages, idx } = furnaceLinesPage(f);
+        label.textContent = totalPages > 1 ? `${idx + 1}/${totalPages}` : '';
+        }
+        }
+
+        if (isLiveUpdate && prodChanged) {
+        card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+        }
+        if (selectedFurnaceId === f.furnaceId) renderDrilldown(f);
+        }
+
+        function refreshFurnaceCardDisplay(f) {
+        const chart = charts['f' + f.furnaceId];
+        if (chart) {
+        chart.data = lineBarConfig(f).data;
+        chart.update('none');
+        }
+        const { pageType } = furnaceLinesPage(f);
+        const numbersEl = document.getElementById('numbers-' + f.furnaceId);
+        if (numbersEl) numbersEl.innerHTML = cardNumbersHtml(f, pageType);
+        renderPageRing(f);
+        }
+
+        function stepFurnacePage(furnaceId, delta) {
+        const f = snapshot.furnaces.find(x => x.furnaceId === furnaceId);
+        if (!f) return;
+        const { totalPages } = furnaceLinesPage(f);
+        if (totalPages <= 1) return;
+        furnacePage[furnaceId] = ((furnacePage[furnaceId] || 0) + delta + totalPages) % totalPages;
+        refreshFurnaceCardDisplay(f);
+        }
+
+        // ---------------------------------------------------------------
+        // PANTALLA DE TENDENCIAS (flecha derecha del dashboard general): 4 gráficas, una
+        // por categoría (Core Builders / Back End / Clam Shells / Tube Mills), cada una con
+        // Producción/hora + Acumulado + Acumulado esperado — Back End además trae SAP
+        // escaneado (aproximado). Se navega 100% manual, nunca se mueve sola.
+        // ---------------------------------------------------------------
+        let currentScreen = 'main'; // 'main' | 'trends'
+
+        function goToScreen(screen) {
+        currentScreen = screen;
+        document.getElementById('screensTrack').style.transform = screen === 'trends' ? 'translateX(-50%)' : 'translateX(0)';
+        document.getElementById('rightArrow').style.display = screen === 'main' ? 'flex' : 'none';
+        document.getElementById('leftArrow').style.display = screen === 'trends' ? 'flex' : 'none';
+        if (screen === 'trends') renderTrendsScreen();
+        }
+
+        document.getElementById('rightArrow').onclick = () => goToScreen('trends');
+        document.getElementById('leftArrow').onclick = () => goToScreen('main');
+
+        function categoryCumulative(trend, key) {
+        let running = 0;
+        return trend.map(h => (running += (h[key] || 0)));
+        }
+
         const goalGlowPlugin = {
-            id: 'goalGlow',
-            beforeDatasetDraw(chart, args) {
-                if (!chart.data.datasets[args.index].isGoal) return;
-                chart.ctx.save();
-                chart.ctx.shadowColor = getCss('--goal');
-                chart.ctx.shadowBlur = 12;
-            },
-            afterDatasetDraw(chart, args) {
-                if (!chart.data.datasets[args.index].isGoal) return;
-                chart.ctx.restore();
-            }
+        id: 'goalGlow',
+        beforeDatasetDraw(chart, args) {
+        if (!chart.data.datasets[args.index].isGoal) return;
+        chart.ctx.save(); chart.ctx.shadowColor = getCss('--goal'); chart.ctx.shadowBlur = 10;
+        },
+        afterDatasetDraw(chart, args) {
+        if (!chart.data.datasets[args.index].isGoal) return;
+        chart.ctx.restore();
+        }
         };
 
-        // ---------------- HOURLY TREND ----------------
-        // GOAL line = 85% of the expected accumulated that the SP reports (snapshot.accumulatedRate).
-        // The expected pieces per hour come from the same available-seconds curve used for cycle time
-        // (breaks excluded, already scaled by the service so its sum = accumulatedRate x theoretical CT),
-        // so the LAST point of the goal line is exactly 0.85 x accumulatedRate (e.g. 0.85 x 273 = 232).
-        function expectedCumulativeSeries(pts) {
-            const ct = snapshot.cycleTimeSecs;
-            const byHour = {};
-            (snapshot.cycleTimeTrend || []).forEach(p => byHour[p.hour] = p.availableSeconds || 0);
-            const secs = pts.map(h => byHour[h.hour] || 0);
-            const totalSecs = secs.reduce((a, b) => a + b, 0);
-            if (ct > 0 && totalSecs > 0) {
-                let run = 0;
-                // normalize so the curve ends exactly at accumulatedRate even with rounding
-                const k = (snapshot.accumulatedRate || 0) / (totalSecs / ct);
-                return secs.map(sx => (run += (sx / ct) * k));
-            }
-            // Fallback (no cycle-time data): rescale the server curve so its latest point equals accumulatedRate.
-            const last = pts.length ? (pts[pts.length - 1].expectedCumulative || 0) : 0;
-            const k = last > 0 ? (snapshot.accumulatedRate || 0) / last : 1;
-            return pts.map(h => (h.expectedCumulative || 0) * k);
+        function buildCategoryTrendConfig(trend, withSapLine) {
+        const datasets = [
+        {
+        type: 'bar', label: 'Pieces / hour (bars, left axis)',
+        data: trend.map(h => h.production),
+        backgroundColor: getCss('--bar'),
+        borderRadius: 6, maxBarThickness: 40, yAxisID: 'y', order: 3
+        },
+        {
+        type: 'line', label: 'Real accumulated (right axis)',
+        data: categoryCumulative(trend, 'production'),
+        borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .12),
+        fill: true, tension: .35, pointRadius: 3, pointBackgroundColor: getCss('--good'),
+        yAxisID: 'y1', order: 2
+        },
+        {
+        type: 'line', label: 'GOAL: expected by this hour (right axis)',
+        data: trend.map(h => h.expectedCumulative),
+        isGoal: true,
+        borderColor: getCss('--goal'), backgroundColor: 'transparent',
+        borderWidth: 4, tension: .35, pointRadius: 4, pointBackgroundColor: getCss('--goal'), pointBorderColor: getCss('--card'), pointBorderWidth: 2,
+        fill: false, yAxisID: 'y1', order: 1
+        }
+        ];
+        if (withSapLine) {
+        datasets.push({
+        type: 'line', label: 'SAP scanned (approx.)',
+        data: categoryCumulative(trend, 'sapProduction'),
+        borderColor: getCss('--bad'), backgroundColor: 'transparent',
+        borderDash: [2, 3], tension: .35, pointRadius: 2, fill: false,
+        yAxisID: 'y1', order: 0
+        });
+        }
+        return {
+        plugins: [goalGlowPlugin],
+        data: { labels: trend.map(h => h.hour), datasets },
+        options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        animation: { duration: 400 },
+        plugins: { legend: { position: 'bottom', labels: { color: getCss('--text'), font: { size: 13, weight: '700' }, boxWidth: 22, boxHeight: 5 } } },
+        scales: {
+        x: { title: { display: true, text: 'Shift hour', color: getCss('--text-dim'), font: { size: 13, weight: '700' } }, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
+        y: { position: 'left', beginAtZero: true, title: { display: true, text: 'Pieces / hour', color: getCss('--text-dim'), font: { size: 13, weight: '700' } }, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
+        y1: { position: 'right', beginAtZero: true, title: { display: true, text: 'Shift accumulated (pieces)', color: getCss('--text-dim'), font: { size: 13, weight: '700' } }, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { display: false } }
+        }
+        }
+        };
         }
 
-        function trendSeries() {
-            const pts = snapshot.hourlyTrend || [];
-            let run = 0;
-            const expected = expectedCumulativeSeries(pts);
-            return {
-                labels: pts.map(h => h.hour),
-                perHour: pts.map(h => h.production),
-                acc: pts.map(h => (run += h.production)),
-                goal: expected.map(v => v * TARGET),
-                pts
-            };
+        function renderTrendsScreen() {
+        const specs = [
+        { id: 'chart-cb', trend: snapshot.coreBuilderHourlyTrend || [], sap: false },
+        { id: 'chart-be', trend: snapshot.backEndHourlyTrend || [], sap: true },
+        { id: 'chart-cs', trend: snapshot.clamShellHourlyTrend || [], sap: false },
+        { id: 'chart-tm', trend: snapshot.tubeMillsHourlyTrend || [], sap: false }
+        ];
+        specs.forEach(spec => {
+        const cfg = buildCategoryTrendConfig(spec.trend, spec.sap);
+        if (charts[spec.id]) {
+        charts[spec.id].data = cfg.data;
+        charts[spec.id].update('none');
+        } else {
+        charts[spec.id] = new Chart(document.getElementById(spec.id), cfg);
+        }
+        });
         }
 
-        function renderTrend() {
-            const canvas = document.getElementById('trendChart');
-            if (!canvas) return;
-            const s = trendSeries();
-
-            // KPIs at the latest point: goal = 85% of the SP's expected accumulated (accumulatedRate)
-            const idx = s.goal.length - 1;
-            const accNow = s.acc[idx] ?? 0, goalNow = s.goal[idx] ?? 0, diff = accNow - goalNow;
-            document.getElementById('kAcc').textContent = fmt(accNow);
-            document.getElementById('kGoal').textContent = fmt(goalNow);
-            const kd = document.getElementById('kDiff');
-            kd.textContent = (diff >= 0 ? '+' : '') + fmt(diff);
-            kd.style.color = diff >= 0 ? getCss('--good') : getCss('--bad');
-
-            if (charts.trend) {
-                const c = charts.trend;
-                c.data.labels = s.labels;
-                c.data.datasets[0].data = s.perHour;
-                c.data.datasets[1].data = s.acc;
-                c.data.datasets[2].data = s.goal;
-                c.update('none');
-                return;
-            }
-            charts.trend = new Chart(canvas, {
-                data: {
-                    labels: s.labels,
-                    datasets: [
-                        { type: 'bar', label: 'Pieces / hour (bars, left axis)', data: s.perHour, backgroundColor: getCss('--bar'), borderRadius: 6, maxBarThickness: 70, yAxisID: 'y', order: 3 },
-                        { type: 'line', label: 'Real accumulated (right axis)', data: s.acc, borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .14), fill: true, borderWidth: 4, tension: .3, pointRadius: 5, pointBackgroundColor: getCss('--good'), pointBorderColor: getCss('--card'), pointBorderWidth: 2, yAxisID: 'y1', order: 2 },
-                        { type: 'line', label: 'GOAL 85% (right axis)', data: s.goal, isGoal: true, borderColor: getCss('--goal'), backgroundColor: 'transparent', borderWidth: 5, tension: .3, pointRadius: 6, pointBackgroundColor: getCss('--goal'), pointBorderColor: getCss('--card'), pointBorderWidth: 2, fill: false, yAxisID: 'y1', order: 1 }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    layout: { padding: { top: 6, right: 4 } },
-                    plugins: { legend: legendStyle(), tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } } },
-                    scales: {
-                        x: { title: axisTitle('Shift hour'), ticks: tickStyle(), grid: { color: getCss('--grid-line') } },
-                        y: { position: 'left', beginAtZero: true, grace: '12%', title: axisTitle('Pieces / hour', getCss('--bar')), ticks: tickStyle(), grid: { color: getCss('--grid-line') } },
-                        y1: { position: 'right', beginAtZero: true, title: axisTitle('Shift accumulated (pieces)', getCss('--good')), ticks: tickStyle(), grid: { display: false } }
-                    }
-                },
-                plugins: [barValuesPlugin(0, ''), goalGlowPlugin]
-            });
+        function selectFurnace(id) {
+        selectedFurnaceId = (selectedFurnaceId === id) ? null : id;
+        applySelection();
+        if (selectedFurnaceId) {
+        const f = snapshot.furnaces.find(x => x.furnaceId === selectedFurnaceId);
+        renderDrilldown(f);
+        document.getElementById('drilldownOverlay').classList.add('open');
+        } else {
+        document.getElementById('drilldownOverlay').classList.remove('open');
+        }
         }
 
-        // ---------------- CYCLE TIME ----------------
-        function renderCycleTimeChart() {
-            const canvas = document.getElementById('cycleTimeChart');
-            if (!canvas) return;
-
-            const points = snapshot.cycleTimeTrend || [];
-            const labels = points.map(p => p.hour);
-            const actual = points.map(p => p.actualCycleTimeSecs);
-            const theoretical = labels.map(() => snapshot.cycleTimeSecs);
-            const mean = snapshot.actualCycleTimeMean;
-            const meanLine = labels.map(() => mean != null ? mean : null);
-
-            document.getElementById('kAvg').textContent = mean != null ? Number(mean).toFixed(1) + 's' : '—';
-            document.getElementById('kTheo').textContent = Number(snapshot.cycleTimeSecs).toFixed(1) + 's';
-
-            const barColor = (v) => {
-                if (v == null) return 'transparent';
-                if (v <= snapshot.cycleTimeSecs * 1.05) return hexToRgba(getCss('--good'), .8);
-                if (v <= snapshot.cycleTimeSecs * 1.2) return hexToRgba(getCss('--warn'), .8);
-                return hexToRgba(getCss('--bad'), .8);
-            };
-
-            if (charts.cycleTime) {
-                const ds = charts.cycleTime.data.datasets;
-                charts.cycleTime.data.labels = labels;
-                ds[0].data = actual; ds[0].backgroundColor = actual.map(barColor);
-                ds[1].data = theoretical;
-                ds[2].data = meanLine;
-                charts.cycleTime.update('none');
-                return;
-            }
-
-            charts.cycleTime = new Chart(canvas, {
-                data: {
-                    labels,
-                    datasets: [
-                        { type: 'bar', label: 'Real cycle time (sec)', data: actual, backgroundColor: actual.map(barColor), borderRadius: 6, maxBarThickness: 60, order: 2 },
-                        { type: 'line', label: 'GOAL: theoretical cycle time (sec)', data: theoretical, isGoal: true, borderColor: getCss('--goal'), borderWidth: 5, pointRadius: 0, fill: false, order: 0 },
-                        { type: 'line', label: 'Shift average (sec)', data: meanLine, borderColor: getCss('--avg'), borderWidth: 4, borderDash: [3, 6], borderCapStyle: 'round', pointRadius: 0, fill: false, order: 1, spanGaps: true }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    layout: { padding: { top: 6, right: 4 } },
-                    plugins: {
-                        legend: legendStyle(),
-                        tooltip: {
-                            titleFont: { size: 16 }, bodyFont: { size: 16 },
-                            callbacks: {
-                                label: (c) => c.raw == null ? `${c.dataset.label}: no production that hour` : `${c.dataset.label}: ${Number(c.raw).toFixed(1)}s`,
-                                afterBody: (items) => {
-                                    const p = points[items[0]?.dataIndex];
-                                    if (!p) return [];
-                                    const notes = [`Pieces that hour: ${p.production}`];
-                                    if (p.availableSeconds) notes.push(`Available seconds used: ${p.availableSeconds}s`);
-                                    if (p.isInProgress) notes.push('⏳ This hour is still in progress — the number is partial.');
-                                    return notes;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: { title: axisTitle('Shift hour'), ticks: tickStyle(), grid: { color: getCss('--grid-line') } },
-                        y: { beginAtZero: true, grace: '12%', title: axisTitle('Seconds / piece'), ticks: tickStyle(), grid: { color: getCss('--grid-line') } }
-                    }
-                },
-                plugins: [barValuesPlugin(1, 's'), goalGlowPlugin]
-            });
+        function applySelection() {
+        snapshot.furnaces.forEach(f => {
+        const card = document.getElementById('furnace-' + f.furnaceId);
+        if (!card) return;
+        card.classList.toggle('selected', selectedFurnaceId === f.furnaceId);
+        card.classList.toggle('dimmed', selectedFurnaceId !== null && selectedFurnaceId !== f.furnaceId);
+        });
         }
 
-        // ---------------- CONTROLS ----------------
+        function renderDrilldown(f) {
+        if (!f) return;
+        document.getElementById('drilldownTitle').innerHTML =
+        `<span class="fnum" style="display:inline-flex;width:22px;height:22px;border-radius:7px;background:${furnaceColor(f.furnaceId)};color:#06101f;align-items:center;justify-content:center;font-size:.75rem;">${fnumLabel(f.furnaceId)}</span> ${f.furnaceName}`;
+
+        if (f.lines.length === 0) {
+        document.getElementById('drilldownChips').innerHTML = `<span class="chip">No planned production this shift</span>`;
+        document.getElementById('drilldownBody').innerHTML = '';
+        return;
+        }
+
+        document.getElementById('drilldownChips').innerHTML = `
+        <span class="chip">Production: ${f.totalProduction.toLocaleString()}</span>
+        <span class="chip">Plan: ${f.totalPlanned.toLocaleString()}</span>
+        <span class="chip">OEE: ${pct(f.oee)}</span>
+        <span class="chip">SAP: ${pct(f.sapPercent)}</span>
+        <span class="chip">${f.lines.filter(l => l.countsForStats).length} lines</span>
+        ${f.lines.some(l => l.isUnplannedProduction) ? `<span class="chip chip-unplanned">⚠ ${f.lines.filter(l => l.isUnplannedProduction).length} non-planned</span>` : ''}
+        `;
+        const rows = [...f.lines].sort((a, b) => a.productOrder - b.productOrder).map(l => {
+        const sapCell = l.excludedFromSap
+        ? `<span class="sap-excluded">-</span>`
+        : (l.total === 0 ? '0' : l.totalSap.toLocaleString());
+        const nameCell = l.productListId > 0
+        ? `<a href="/Line/${l.productListId}" class="line-link" title="View this line">${l.productDesc}</a>`
+        : l.productDesc;
+        if (l.isUnplannedProduction) {
+        return `
+        <tr class="unplanned-row">
+        <td>${nameCell}</td>
+        <td><span class="unplanned-tag">⚠ NON PLANNED PRODUCTION</span></td>
+        <td class="num">${l.total.toLocaleString()}</td>
+        <td class="num">-</td>
+        <td class="num">-</td>
+        <td class="num">${sapCell}</td>
+        </tr>`;
+        }
+        if (l.total === 0) {
+        return `
+        <tr class="no-prod-row">
+        <td>${nameCell}</td>
+        <td><span class="no-prod-tag">LINE WITH NO PRODUCTION</span></td>
+        <td class="num">0</td>
+        <td class="num">${l.accumulatedRate.toLocaleString()}</td>
+        <td class="num">${l.plannedShift.toLocaleString()}</td>
+        <td class="num">${sapCell}</td>
+        </tr>`;
+        }
+        return `
+        <tr>
+        <td>${nameCell}</td>
+        <td>
+        <div class="bar-cell">
+        <div class="bar-track"><div class="target-marker" style="left:85%"></div><div class="bar-fill" style="width:${Math.min(100, l.oeeShift * 100)}%; background:${oeeColor(l.oeeShift)}"></div></div>
+        <span style="font-family:'JetBrains Mono',monospace;">${pct(l.oeeShift)}</span>
+        </div>
+        </td>
+        <td class="num">${l.total.toLocaleString()}</td>
+        <td class="num">${l.accumulatedRate.toLocaleString()}</td>
+        <td class="num">${l.plannedShift.toLocaleString()}</td>
+        <td class="num">${sapCell}</td>
+        </tr>`;
+        }).join('');
+        document.getElementById('drilldownBody').innerHTML = rows;
+        }
+
+        document.getElementById('closeDrilldown').onclick = () => selectFurnace(selectedFurnaceId);
+        document.getElementById('drilldownOverlay').onclick = (e) => {
+        if (e.target.id === 'drilldownOverlay') selectFurnace(selectedFurnaceId);
+        };
+
         document.getElementById('toggleTheme').onclick = () => {
-            const html = document.documentElement;
-            const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-            html.setAttribute('data-theme', next);
-            try { localStorage.setItem('pm-theme', next); } catch (e) { }
-            if (charts.trend) { charts.trend.destroy(); charts.trend = null; }
-            if (charts.cycleTime) { charts.cycleTime.destroy(); charts.cycleTime = null; }
-            document.getElementById('bodyGrid').innerHTML = '';
-            render();
+        const html = document.documentElement;
+        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('pm-theme', next);
+        Object.values(charts).forEach(c => c && c.destroy());
+        for (const k in charts) delete charts[k];
+        document.getElementById('grid').innerHTML = '';
+        render(false);
+        if (currentScreen === 'trends') renderTrendsScreen();
         };
-        try { const t = localStorage.getItem('pm-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) { }
+        const savedTheme = localStorage.getItem('pm-theme');
+        if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
 
         document.getElementById('togglePresentation').onclick = () => {
-            document.getElementById('app').classList.toggle('presentation');
-            if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => { });
-            else document.exitFullscreen?.().catch(() => { });
-            setTimeout(() => Object.values(charts).forEach(c => c && c.resize()), 300);
+        document.getElementById('app').classList.toggle('presentation');
+        if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen?.().catch(() => {});
+        } else {
+        document.exitFullscreen?.().catch(() => {});
+        }
+        setTimeout(() => Object.values(charts).forEach(c => c && c.resize()), 260);
         };
-        window.addEventListener('resize', () => Object.values(charts).forEach(c => c && c.resize()));
 
-        if (!IS_HISTORICAL) {
-            PM.startHub({
-                url: '/hubs/metrics',
-                handlers: {
-                    LineSnapshotUpdated: (payload) => {
-                        if (payload.productListId !== LINE_ID) return;
-                        snapshot = payload;
-                        render();
-                    }
-                },
-                onConnected: (conn) => conn.invoke('JoinLine', LINE_ID)   // re-runs after every reconnect
-            });
-            PM.scheduleRefresh();   // reload at 00:00 / 06:00 / 12:00 / 18:00
+        let carouselMode = localStorage.getItem('pm-carousel-mode') || 'auto';
+        let cardIntervalId = null, kpiIntervalId = null;
+
+        function advanceAllCardPages() {
+        snapshot.furnaces.forEach(f => {
+        const { totalPages } = furnaceLinesPage(f);
+        if (totalPages <= 1) return;
+        furnacePage[f.furnaceId] = ((furnacePage[f.furnaceId] || 0) + 1) % totalPages;
+        refreshFurnaceCardDisplay(f);
+        });
         }
 
-        render();
+        function applyModeUI() {
+        document.getElementById('modeCheckbox').checked = carouselMode === 'manual';
+        document.getElementById('modeLabelAuto').classList.toggle('active', carouselMode === 'auto');
+        document.getElementById('modeLabelManual').classList.toggle('active', carouselMode === 'manual');
+        document.getElementById('app').classList.toggle('manual-mode', carouselMode === 'manual');
+        }
+
+        function restartAutoCarousels() {
+        if (cardIntervalId) clearInterval(cardIntervalId);
+        if (kpiIntervalId) clearInterval(kpiIntervalId);
+        cardIntervalId = null;
+        kpiIntervalId = null;
+        if (carouselMode !== 'auto') return;
+        cardIntervalId = setInterval(advanceAllCardPages, PAGE_ROTATE_MS);
+        kpiIntervalId = setInterval(advanceKpiGroup, KPI_ROTATE_MS);
+        }
+
+        document.getElementById('modeCheckbox').addEventListener('change', (e) => {
+        carouselMode = e.target.checked ? 'manual' : 'auto';
+        localStorage.setItem('pm-carousel-mode', carouselMode);
+        applyModeUI();
+        restartAutoCarousels();
+        });
+
+        PM.startHub({
+        url: '/hubs/metrics',
+        handlers: {
+        SnapshotUpdated: (newSnapshot) => {
+        snapshot = newSnapshot;
+        render(true);
+        }
+        }
+        });
+        PM.scheduleRefresh();   // recarga 00:00 / 06:00 / 12:00 / 18:00
+
+        render(false);
+        applyModeUI();
+        restartAutoCarousels();
     </script>
 </body>
-</html>
-@functions {
-    string FurnaceColor(int id) => id switch
-    {
-        1 => "#4da3ff",
-        2 => "#35d68f",
-        3 => "#f2b84b",
-        4 => "#c084fc",
-        5 => "#ff8a5c",
-        6 => "#64748b",
-        _ => "#4da3ff"
-    };
-
-    string FurnaceHref(int id) => id == 6 ? "/TubeMills" : $"/Furnace{id}";
-
-    bool IsHistorical => ViewData["IsHistorical"] as bool? ?? false;
-    string HistoricalDateStr => ViewData["HistoricalDate"] as string ?? "";
-    int HistoricalShiftId => ViewData["HistoricalShiftId"] as int? ?? 1;
-
-    static readonly (string Token, string LogoFile, string AltText)[] ClientLogoRules = new[]
-    {
-        ("PCM", "honda.png", "Honda"),
-        ("WS", "chrysler.png", "Chrysler"),
-        ("D2UX", "gm.png", "General Motors"),
-        ("Lucid", "lucid.png", "Lucid"),
-        ("Clam Shell", "default-car.png", "Cliente"),
-        ("BMW", "bmw.png", "BMW"),
-        ("Tesla", "tesla.png", "Tesla"),
-        ("Toyota", "toyota.png", "Toyota"),
-        ("GM", "gm.png", "General Motors"),
-        ("Honda", "honda.png", "Honda"),
-        ("RIVIAN", "rivian.png", "Rivian"),
-        ("BEV3", "gm.png", "General Motors"),
-    };
-
-    (string LogoFile, string AltText) GetClientLogo(string productDesc)
-    {
-        var desc = productDesc ?? "";
-        foreach (var rule in ClientLogoRules)
-        {
-            var pattern = @"\b" + System.Text.RegularExpressions.Regex.Escape(rule.Token) + @"\b";
-            if (System.Text.RegularExpressions.Regex.IsMatch(desc, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            {
-                return (rule.LogoFile, rule.AltText);
-            }
-        }
-        return ("default-car.png", "Cliente");
-    }
-}
+</html>
