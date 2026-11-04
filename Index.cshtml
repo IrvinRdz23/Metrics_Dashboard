@@ -1523,7 +1523,7 @@
         const seen = new Set();
         let sum = 0;
         (snapshot.furnaces || []).forEach(f => (f.lines || []).forEach(l => {
-        if (!l.countsForStats) return;
+        if (!l.countsForStats || !(l.total > 0)) return;   // planned lines with 0 pieces don't count (same rule as the OEE)
         const seg = l.segment || (l.groupId === 7 ? 'tubeMills' : l.groupId === 6 ? 'clamShell' : (l.excludedFromSap ? 'coreBuilder' : 'backEnd'));
         if (seg !== segment) return;
         const key = l.groupId + '|' + l.productDesc;

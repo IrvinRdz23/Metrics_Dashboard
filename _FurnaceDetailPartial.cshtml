@@ -450,11 +450,12 @@
                 return { pts: snapshot.backEndHourlyTrend, label: 'BACK END', plan: snapshot.backEndPlanned, ok: true };
             return { pts: snapshot.hourlyTrend, label: 'NO PRODUCTION', plan: snapshot.totalPlanned, ok: false };
         }
-        // GOAL = 85% of what the SP says we should have by now (sum of accumulatedRate of the lines in this trend:
+        // GOAL = 85% of what the SP says we should have by now (sum of accumulatedRate of the lines in this trend that already produced > 0 pieces:
         // Back End lines that count; for Tube Mills all counted lines). The server curve (plan x elapsed fraction)
         // only gives the SHAPE: it is rescaled so its latest point equals that SP expected, same as the Line view.
         function spExpectedNow() {
-            const counted = snapshot.lines.filter(l => l.countsForStats);
+            // Planned lines that have made 0 pieces do NOT count (same rule as the OEE).
+            const counted = snapshot.lines.filter(l => l.countsForStats && l.total > 0);
             const inTrend = FURNACE_ID === 6 ? counted
                 : counted.filter(l => l.segment ? l.segment === 'backEnd' : (l.groupId !== 6 && l.groupId !== 7 && !l.excludedFromSap));
             return inTrend.reduce((a, l) => a + (l.accumulatedRate || 0), 0);
