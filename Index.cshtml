@@ -3,11 +3,11 @@
     Layout = null;
 }
 <!DOCTYPE html>
-<html lang="es" data-theme="dark">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Plant Metrics · Dashboard General</title>
+    <title>Plant Metrics · General Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -39,6 +39,8 @@
         --pill-text: #061018;
         --seg-cb: #f2b84b;
         --seg-be: #55acff;
+        --goal: #3aa0ff;                 /* GOAL lines: solid blue */
+        --bar: rgba(167,139,250,0.85);   /* hourly bars: purple */
         }
 
         :root[data-theme="light"] {
@@ -65,6 +67,8 @@
         --pill-text: #ffffff;
         --seg-cb: #96650a;
         --seg-be: #1957c2;
+        --goal: #0b5bd3;
+        --bar: rgba(109,40,217,0.80);
         }
 
         * {
@@ -811,7 +815,8 @@
         top: -2px;
         bottom: -2px;
         width: 0;
-        border-left: 2px dashed rgba(255,255,255,.55);
+        border-left: 3px solid var(--goal);
+        box-shadow: 0 0 6px var(--goal);
         z-index: 2;
         }
 
@@ -962,7 +967,7 @@
             <div class="brand">
                 <img src="~/images/m2s.png" style="width: 60px;" />
                 <div class="brand-text">
-                    <h1><img src="~/images/MahleOriginal.png" style="width: 80px; margin:20px,0,0,0" /> · Planta 1</h1>
+                    <h1><img src="~/images/MahleOriginal.png" style="width: 80px; margin:20px,0,0,0" /> · Plant 1</h1>
                     <div class="subtitle">
                         <span id="dateLabel"></span>
                         <span class="shift-badge" id="shiftLabel">@Model.ShiftDesc</span>
@@ -980,19 +985,19 @@
                         <div class="kpi-divider"></div>
                         <div class="kpi-block">
                             <div class="value" id="plantProd">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].TotalProduction.ToString("N0") : "0")</div>
-                            <div class="label">Producción</div>
+                            <div class="label">Production</div>
                         </div>
                         <div class="kpi-divider"></div>
                         <div class="kpi-block">
                             <div class="value" id="plantPlanned">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].TotalPlanned.ToString("N0") : "0")</div>
-                            <div class="label">Plan de Turno</div>
+                            <div class="label">Shift Plan</div>
                         </div>
                     </div>
                     <div class="kpi-group-badge" id="kpiGroupBadge">
-                        <button class="carousel-arrow kpi-arrow" id="kpiArrowPrev" title="Grupo anterior">◀</button>
+                        <button class="carousel-arrow kpi-arrow" id="kpiArrowPrev" title="Previous group">◀</button>
                         <div class="fill" id="kpiGroupFill"></div>
                         <span class="label-text" id="kpiGroupName">@(Model.TopKpiGroups.Count > 0 ? Model.TopKpiGroups[0].Label : "")</span>
-                        <button class="carousel-arrow kpi-arrow" id="kpiArrowNext" title="Siguiente grupo">▶</button>
+                        <button class="carousel-arrow kpi-arrow" id="kpiArrowNext" title="Next group">▶</button>
                     </div>
                 </div>
                 <div class="kpi-divider"></div>
@@ -1001,18 +1006,18 @@
                         <span class="live-dot"></span>
                         <span class="value" style="font-size:.88rem" id="lastUpdate">--:--</span>
                     </div>
-                    <div class="label">Última Actualización</div>
+                    <div class="label">Last Update</div>
                 </div>
             </div>
 
             <div class="header-actions-wrap controls-collapsible">
                 <div class="header-actions">
-                    <a class="btn" href="/Dashboard/Historical" title="Ver histórico">📅</a>
+                    <a class="btn" href="/Dashboard/Historical" title="View history">📅</a>
                     <button class="btn" id="toggleTheme">🌗</button>
                     <button class="btn" id="togglePresentation">🖥️</button>
                 </div>
                 <div class="mode-switch">
-                    <span class="mode-label" id="modeLabelAuto">Automático</span>
+                    <span class="mode-label" id="modeLabelAuto">Auto</span>
                     <label class="mode-toggle">
                         <input type="checkbox" id="modeCheckbox" />
                         <span class="mode-slider"></span>
@@ -1051,10 +1056,10 @@
         </div>
     </div>
 
-    <div class="edge-arrow right-arrow" id="rightArrow" title="Ver tendencias por categoría">
+    <div class="edge-arrow right-arrow" id="rightArrow" title="View trends by category">
         <span class="arrow-icon">›</span>
     </div>
-    <div class="edge-arrow left-arrow" id="leftArrow" title="Volver al dashboard" style="display:none;">
+    <div class="edge-arrow left-arrow" id="leftArrow" title="Back to dashboard" style="display:none;">
         <span class="arrow-icon">‹</span>
     </div>
 
@@ -1062,14 +1067,14 @@
         <div class="drilldown-panel">
             <div class="drilldown-head">
                 <div>
-                    <h3 id="drilldownTitle">Horno</h3>
+                    <h3 id="drilldownTitle">Furnace</h3>
                     <div class="drilldown-chips" id="drilldownChips"></div>
                 </div>
-                <button class="btn close-btn" id="closeDrilldown">Cerrar ✕</button>
+                <button class="btn close-btn" id="closeDrilldown">Close ✕</button>
             </div>
             <table class="lines-table">
                 <thead>
-                    <tr><th>Línea</th><th>OEE Turno</th><th>Producción</th><th>Esperado a esta hora</th><th>Plan Turno</th><th>SAP</th></tr>
+                    <tr><th>Line</th><th>Shift OEE</th><th>Production</th><th>Expected by Now</th><th>Shift Plan</th><th>SAP</th></tr>
                 </thead>
                 <tbody id="drilldownBody"></tbody>
             </table>
@@ -1133,21 +1138,21 @@
         function cardNumbersHtml(f, pageType) {
         if (f.furnaceId === 6) {
         return `
-        <div class="n"><div class="v">${f.totalProduction.toLocaleString()}</div><div class="l">Producción</div></div>
-        <div class="n"><div class="v">${f.totalPlanned.toLocaleString()}</div><div class="l">Plan Turno</div></div>
+        <div class="n"><div class="v">${f.totalProduction.toLocaleString()}</div><div class="l">Production</div></div>
+        <div class="n"><div class="v">${f.totalPlanned.toLocaleString()}</div><div class="l">Shift Plan</div></div>
         <div class="n"><div class="v">—</div><div class="l">SAP % (N/A)</div></div>
         `;
         }
         if (pageType === 'clamshell') {
         return `
-        <div class="n"><div class="v">${f.clamShellProduction.toLocaleString()}</div><div class="l">Producción Clam Shells</div></div>
-        <div class="n"><div class="v">${f.clamShellPlanned.toLocaleString()}</div><div class="l">Plan Clam Shells</div></div>
+        <div class="n"><div class="v">${f.clamShellProduction.toLocaleString()}</div><div class="l">Clam Shells Production</div></div>
+        <div class="n"><div class="v">${f.clamShellPlanned.toLocaleString()}</div><div class="l">Clam Shells Plan</div></div>
         <div class="n"><div class="v">—</div><div class="l">SAP % (N/A)</div></div>
         `;
         }
         return `
-        <div class="n"><div class="v"><span class="seg-cb">${f.coreBuilderProduction.toLocaleString()}</span><span class="sep">|</span><span class="seg-be">${f.backEndProduction.toLocaleString()}</span></div><div class="l">Producción (CB | BE)</div></div>
-        <div class="n"><div class="v"><span class="seg-cb">${f.coreBuilderPlanned.toLocaleString()}</span><span class="sep">|</span><span class="seg-be">${f.backEndPlanned.toLocaleString()}</span></div><div class="l">Plan Turno (CB | BE)</div></div>
+        <div class="n"><div class="v"><span class="seg-cb">${f.coreBuilderProduction.toLocaleString()}</span><span class="sep">|</span><span class="seg-be">${f.backEndProduction.toLocaleString()}</span></div><div class="l">Production (CB | BE)</div></div>
+        <div class="n"><div class="v"><span class="seg-cb">${f.coreBuilderPlanned.toLocaleString()}</span><span class="sep">|</span><span class="seg-be">${f.backEndPlanned.toLocaleString()}</span></div><div class="l">Shift Plan (CB | BE)</div></div>
         <div class="n"><div class="v">${pct(f.backEndSapPercent)}</div><div class="l">SAP % (BE)</div></div>
         `;
         }
@@ -1163,13 +1168,13 @@
         let ring = document.getElementById(ringIdPrefix + '-fill');
         if (!ring) {
         container.innerHTML = `
-        <button class="carousel-arrow" title="Página anterior" onclick="event.stopPropagation(); stepFurnacePage(${furnaceId}, -1)">◀</button>
+        <button class="carousel-arrow" title="Previous page" onclick="event.stopPropagation(); stepFurnacePage(${furnaceId}, -1)">◀</button>
         <svg class="page-ring-svg" viewBox="0 0 16 16">
         <circle class="ring-bg" cx="8" cy="8" r="7"></circle>
         <circle class="ring-fill" id="${ringIdPrefix}-fill" cx="8" cy="8" r="7"></circle>
         </svg>
         <span class="page-ring-label" id="${ringIdPrefix}-label"></span>
-        <button class="carousel-arrow" title="Página siguiente" onclick="event.stopPropagation(); stepFurnacePage(${furnaceId}, 1)">▶</button>
+        <button class="carousel-arrow" title="Next page" onclick="event.stopPropagation(); stepFurnacePage(${furnaceId}, 1)">▶</button>
         `;
         ring = document.getElementById(ringIdPrefix + '-fill');
         }
@@ -1187,13 +1192,19 @@
         restartRing(ring);
         }
 
-        document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+        function formatEnglishDate(date) {
+        const d = new Date(date);
+        const day = d.getDate();
+        const suffix = day % 10 === 1 && day !== 11 ? 'st' : day % 10 === 2 && day !== 12 ? 'nd' : day % 10 === 3 && day !== 13 ? 'rd' : 'th';
+        return `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${d.toLocaleDateString('en-US', { month: 'long' })} ${day}${suffix}`;
+        }
+        document.getElementById('dateLabel').textContent = formatEnglishDate(new Date());
 
         function render(isLiveUpdate) {
         renderKpiGroup(isLiveUpdate);
 
         document.getElementById('shiftLabel').textContent = snapshot.shiftDesc || '—';
-        document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('lastUpdate').textContent = new Date(snapshot.generatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
         const grid = document.getElementById('grid');
         const isFirstRender = grid.children.length === 0;
@@ -1270,19 +1281,19 @@
         <div class="card-top">
         <h2>
         <span class="fnum">${fnumLabel(f.furnaceId)}</span><span class="fname">${f.furnaceName}</span>
-        <a class="detail-link" href="${detailHref(f.furnaceId)}" onclick="event.stopPropagation()" title="Ver detalle de ${f.furnaceName}">
+        <a class="detail-link" href="${detailHref(f.furnaceId)}" onclick="event.stopPropagation()" title="View ${f.furnaceName} detail">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
         </a>
         </h2>
         <div class="oee-block">
         <span class="oee-pill ${hasProduction ? '' : 'neutral'}" id="pill-${f.furnaceId}"
         style="background:${hasProduction ? oeeColor(f.oee) : 'var(--neutral)'}">${hasProduction ? pct(f.oee) : '—'}</span>
-        <span class="oee-caption">OEE de Turno</span>
+        <span class="oee-caption">Shift OEE</span>
         </div>
         </div>
         <div class="numbers" id="numbers-${f.furnaceId}">${cardNumbersHtml(f, pageType)}</div>
         <div class="chart-wrap" id="chartwrap-${f.furnaceId}">
-        ${hasProduction ? `<canvas id="chart-${f.furnaceId}"></canvas>` : `<div class="no-plan-box">SIN PRODUCCIÓN<br>EN EL TURNO ACTUAL</div>`}
+        ${hasProduction ? `<canvas id="chart-${f.furnaceId}"></canvas>` : `<div class="no-plan-box">NO PRODUCTION<br>THIS SHIFT</div>`}
         </div>
         <div class="page-ring-wrap" id="pagering-${f.furnaceId}"></div>
         <div class="worst-line" id="worst-${f.furnaceId}"></div>
@@ -1334,6 +1345,7 @@
         };
 
         const OEE_TARGET = 85;
+        const OEE_GOAL = 0.85;
 
         const targetLinePlugin = {
         id: 'targetLine',
@@ -1343,9 +1355,11 @@
         const xPix = scales.x.getPixelForValue(OEE_TARGET);
         if (xPix < chartArea.left || xPix > chartArea.right) return;
         ctx.save();
-        ctx.setLineDash([5, 4]);
-        ctx.strokeStyle = getCss('--text-faint');
-        ctx.lineWidth = 1.5;
+        ctx.setLineDash([]);
+        ctx.strokeStyle = getCss('--goal');
+        ctx.shadowColor = getCss('--goal');
+        ctx.shadowBlur = 8;
+        ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(xPix, chartArea.top);
         ctx.lineTo(xPix, chartArea.bottom);
@@ -1375,7 +1389,7 @@
         maintainAspectRatio: false,
         animation: { duration: 500 },
         layout: { padding: { right: isSmallScreen ? 52 : 78 } },
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toFixed(0) + '% OEE de turno (objetivo 85%)' } } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toFixed(0) + '% shift OEE (goal 85%)' } } },
         scales: {
         x: { min: 0, suggestedMax: 100, ticks: { display: false }, grid: { color: getCss('--grid-line') } },
         y: {
@@ -1391,7 +1405,7 @@
         const el = document.getElementById('worst-' + f.furnaceId);
         if (!el) return;
         if (f.worstLine) {
-        el.innerHTML = `<span>⚠ Línea más baja: ${f.worstLine.productDesc}</span><b>${pct(f.worstLine.oeeShift)}</b>`;
+        el.innerHTML = `<span>⚠ Lowest line: ${f.worstLine.productDesc}</span><b>${pct(f.worstLine.oeeShift)}</b>`;
         } else {
         el.innerHTML = '';
         }
@@ -1425,7 +1439,7 @@
         } else if (!hasProduction && hasCanvas) {
         charts['f' + f.furnaceId]?.destroy();
         delete charts['f' + f.furnaceId];
-        wrap.innerHTML = `<div class="no-plan-box">SIN PRODUCCIÓN<br>EN EL TURNO ACTUAL</div>`;
+        wrap.innerHTML = `<div class="no-plan-box">NO PRODUCTION<br>THIS SHIFT</div>`;
         document.getElementById('pagering-' + f.furnaceId).innerHTML = '';
         } else if (hasProduction && hasCanvas) {
         const chart = charts['f' + f.furnaceId];
@@ -1490,32 +1504,72 @@
         return trend.map(h => (running += (h[key] || 0)));
         }
 
-        function buildCategoryTrendConfig(trend, withSapLine) {
+        const goalGlowPlugin = {
+        id: 'goalGlow',
+        beforeDatasetDraw(chart, args) {
+        if (!chart.data.datasets[args.index].isGoal) return;
+        chart.ctx.save(); chart.ctx.shadowColor = getCss('--goal'); chart.ctx.shadowBlur = 10;
+        },
+        afterDatasetDraw(chart, args) {
+        if (!chart.data.datasets[args.index].isGoal) return;
+        chart.ctx.restore();
+        }
+        };
+
+        // GOAL = 85% of the SP's expected accumulated for that category (sum of accumulatedRate of its counted lines
+        // across all furnaces, de-duplicated). The server curve only provides the SHAPE; it is rescaled so its latest
+        // point equals the SP expected, same logic as the Line view.
+        function categoryExpectedNow(segment) {
+        const seen = new Set();
+        let sum = 0;
+        (snapshot.furnaces || []).forEach(f => (f.lines || []).forEach(l => {
+        if (!l.countsForStats) return;
+        const seg = l.segment || (l.groupId === 7 ? 'tubeMills' : l.groupId === 6 ? 'clamShell' : (l.excludedFromSap ? 'coreBuilder' : 'backEnd'));
+        if (seg !== segment) return;
+        const key = l.groupId + '|' + l.productDesc;
+        if (seen.has(key)) return;
+        seen.add(key);
+        sum += l.accumulatedRate || 0;
+        }));
+        return sum;
+        }
+
+        function categoryGoalSeries(trend, segment) {
+        const vals = trend.map(h => h.expectedCumulative || 0);
+        const target = categoryExpectedNow(segment);
+        let anchor = -1;
+        for (let i = vals.length - 1; i >= 0; i--) { if (vals[i] > 0) { anchor = i; break; } }
+        const k = (anchor >= 0 && target > 0) ? target / vals[anchor] : 1;
+        return vals.map(v => v * k * OEE_GOAL);
+        }
+
+        function buildCategoryTrendConfig(trend, withSapLine, segment) {
         const datasets = [
         {
-        type: 'bar', label: 'Producción / hora',
+        type: 'bar', label: 'Pieces / hour (bars, left axis)',
         data: trend.map(h => h.production),
-        backgroundColor: hexToRgba(getCss('--accent'), .55),
+        backgroundColor: getCss('--bar'),
         borderRadius: 6, maxBarThickness: 40, yAxisID: 'y', order: 3
         },
         {
-        type: 'line', label: 'Acumulado del turno',
+        type: 'line', label: 'Real accumulated (right axis)',
         data: categoryCumulative(trend, 'production'),
         borderColor: getCss('--good'), backgroundColor: hexToRgba(getCss('--good'), .12),
         fill: true, tension: .35, pointRadius: 3, pointBackgroundColor: getCss('--good'),
         yAxisID: 'y1', order: 2
         },
         {
-        type: 'line', label: 'Acumulado esperado a esta hora',
-        data: trend.map(h => h.expectedCumulative),
-        borderColor: getCss('--warn'), backgroundColor: 'transparent',
-        borderDash: [6, 4], tension: .35, pointRadius: 3, pointBackgroundColor: getCss('--warn'),
+        type: 'line', label: 'GOAL 85% (right axis)',
+        data: categoryGoalSeries(trend, segment),
+        isGoal: true,
+        borderColor: getCss('--goal'), backgroundColor: 'transparent',
+        borderWidth: 4, tension: .35, pointRadius: 4, pointBackgroundColor: getCss('--goal'), pointBorderColor: getCss('--card'), pointBorderWidth: 2,
         fill: false, yAxisID: 'y1', order: 1
         }
         ];
         if (withSapLine) {
         datasets.push({
-        type: 'line', label: 'SAP escaneado (aprox.)',
+        type: 'line', label: 'SAP scanned (approx.)',
         data: categoryCumulative(trend, 'sapProduction'),
         borderColor: getCss('--bad'), backgroundColor: 'transparent',
         borderDash: [2, 3], tension: .35, pointRadius: 2, fill: false,
@@ -1523,16 +1577,17 @@
         });
         }
         return {
+        plugins: [goalGlowPlugin],
         data: { labels: trend.map(h => h.hour), datasets },
         options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         animation: { duration: 400 },
-        plugins: { legend: { labels: { color: getCss('--text-dim'), font: { size: 11, weight: '600' }, boxWidth: 11 } } },
+        plugins: { legend: { position: 'bottom', labels: { color: getCss('--text'), font: { size: 13, weight: '700' }, boxWidth: 22, boxHeight: 5 } } },
         scales: {
-        x: { ticks: { color: getCss('--text-dim'), font: { size: 11 } }, grid: { color: getCss('--grid-line') } },
-        y: { position: 'left', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 11 } }, grid: { color: getCss('--grid-line') } },
-        y1: { position: 'right', beginAtZero: true, ticks: { color: getCss('--text-dim'), font: { size: 11 } }, grid: { display: false } }
+        x: { title: { display: true, text: 'Shift hour', color: getCss('--text-dim'), font: { size: 13, weight: '700' } }, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
+        y: { position: 'left', beginAtZero: true, title: { display: true, text: 'Pieces / hour', color: getCss('--text-dim'), font: { size: 13, weight: '700' } }, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { color: getCss('--grid-line') } },
+        y1: { position: 'right', beginAtZero: true, title: { display: true, text: 'Shift accumulated (pieces)', color: getCss('--text-dim'), font: { size: 13, weight: '700' } }, ticks: { color: getCss('--text-dim'), font: { size: 13 } }, grid: { display: false } }
         }
         }
         };
@@ -1540,13 +1595,13 @@
 
         function renderTrendsScreen() {
         const specs = [
-        { id: 'chart-cb', trend: snapshot.coreBuilderHourlyTrend || [], sap: false },
-        { id: 'chart-be', trend: snapshot.backEndHourlyTrend || [], sap: true },
-        { id: 'chart-cs', trend: snapshot.clamShellHourlyTrend || [], sap: false },
-        { id: 'chart-tm', trend: snapshot.tubeMillsHourlyTrend || [], sap: false }
+        { id: 'chart-cb', trend: snapshot.coreBuilderHourlyTrend || [], sap: false, seg: 'coreBuilder' },
+        { id: 'chart-be', trend: snapshot.backEndHourlyTrend || [], sap: true, seg: 'backEnd' },
+        { id: 'chart-cs', trend: snapshot.clamShellHourlyTrend || [], sap: false, seg: 'clamShell' },
+        { id: 'chart-tm', trend: snapshot.tubeMillsHourlyTrend || [], sap: false, seg: 'tubeMills' }
         ];
         specs.forEach(spec => {
-        const cfg = buildCategoryTrendConfig(spec.trend, spec.sap);
+        const cfg = buildCategoryTrendConfig(spec.trend, spec.sap, spec.seg);
         if (charts[spec.id]) {
         charts[spec.id].data = cfg.data;
         charts[spec.id].update('none');
@@ -1583,31 +1638,31 @@
         `<span class="fnum" style="display:inline-flex;width:22px;height:22px;border-radius:7px;background:${furnaceColor(f.furnaceId)};color:#06101f;align-items:center;justify-content:center;font-size:.75rem;">${fnumLabel(f.furnaceId)}</span> ${f.furnaceName}`;
 
         if (f.lines.length === 0) {
-        document.getElementById('drilldownChips').innerHTML = `<span class="chip">Sin producción planeada en el turno actual</span>`;
+        document.getElementById('drilldownChips').innerHTML = `<span class="chip">No planned production this shift</span>`;
         document.getElementById('drilldownBody').innerHTML = '';
         return;
         }
 
         document.getElementById('drilldownChips').innerHTML = `
-        <span class="chip">Producción: ${f.totalProduction.toLocaleString()}</span>
+        <span class="chip">Production: ${f.totalProduction.toLocaleString()}</span>
         <span class="chip">Plan: ${f.totalPlanned.toLocaleString()}</span>
         <span class="chip">OEE: ${pct(f.oee)}</span>
         <span class="chip">SAP: ${pct(f.sapPercent)}</span>
-        <span class="chip">${f.lines.filter(l => l.countsForStats).length} líneas</span>
-        ${f.lines.some(l => l.isUnplannedProduction) ? `<span class="chip chip-unplanned">⚠ ${f.lines.filter(l => l.isUnplannedProduction).length} no planeada(s)</span>` : ''}
+        <span class="chip">${f.lines.filter(l => l.countsForStats).length} lines</span>
+        ${f.lines.some(l => l.isUnplannedProduction) ? `<span class="chip chip-unplanned">⚠ ${f.lines.filter(l => l.isUnplannedProduction).length} non-planned</span>` : ''}
         `;
         const rows = [...f.lines].sort((a, b) => a.productOrder - b.productOrder).map(l => {
         const sapCell = l.excludedFromSap
         ? `<span class="sap-excluded">-</span>`
         : (l.total === 0 ? '0' : l.totalSap.toLocaleString());
         const nameCell = l.productListId > 0
-        ? `<a href="/Line/${l.productListId}" class="line-link" title="Ver TV de esta línea">${l.productDesc}</a>`
+        ? `<a href="/Line/${l.productListId}" class="line-link" title="View this line">${l.productDesc}</a>`
         : l.productDesc;
         if (l.isUnplannedProduction) {
         return `
         <tr class="unplanned-row">
         <td>${nameCell}</td>
-        <td><span class="unplanned-tag">⚠ PRODUCCIÓN NO PLANEADA</span></td>
+        <td><span class="unplanned-tag">⚠ NON PLANNED PRODUCTION</span></td>
         <td class="num">${l.total.toLocaleString()}</td>
         <td class="num">-</td>
         <td class="num">-</td>
@@ -1618,7 +1673,7 @@
         return `
         <tr class="no-prod-row">
         <td>${nameCell}</td>
-        <td><span class="no-prod-tag">LÍNEA SIN PRODUCCIÓN</span></td>
+        <td><span class="no-prod-tag">LINE WITH NO PRODUCTION</span></td>
         <td class="num">0</td>
         <td class="num">${l.accumulatedRate.toLocaleString()}</td>
         <td class="num">${l.plannedShift.toLocaleString()}</td>

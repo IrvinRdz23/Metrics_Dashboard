@@ -450,13 +450,31 @@
                 return { pts: snapshot.backEndHourlyTrend, label: 'BACK END', plan: snapshot.backEndPlanned, ok: true };
             return { pts: snapshot.hourlyTrend, label: 'NO PRODUCTION', plan: snapshot.totalPlanned, ok: false };
         }
+        // GOAL = 85% of what the SP says we should have by now (sum of accumulatedRate of the lines in this trend:
+        // Back End lines that count; for Tube Mills all counted lines). The server curve (plan x elapsed fraction)
+        // only gives the SHAPE: it is rescaled so its latest point equals that SP expected, same as the Line view.
+        function spExpectedNow() {
+            const counted = snapshot.lines.filter(l => l.countsForStats);
+            const inTrend = FURNACE_ID === 6 ? counted
+                : counted.filter(l => l.segment ? l.segment === 'backEnd' : (l.groupId !== 6 && l.groupId !== 7 && !l.excludedFromSap));
+            return inTrend.reduce((a, l) => a + (l.accumulatedRate || 0), 0);
+        }
+        function rescaledExpected(pts, targetNow) {
+            const vals = pts.map(h => h.expectedCumulative || 0);
+            let anchor = -1;
+            for (let i = vals.length - 1; i >= 0; i--) { if (vals[i] > 0) { anchor = i; break; } }
+            if (anchor < 0 || !(targetNow > 0)) return vals;
+            const k = targetNow / vals[anchor];
+            return vals.map(v => v * k);
+        }
         function trendSeries(src) {
             let run = 0;
+            const expected = rescaledExpected(src.pts, spExpectedNow());
             return {
                 labels: src.pts.map(h => h.hour),
                 perHour: src.pts.map(h => h.production),
                 acc: src.pts.map(h => (run += h.production)),
-                exp: src.pts.map(h => h.expectedCumulative * TARGET)
+                exp: expected.map(v => v * TARGET)
             };
         }
 
@@ -511,12 +529,10 @@
                 ? (FURNACE_ID === 6 ? 'Only Tube Mills' : 'Only Back End')
                 : 'Only Back End';
 
-            const lastAcc = s.acc.length ? s.acc[s.acc.length - 1] : 0;
-            const lastExp = s.exp.length ? s.exp[s.exp.length - 1] : 0;
-            // En vivo se compara contra la última hora con producción; en histórico, contra el cierre del turno.
-            let idx = s.exp.length - 1;
-            if (!IS_HISTORICAL) { for (let i = s.exp.length - 1; i >= 0; i--) { if (src.pts[i].production > 0) { idx = i; break; } } }
-            const nowAcc = s.acc[idx] ?? 0, nowExp = s.exp[idx] ?? 0, diff = nowAcc - nowExp;
+            // KPIs at the latest point: goal = 85% of the SP's expected accumulated (e.g. 0.85 x 273 = 232)
+            const idx = s.exp.length - 1;
+            const lastAcc = s.acc[idx] ?? 0;
+            const nowAcc = lastAcc, nowExp = s.exp[idx] ?? 0, diff = nowAcc - nowExp;
             document.getElementById('kAcc').textContent = fmt(lastAcc);
             document.getElementById('kExp').textContent = fmt(nowExp);
             document.getElementById('kExpL').textContent = 'Goal 85%';
